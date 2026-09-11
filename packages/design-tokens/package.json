@@ -1,0 +1,16 @@
+{
+  "name": "@tokoboss/design-tokens",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "scripts": {
+    "build": "echo \"Design tokens build stub\" && exit 0",
+    "lint": "echo \"Design tokens lint stub\" && exit 0",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

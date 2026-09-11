@@ -1,0 +1,16 @@
+{
+  "name": "@tokoboss/domain",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"Domain build stub\" && exit 0",
+    "lint": "echo \"Domain lint stub\" && exit 0",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
