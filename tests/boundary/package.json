@@ -1,0 +1,11 @@
+{
+  "name": "@tokoboss/boundary-tests",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node check-boundaries.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5"
+  }
+}
