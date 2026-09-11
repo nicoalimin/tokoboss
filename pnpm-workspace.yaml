@@ -3,3 +3,4 @@ packages:
   - 'mobile'
   - 'infra/*'
   - 'packages/*'
+  - 'tests/*'

@@ -9,6 +9,8 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "test:boundaries": "pnpm --filter @tokoboss/boundary-tests test",
+    "test:example": "pnpm --filter @tokoboss/example-use-case-test test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\""
   },
