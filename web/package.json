@@ -11,6 +11,7 @@
     "test": "echo \"No tests yet\" && exit 0"
   },
   "dependencies": {
+    "@tokoboss/design-tokens": "workspace:*",
     "next": "^15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -19,8 +20,11 @@
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.6",
     "@types/react-dom": "^19.0.2",
+    "autoprefixer": "^10.5.6",
     "eslint": "^9.18.0",
     "eslint-config-next": "^15.1.6",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^3.4.19",
     "typescript": "^5.7.3"
   }
 }
