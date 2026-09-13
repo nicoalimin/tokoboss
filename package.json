@@ -11,6 +11,12 @@
     "test": "pnpm -r test",
     "test:boundaries": "pnpm --filter @tokoboss/boundary-tests test",
     "test:example": "pnpm --filter @tokoboss/example-use-case-test test",
+    "test:transaction": "pnpm --filter @tokoboss/db-transaction-test test",
+    "db:generate": "pnpm --filter @tokoboss/database db:generate",
+    "db:check": "pnpm --filter @tokoboss/database db:check",
+    "db:migrate": "pnpm --filter @tokoboss/database db:migrate",
+    "db:migrate:prod": "pnpm --filter @tokoboss/database db:migrate:prod",
+    "db:seed": "pnpm --filter @tokoboss/database db:seed",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\""
   },

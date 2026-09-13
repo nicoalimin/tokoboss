@@ -8,9 +8,24 @@
     "build": "echo \"Database build stub\" && exit 0",
     "lint": "echo \"Database lint stub\" && exit 0",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"No tests yet\" && exit 0"
+    "test": "echo \"No tests yet\" && exit 0",
+    "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check && tsx ./src/scripts/check.ts",
+    "db:migrate": "tsx ./src/scripts/migrate.ts",
+    "db:migrate:prod": "tsx ./src/scripts/migrate.ts --allow-production",
+    "db:seed": "tsx ./src/scripts/seed.ts",
+    "db:seed:dry-run": "tsx ./src/scripts/seed.ts --dry-run"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "@tokoboss/domain": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
 }

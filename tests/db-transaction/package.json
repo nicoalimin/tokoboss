@@ -1,0 +1,17 @@
+{
+  "name": "@tokoboss/db-transaction-test",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Transaction integration test through the DatabasePort (UTA-10)",
+  "scripts": {
+    "test": "tsx run-transaction.ts"
+  },
+  "dependencies": {
+    "@tokoboss/database": "workspace:*",
+    "@tokoboss/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2"
+  }
+}
