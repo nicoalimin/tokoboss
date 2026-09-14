@@ -44,3 +44,6 @@ Thumbs.db
 
 # Vercel
 .vercel
+
+# Devbox
+.devbox-worktrees
