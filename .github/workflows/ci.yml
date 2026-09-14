@@ -87,8 +87,8 @@ jobs:
         run: |
           set -euo pipefail
           # The fixture contains a forbidden `next` import in a domain-like file.
-          # Exit code 1 here PROVES the gate bites; `&& exit 1` below inverts it
-          # so this step passes only when the violation was caught.
+          # The checker must exit 1 on it; the if/else inverts that result so
+          # this step passes only when the violation was caught.
           if node tests/boundary/check-boundaries.js --path tests/boundary/fixtures/bad; then
             echo "❌ gate-proof: checker PASSED on a deliberate violation — gate is broken"
             exit 1
