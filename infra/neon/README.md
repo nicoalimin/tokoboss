@@ -55,6 +55,21 @@ History is visible in the `drizzle.__drizzle_migrations` table on the branch.
 whole migrate step. Concurrent deploys targeting the same branch serialize; the
 lock is session-scoped and always released (`finally`), even on failure.
 
+## Production migrations (automated)
+
+The `.github/workflows/production-migrate.yml` workflow automatically runs
+migrations on every push to `main`. It requires:
+
+- **GitHub secret**: `NEON_PRODUCTION_DATABASE_URL` — the **direct** (non-pooled)
+  Neon connection URL for the production branch:
+  ```
+  postgresql://user:pass@ep-xxx.neon.tech/tokoboss?sslmode=require
+  ```
+  (NOT the `-pooler` URL; migrations require the direct endpoint for advisory locks)
+
+The workflow is idempotent and protected by the advisory lock, so concurrent
+pushes serialize safely. Manual re-runs are available via `workflow_dispatch`.
+
 ## What lives where
 
 - `infra/drizzle/` — committed migration SQL + journal (the pipeline).
