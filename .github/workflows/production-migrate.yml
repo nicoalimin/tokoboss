@@ -1,0 +1,56 @@
+name: production-migrate
+
+# Automatically run database migrations on every push to main.
+#
+# Required GitHub secret:
+# - NEON_PRODUCTION_DATABASE_URL: Direct (non-pooled) Neon connection URL
+#   for the production branch. Example format:
+#   postgresql://user:pass@ep-xxx.neon.tech/tokoboss?sslmode=require
+#   (NOT the -pooler URL; migrations require the direct endpoint)
+#
+# The migrate script uses an advisory lock to serialize concurrent runs
+# and is idempotent (safe to re-run). See packages/database/README.md
+# and infra/drizzle/README.md for details.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production-migrate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: migrate production database
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_ENV: production
+      ALLOW_PROD_MIGRATE: 'true'
+      DATABASE_URL: ${{ secrets.NEON_PRODUCTION_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run production migrations
+        run: pnpm --filter @tokoboss/database db:migrate:prod
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Production migration (push to main)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Outcome: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Migration history is in \`drizzle.__drizzle_migrations\` on the production branch." >> "$GITHUB_STEP_SUMMARY"
