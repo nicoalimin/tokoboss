@@ -1,0 +1,45 @@
+name: db-check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  db:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Migration consistency check
+        run: pnpm --filter @tokoboss/database db:check
+
+      - name: Detect schema drift / uncommitted generated migration
+        run: |
+          pnpm --filter @tokoboss/database db:generate
+          git diff --exit-code -- infra/drizzle || (
+            echo "::error::Schema drift detected: schema changed without committing the generated migration. Run 'pnpm db:generate' in packages/database and commit the result."
+            exit 1
+          )
+
+      - name: Database tests (transaction integration, no prod credentials)
+        run: pnpm --filter @tokoboss/database test
+        env:
+          DATABASE_URL: ''
+
+      - name: Boundary tests
+        run: pnpm test:boundaries
