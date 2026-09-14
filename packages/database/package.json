@@ -17,6 +17,7 @@
     "db:seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
+    "@tokoboss/application": "workspace:*",
     "@tokoboss/domain": "workspace:*",
     "drizzle-orm": "^0.44.2",
     "postgres": "^3.4.5"

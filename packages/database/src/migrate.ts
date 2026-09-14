@@ -5,7 +5,7 @@ import path from 'node:path';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate as drizzleMigrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
-import { schema } from './schema/index.js';
+import { schema } from './schema/index';
 
 export const MIGRATION_ADVISORY_LOCK_KEY = 'tokoboss_migrations';
 /** History table written by the drizzle migrator (schema-qualified). */

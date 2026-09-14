@@ -1,6 +1,6 @@
 import { index, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
-import { tenants } from './tenants.js';
-import { utcCreatedAt, uuidPk } from './helpers.js';
+import { tenants } from './tenants';
+import { utcCreatedAt, uuidPk } from './helpers';
 
 /**
  * Audit events — append-only log owned by a tenant.

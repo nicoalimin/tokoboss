@@ -12,8 +12,8 @@ import {
   diffMigrationHashes,
   formatMigrationStatus,
   getMigrationFileHash,
-} from '../migrate.js';
-import { assertSeedAllowed } from '../seed.js';
+} from '../migrate';
+import { assertSeedAllowed } from '../seed';
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../../../infra/drizzle');
 

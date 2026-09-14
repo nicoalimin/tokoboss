@@ -1,8 +1,8 @@
 import type { Repository } from '@tokoboss/domain';
 import { eq } from 'drizzle-orm';
-import type { DatabaseHandle, Transaction } from '../db.js';
-import { auditEvents, tenants } from '../schema/index.js';
-import type { NewAuditEventRow } from '../schema/index.js';
+import type { DatabaseHandle, Transaction } from '../db';
+import { auditEvents, tenants } from '../schema/index';
+import type { NewAuditEventRow } from '../schema/index';
 
 export interface TenantEntity {
   id: string;
