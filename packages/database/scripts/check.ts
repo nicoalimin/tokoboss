@@ -54,10 +54,45 @@ async function main(): Promise<void> {
     path.join(migrationsDir, 'meta', '_journal.json'),
     'utf8'
   );
-  const journal = JSON.parse(raw) as { entries: Array<{ tag: string }> };
+  const journal = JSON.parse(raw) as {
+    entries: Array<{ idx: number; tag: string }>;
+  };
   const journalTags = journal.entries.map((e) => `${e.tag}.sql`).sort();
 
   let ok = true;
+
+  // Journal idx must be 0..n-1 in order (drizzle-kit convention). A gap or
+  // 1-based start breaks future `generate` sequencing and the AGENTS.md
+  // gap-free rule, so fail here instead of shipping a permanent wart.
+  const ordered = [...journal.entries].sort((a, b) => a.idx - b.idx);
+  ordered.forEach((entry, position) => {
+    if (entry.idx !== position) {
+      console.error(
+        `Journal idx gap/dupe: position ${position} has idx=${entry.idx} (tag=${entry.tag}). Fix meta/_journal.json (branch entries move after main; never renumber main).`
+      );
+      ok = false;
+    }
+    const expectedFile = `${entry.tag}.sql`;
+    if (!sqlFiles.includes(expectedFile)) {
+      console.error(
+        `Journal entry idx=${entry.idx} (tag=${entry.tag}) expects file ${expectedFile}, which is missing or misnamed.`
+      );
+      ok = false;
+    }
+    // drizzle-kit names tags `NNNN_name` with NNNN == idx+1; enforce the
+    // coupling so renumbering mistakes (AGENTS.md rebase rule) fail fast.
+    const expectedPrefix = String(entry.idx + 1).padStart(4, '0');
+    if (!entry.tag.startsWith(`${expectedPrefix}_`)) {
+      console.error(
+        `Journal entry idx=${entry.idx} has tag=${entry.tag}, expected prefix ${expectedPrefix}_ (tag sequence must match idx+1).`
+      );
+      ok = false;
+    }
+  });
+  if (new Set(journal.entries.map((e) => e.tag)).size !== journal.entries.length) {
+    console.error('Journal has duplicate tags — each migration tag must be unique.');
+    ok = false;
+  }
 
   const missing = sqlFiles.filter((f) => !journalTags.includes(f));
   const extra = journalTags.filter((f) => !sqlFiles.includes(f));

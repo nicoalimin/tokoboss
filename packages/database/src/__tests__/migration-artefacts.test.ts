@@ -97,9 +97,21 @@ describe('committed migration artefacts', () => {
       path.join(MIGRATIONS_DIR, 'meta', '_journal.json'),
       'utf8'
     );
-    const journal = JSON.parse(raw) as { entries: Array<{ tag: string }> };
+    const journal = JSON.parse(raw) as {
+      entries: Array<{ idx: number; tag: string }>;
+    };
     const journalFiles = journal.entries.map((e) => `${e.tag}.sql`).sort();
     expect(journalFiles).toEqual(sqlFiles);
+
+    // Journal idx must be 0..n-1 in order with NNNN filenames matching
+    // idx+1 (drizzle-kit convention; see scripts/check.ts, the CI twin).
+    const ordered = [...journal.entries].sort((a, b) => a.idx - b.idx);
+    ordered.forEach((entry, position) => {
+      expect(entry.idx).toBe(position);
+      expect(sqlFiles).toContain(`${entry.tag}.sql`);
+      // Tag sequence prefix must match idx+1 (drizzle-kit convention).
+      expect(entry.tag.startsWith(`${String(entry.idx + 1).padStart(4, '0')}_`)).toBe(true);
+    });
 
     const seqs = sqlFiles.map((f) => f.slice(0, 4));
     expect(new Set(seqs).size).toBe(seqs.length);
