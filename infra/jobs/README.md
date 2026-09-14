@@ -38,8 +38,9 @@ curl -X POST localhost:3000/api/jobs/hello \
   -d '{"idempotencyKey":"demo-retry","failStepOnce":true}'
 # → 202, status `waiting`, timeline ends with a `retry` event.
 
-# After the backoff (or immediately in tests), reconcile re-runs the
+# After the backoff (~5s for the first attempt), reconcile re-runs the
 # workflow; it observes the `retry` event, skips the failure, and completes:
+sleep 6
 curl -X POST localhost:3000/api/jobs/reconcile \
   -H 'x-workspace-id: ws_local'
 ```
