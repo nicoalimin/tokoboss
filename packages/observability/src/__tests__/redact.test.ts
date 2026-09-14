@@ -89,4 +89,12 @@ describe('redact', () => {
       ])
     ).toThrow();
   });
+
+  it('collapses circular references instead of recursing forever', () => {
+    const cyclic: Record<string, unknown> = { orderId: 'ORD-1' };
+    cyclic.self = cyclic;
+    const out = redact(cyclic) as Record<string, unknown>;
+    expect(out.orderId).toBe('ORD-1');
+    expect(out.self).toBe(REDACTED);
+  });
 });

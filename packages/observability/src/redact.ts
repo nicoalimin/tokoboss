@@ -44,25 +44,29 @@ function redactDatabaseUrlToHost(value: string): string {
 }
 
 function redactStringByValue(key: string, value: string): string {
-  let out = value;
-  if (POSTGRES_RE.test(value)) {
-    out = out.replace(POSTGRES_RE, (m) => redactDatabaseUrlToHost(m));
-  }
-  // Reset stateful global regexes before reuse.
-  out = out
+  // `replace` with a global regex always scans from index 0, so no
+  // lastIndex bookkeeping is needed here.
+  const out = value
+    .replace(POSTGRES_RE, (m) => redactDatabaseUrlToHost(m))
     .replace(EMAIL_RE, REDACTED)
     .replace(BEARER_RE, REDACTED)
     .replace(PHONE_RE, REDACTED)
     .replace(NIK_RE, REDACTED);
   // Only scrub long opaque secrets when the key already looks sensitive or
   // blob-like; otherwise long hex (e.g. a commit SHA) is useful diagnostics.
-  if (SENSITIVE_KEY.test(key) || BLOB_KEY.test(key)) {
-    out = out.replace(LONG_HEX_RE, REDACTED);
-  }
-  return out;
+  const scrubbed =
+    SENSITIVE_KEY.test(key) || BLOB_KEY.test(key)
+      ? out.replace(LONG_HEX_RE, REDACTED)
+      : out;
+  return scrubbed;
 }
 
-function redactKeyValue(key: string, value: unknown, depth: number): unknown {
+function redactKeyValue(
+  key: string,
+  value: unknown,
+  depth: number,
+  seen: WeakSet<object>
+): unknown {
   if (SENSITIVE_KEY.test(key) || RAW_PAYLOAD_KEY.test(key)) return REDACTED;
   if (PII_KEY.test(key)) return REDACTED;
   if (BLOB_KEY.test(key)) {
@@ -77,16 +81,24 @@ function redactKeyValue(key: string, value: unknown, depth: number): unknown {
     }
     return REDACTED_BLOB_PATH;
   }
-  return redactUnknown(value, depth);
+  return redactUnknown(value, depth, seen);
 }
 
-function redactUnknown(value: unknown, depth: number): unknown {
+function redactUnknown(
+  value: unknown,
+  depth: number,
+  seen: WeakSet<object>
+): unknown {
   if (depth > 6) return REDACTED;
   if (value === null || value === undefined) return value;
   if (typeof value === 'string') return redactStringByValue('', value);
   if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (typeof value === 'object') {
+    if (seen.has(value)) return REDACTED;
+    seen.add(value);
+  }
   if (Array.isArray(value)) {
-    return value.map((v) => redactUnknown(v, depth + 1));
+    return value.map((v) => redactUnknown(v, depth + 1, seen));
   }
   if (typeof value === 'object') {
     const out: Record<string, unknown> = {};
@@ -100,7 +112,7 @@ function redactUnknown(value: unknown, depth: number): unknown {
       ) {
         out[k] = redactStringByValue(k, v);
       } else {
-        out[k] = redactKeyValue(k, v, depth + 1);
+        out[k] = redactKeyValue(k, v, depth + 1, seen);
       }
     }
     return out;
@@ -109,12 +121,12 @@ function redactUnknown(value: unknown, depth: number): unknown {
 }
 
 /**
- * Redact any value for safe logging. Circular-safe (falls back to a
- * redacted placeholder on cycles).
+ * Redact any value for safe logging. Circular-safe: cycles collapse to
+ * `[REDACTED]` instead of recursing forever.
  */
 export function redact<T>(value: T): T {
   try {
-    return redactUnknown(value, 0) as T;
+    return redactUnknown(value, 0, new WeakSet()) as T;
   } catch {
     return REDACTED as unknown as T;
   }
@@ -128,9 +140,9 @@ export function redactFields(
 }
 
 /**
- * Assert a payload contains no obvious secret/PII leak. Used by health
- * endpoint tests: throws if `JSON.stringify(payload)` still matches a
- * sensitive value pattern.
+ * Assert a payload contains no obvious secret/PII leak. Throws if
+ * `JSON.stringify(payload)` still matches a sensitive value pattern or
+ * contains a known secret. Backs the CI `health` job's secret scan.
  */
 export function assertNoSecrets(
   payload: unknown,
