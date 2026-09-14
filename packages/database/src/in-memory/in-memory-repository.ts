@@ -4,7 +4,10 @@ import { BaseRepository } from '../repositories/index.js';
  * In-memory repository implementation
  * Useful for testing and demonstrations
  */
-export class InMemoryRepository<T extends { id: ID }, ID> extends BaseRepository<T, ID> {
+export class InMemoryRepository<
+  T extends { id: ID },
+  ID,
+> extends BaseRepository<T, ID> {
   private readonly store = new Map<ID, T>();
 
   async findById(id: ID): Promise<T | null> {

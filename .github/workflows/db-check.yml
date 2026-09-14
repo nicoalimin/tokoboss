@@ -1,0 +1,35 @@
+name: db-check
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  db-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck database package
+        run: pnpm --filter @tokoboss/database typecheck
+
+      - name: Database tests (PGlite, no credentials)
+        run: pnpm --filter @tokoboss/database test
+
+      - name: Drizzle drift check (schema vs committed SQL)
+        run: pnpm --filter @tokoboss/database db:check:kit
+
+      - name: Migration hygiene (journal sync, no uncommitted SQL)
+        run: pnpm --filter @tokoboss/database db:check
