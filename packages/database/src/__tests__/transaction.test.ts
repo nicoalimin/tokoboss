@@ -18,9 +18,9 @@ import { describe, expect, it } from 'vitest';
  * Migrator-level re-run safety comes from drizzle's `drizzle.__drizzle_migrations`
  * history table (see `getMigrationStatus`); the CLI reports "no pending work".
  */
-import { auditEvents, schema, tenants } from '../schema/index.js';
-import { DrizzleTenantRepository } from '../repositories/drizzle-tenant-repository.js';
-import { insertSyntheticSeed } from '../seed.js';
+import { auditEvents, schema, tenants } from '../schema/index';
+import { DrizzleTenantRepository } from '../repositories/drizzle-tenant-repository';
+import { insertSyntheticSeed } from '../seed';
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../../../infra/drizzle');
 

@@ -15,6 +15,13 @@
       "when": 1789301304748,
       "tag": "0002_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789384230152,
+      "tag": "0003_jobs_job_events",
+      "breakpoints": true
     }
   ]
 }

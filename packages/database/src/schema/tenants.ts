@@ -1,5 +1,5 @@
 import { pgTable, text } from 'drizzle-orm/pg-core';
-import { utcTimestamps, uuidPk } from './helpers.js';
+import { utcTimestamps, uuidPk } from './helpers';
 
 /**
  * Tenants — top-level isolation boundary.

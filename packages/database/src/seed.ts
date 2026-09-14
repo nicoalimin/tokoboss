@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
-import type { DatabaseHandle } from './db.js';
-import { auditEvents, tenants } from './schema/index.js';
+import type { DatabaseHandle } from './db';
+import { auditEvents, tenants } from './schema/index';
 
 export interface SyntheticSeedOptions {
   /** Number of synthetic tenants to create. Defaults to 3. */

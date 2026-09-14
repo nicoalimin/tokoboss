@@ -1,4 +1,4 @@
-import { BaseRepository } from '../repositories/index.js';
+import { BaseRepository } from '../repositories/index';
 
 /**
  * In-memory repository implementation

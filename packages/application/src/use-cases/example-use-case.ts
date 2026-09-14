@@ -1,6 +1,6 @@
 import type { Repository } from '@tokoboss/domain';
 import { Money, Quantity } from '@tokoboss/domain';
-import { UseCase, Result, Success, Failure } from './base-use-case.js';
+import { UseCase, Result, Success, Failure } from './base-use-case';
 
 /**
  * Example item for demonstration purposes

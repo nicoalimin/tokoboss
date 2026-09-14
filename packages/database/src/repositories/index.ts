@@ -1,2 +1,3 @@
-export * from './base-repository.js';
-export * from './drizzle-tenant-repository.js';
+export * from './base-repository';
+export * from './drizzle-tenant-repository';
+export * from './drizzle-job-repository';
