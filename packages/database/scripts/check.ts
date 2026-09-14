@@ -79,7 +79,9 @@ async function main(): Promise<void> {
     ok = false;
   }
 
-  if (!gitClean(root, ['infra/drizzle'])) {
+  // Only migration artefacts gate the pipeline — docs (README.md) and setup
+  // notes may change freely without tripping the check.
+  if (!gitClean(root, ['infra/drizzle/*.sql', 'infra/drizzle/meta'])) {
     console.error(
       'Commit generated migrations before pushing (generate → review → commit).'
     );

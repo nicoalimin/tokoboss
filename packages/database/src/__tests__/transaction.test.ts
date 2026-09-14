@@ -13,7 +13,10 @@ import { describe, expect, it } from 'vitest';
  * 2. A multi-table unit of work commits atomically via the
  *    `DrizzleTenantRepository` (domain `Repository` port).
  * 3. A failing unit of work rolls back (nothing visible afterwards).
- * 4. Re-applying the migration is safe (idempotent helper path).
+ * 4. The synthetic seed is idempotent and writes synthetic-only rows.
+ *
+ * Migrator-level re-run safety comes from drizzle's `drizzle.__drizzle_migrations`
+ * history table (see `getMigrationStatus`); the CLI reports "no pending work".
  */
 import { auditEvents, schema, tenants } from '../schema/index.js';
 import { DrizzleTenantRepository } from '../repositories/drizzle-tenant-repository.js';
@@ -59,7 +62,7 @@ describe('transaction integration (database port)', () => {
     try {
       const repo = new DrizzleTenantRepository(db);
       const created = await db.transaction(async (tx) =>
-        new DrizzleTenantRepository(tx as never).createWithAuditEvent(
+        new DrizzleTenantRepository(tx).createWithAuditEvent(
           { name: 'Acme', slug: 'acme' },
           { action: 'tenant.created', payload: { synthetic: true } }
         )
@@ -83,7 +86,7 @@ describe('transaction integration (database port)', () => {
     try {
       await expect(
         db.transaction(async (tx) => {
-          const repo = new DrizzleTenantRepository(tx as never);
+          const repo = new DrizzleTenantRepository(tx);
           await repo.createWithAuditEvent(
             { name: 'Doomed', slug: 'doomed' },
             { action: 'tenant.created' }
@@ -104,13 +107,13 @@ describe('transaction integration (database port)', () => {
     const { client, db } = await createMigratedDb();
     try {
       const first = await db.transaction((tx) =>
-        insertSyntheticSeed(tx as never, { tenantCount: 2 })
+        insertSyntheticSeed(tx, { tenantCount: 2 })
       );
       expect(first.tenantsCreated).toBe(2);
       expect(first.auditEventsCreated).toBe(2);
 
       const second = await db.transaction((tx) =>
-        insertSyntheticSeed(tx as never, { tenantCount: 2 })
+        insertSyntheticSeed(tx, { tenantCount: 2 })
       );
       expect(second.tenantsCreated).toBe(0);
       expect(second.slugs).toEqual(first.slugs);

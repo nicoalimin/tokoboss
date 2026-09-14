@@ -47,7 +47,7 @@ DATABASE_URL=postgresql://… pnpm --filter @tokoboss/database db:migrate
 APP_ENV=preview DATABASE_URL=postgresql://… pnpm --filter @tokoboss/database db:seed
 ```
 
-History is visible in the `__drizzle_migrations` table on the branch.
+History is visible in the `drizzle.__drizzle_migrations` table on the branch.
 
 ## Advisory lock
 

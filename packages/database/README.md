@@ -29,7 +29,7 @@ await db.close();
 - `src/schema/` — Drizzle tables + `helpers.ts` (UUID/UTC conventions, FK actions).
 - `src/db.ts` — `createDb()` adapter factory + `withTransaction` wrapper.
 - `src/migrate.ts` — advisory-locked migrator, `getMigrationStatus()`,
-  `__drizzle_migrations` history readers.
+  `drizzle.__drizzle_migrations` history readers.
 - `src/seed.ts` — deterministic synthetic seed (refuses `APP_ENV=production`).
 - `src/repositories/` — `DrizzleTenantRepository` (domain `Repository` port).
   Dialect-agnostic: works with postgres-js in production and PGlite in tests.

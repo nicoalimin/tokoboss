@@ -8,7 +8,11 @@ import { describe, expect, it } from 'vitest';
  */
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { formatMigrationStatus } from '../migrate.js';
+import {
+  diffMigrationHashes,
+  formatMigrationStatus,
+  getMigrationFileHash,
+} from '../migrate.js';
 import { assertSeedAllowed } from '../seed.js';
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../../../infra/drizzle');
@@ -44,6 +48,41 @@ describe('migration status reporting', () => {
         pending: ['0001_initial'],
       })
     ).toMatch(/Pending migrations/);
+  });
+});
+
+describe('migration content hashes (status truthfulness)', () => {
+  it('hashes the committed file deterministically (sha256 hex)', async () => {
+    const first = await getMigrationFileHash('0001_initial', MIGRATIONS_DIR);
+    const second = await getMigrationFileHash('0001_initial', MIGRATIONS_DIR);
+    expect(first).toMatch(/^[0-9a-f]{64}$/);
+    expect(second).toBe(first);
+  });
+
+  it('agrees with the hash drizzle itself records in history', async () => {
+    // getMigrationStatus must match what the migrator writes to
+    // drizzle.__drizzle_migrations, otherwise a successful migrate would
+    // falsely report pending work. Compare against drizzle's own reader.
+    const { readMigrationFiles } = await import('drizzle-orm/migrator');
+    const [entry] = readMigrationFiles({ migrationsFolder: MIGRATIONS_DIR });
+    expect(entry).toBeDefined();
+    await expect(
+      getMigrationFileHash('0001_initial', MIGRATIONS_DIR)
+    ).resolves.toBe(entry?.hash);
+  });
+
+  it('diffs applied vs pending by content hash, not tag', () => {
+    const known = [
+      { tag: '0001_initial', hash: 'aaa' },
+      { tag: '0002_add_x', hash: 'bbb' },
+    ];
+    expect(diffMigrationHashes(known, ['aaa', 'bbb']).pending).toEqual([]);
+    expect(diffMigrationHashes(known, ['aaa']).pending).toEqual(['0002_add_x']);
+    // Same tag, different content (edited after apply) → pending again.
+    expect(
+      diffMigrationHashes([{ tag: '0001_initial', hash: 'changed' }], ['aaa'])
+        .pending
+    ).toEqual(['0001_initial']);
   });
 });
 

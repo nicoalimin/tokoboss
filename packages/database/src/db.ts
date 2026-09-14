@@ -8,6 +8,25 @@ export type Database = PostgresJsDatabase<typeof schema>;
 /** Logical unit of work passed to {@link withTransaction} callbacks. */
 export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 
+/**
+ * Structural query surface shared by the postgres-js adapter and the PGlite
+ * test adapter (`drizzle-orm/postgres-js` vs `drizzle-orm/pglite`).
+ * Builders stay `any` so this port is dialect-agnostic; inputs and outputs
+ * are typed at each method boundary instead.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnyQueryBuilder = any;
+export interface DatabaseHandle {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  select: (...args: any[]) => AnyQueryBuilder;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  insert: (...args: any[]) => AnyQueryBuilder;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  update: (...args: any[]) => AnyQueryBuilder;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  delete: (...args: any[]) => AnyQueryBuilder;
+}
+
 export interface DbHandle {
   db: Database;
   /** Raw postgres.js client — call `close()` on shutdown. */

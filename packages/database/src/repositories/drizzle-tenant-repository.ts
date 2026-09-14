@@ -1,6 +1,6 @@
 import type { Repository } from '@tokoboss/domain';
 import { eq } from 'drizzle-orm';
-import type { Transaction } from '../db.js';
+import type { DatabaseHandle, Transaction } from '../db.js';
 import { auditEvents, tenants } from '../schema/index.js';
 import type { NewAuditEventRow } from '../schema/index.js';
 
@@ -12,26 +12,7 @@ export interface TenantEntity {
   updatedAt: Date;
 }
 
-/**
- * Structural query surface shared by the postgres-js adapter and the PGlite
- * test adapter (`drizzle-orm/postgres-js` vs `drizzle-orm/pglite`).
- * `any`-typed builders keep this port dialect-agnostic; inputs and outputs
- * stay typed via `TenantEntity` / row types at the method boundaries.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyQueryBuilder = any;
-interface DialectAgnosticDb {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  select: (...args: any[]) => AnyQueryBuilder;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  insert: (...args: any[]) => AnyQueryBuilder;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  update: (...args: any[]) => AnyQueryBuilder;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  delete: (...args: any[]) => AnyQueryBuilder;
-}
-
-type DbOrTx = Transaction | DialectAgnosticDb;
+type DbOrTx = Transaction | DatabaseHandle;
 
 function toEntity(row: typeof tenants.$inferSelect): TenantEntity {
   return {

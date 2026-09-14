@@ -36,7 +36,7 @@ generate → review → test → migrate
 - **Never renumber `main`.** On rebase conflicts, branch migrations move after
   `main` (`max+1, …`), then update `meta/_journal.json` (see `AGENTS.md`).
 - **Re-running migrate is safe.** The migrator tracks applied migrations in the
-  `__drizzle_migrations` history table and reports `no pending work` when converged.
+  `drizzle.__drizzle_migrations` history table and reports `no pending work` when converged.
 - **One migrator at a time.** Every migrate acquires
   `pg_advisory_lock(hashtext('tokoboss_migrations'))` and releases it afterwards,
   so concurrent deploys serialize instead of racing.
@@ -55,7 +55,7 @@ generate → review → test → migrate
 ## Migration history
 
 - Source of truth in git: `infra/drizzle/meta/_journal.json`.
-- Source of truth in the database: the `__drizzle_migrations` table (written by the
+- Source of truth in the database: the `drizzle.__drizzle_migrations` table (written by the
   migrator; never edit by hand).
 - `getMigrationStatus()` diffs the two; `db:check` (CI) fails when the journal and
   the `NNNN_*.sql` files disagree, when sequence numbers duplicate, or when

@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import type { Transaction } from './db.js';
+import type { DatabaseHandle } from './db.js';
 import { auditEvents, tenants } from './schema/index.js';
 
 export interface SyntheticSeedOptions {
@@ -33,10 +33,10 @@ export function assertSeedAllowed(appEnv: string | undefined): void {
 /**
  * Insert deterministic synthetic rows (no production data, no credentials).
  * Idempotent on `slug`: re-running skips existing tenants.
- * Must be called inside a transaction for atomicity — see `seedSynthetic`.
+ * Call inside a transaction (`withTransaction`) for atomicity.
  */
 export async function insertSyntheticSeed(
-  tx: Transaction,
+  tx: DatabaseHandle,
   options: SyntheticSeedOptions = {}
 ): Promise<SyntheticSeedResult> {
   const tenantCount = options.tenantCount ?? 3;
@@ -65,7 +65,9 @@ export async function insertSyntheticSeed(
         .insert(tenants)
         .values({ name, slug })
         .returning({ id: tenants.id });
-      tenantId = inserted[0]?.id ?? '';
+      const row = inserted[0];
+      if (!row) throw new Error(`Failed to insert synthetic tenant ${slug}`);
+      tenantId = row.id;
       tenantsCreated += 1;
     }
 
