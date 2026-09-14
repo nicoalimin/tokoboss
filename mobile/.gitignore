@@ -10,4 +10,5 @@ npm-debug.*
 *.mobileprovision
 *.orig.*
 web-build/
+.env
 .env*.local
