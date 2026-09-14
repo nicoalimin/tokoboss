@@ -53,3 +53,8 @@ Production migrate is intentionally awkward — it must be:
 ```bash
 APP_ENV=production ALLOW_PROD_MIGRATE=true DATABASE_URL=… pnpm --filter @tokoboss/database db:migrate:prod
 ```
+
+## Smoke retest note
+
+Post-#16/#17 pipeline check: worktree recreated cleanly, `db:check` +
+`drizzle-kit check` + vitest re-run green on this branch. No product change.
