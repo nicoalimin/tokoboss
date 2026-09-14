@@ -116,8 +116,9 @@ jobs:
       - run: pnpm --filter @tokoboss/web build
 
   mobile-checks:
-    # UTA-13 owns the mobile scaffold; baseline only runs its existing
-    # lint/typecheck so a broken scaffold blocks CI without a full Expo build.
+    # UTA-13 owns the mobile scaffold: lint, typecheck, and the vitest
+    # suite (contract-validated client, secure session, device stubs,
+    # guardrails). Full EAS builds stay manual until signing secrets exist.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -132,6 +133,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tokoboss/mobile lint
       - run: pnpm --filter @tokoboss/mobile typecheck
+      - run: pnpm --filter @tokoboss/mobile test
 
   failure-proof:
     # Negative controls: each gate must FAIL on a deliberately broken
