@@ -8,9 +8,24 @@
     "build": "echo \"Database build stub\" && exit 0",
     "lint": "echo \"Database lint stub\" && exit 0",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"No tests yet\" && exit 0"
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate --config ./drizzle.config.ts",
+    "db:check": "tsx scripts/check.ts",
+    "db:check:kit": "drizzle-kit check --config ./drizzle.config.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:migrate:prod": "tsx scripts/migrate-prod.ts",
+    "db:seed": "tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@tokoboss/domain": "workspace:*",
+    "drizzle-orm": "^0.44.2",
+    "postgres": "^3.4.5"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "@electric-sql/pglite": "^0.2.17",
+    "drizzle-kit": "^0.31.1",
+    "tsx": "^4.19.4",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.4"
   }
 }
