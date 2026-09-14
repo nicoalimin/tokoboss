@@ -1,8 +1,10 @@
 /**
  * Synthetic seed (UTA-10).
  *
- * Generates deterministic, obviously-fake data (`SEED_` names, `seed.*`
- * event types) so seeded rows can never be mistaken for real data.
+ * Generates reproducible, obviously-fake data (`SEED_` names, `seed.*`
+ * event types, fixed counts) so seeded rows can never be mistaken for
+ * real data. Row IDs are random UUIDs so re-running the seed never
+ * collides on primary keys.
  *
  * Safety rules (acceptance criterion: no production data/credentials in
  * tests or seeds):
