@@ -1,0 +1,197 @@
+name: ci
+
+# UTA-12 baseline quality gates: from a clean checkout — install, lint,
+# package boundary checks, typecheck, unit tests, migration/db checks, and
+# applicable web (+ mobile scaffold) builds. The `failure-proof` job injects
+# deliberately broken fixtures and asserts each gate blocks them; `health`
+# boots the built web app and asserts the endpoints are secret-free and
+# correlation ids join request -> job logs end to end.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:boundaries
+      - run: pnpm test:example
+
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+  migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck database package
+        run: pnpm --filter @tokoboss/database typecheck
+      - name: Database tests (PGlite, no credentials)
+        run: pnpm --filter @tokoboss/database test
+      - name: Drizzle drift check (schema vs committed SQL)
+        run: pnpm --filter @tokoboss/database db:check:kit
+      - name: Migration hygiene (journal sync, no uncommitted SQL)
+        run: pnpm --filter @tokoboss/database db:check
+
+  web-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tokoboss/web build
+
+  mobile-checks:
+    # UTA-13 owns the mobile scaffold; baseline only runs its existing
+    # lint/typecheck so a broken scaffold blocks CI without a full Expo build.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tokoboss/mobile lint
+      - run: pnpm --filter @tokoboss/mobile typecheck
+
+  failure-proof:
+    # Negative controls: each gate must FAIL on a deliberately broken
+    # fixture. If a gate ever passes broken input, this job goes red.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node infra/observability/ci-failure-proof.mjs
+
+  health:
+    needs: [web-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_ENV: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tokoboss/web build
+      - name: Boot built web app and assert secret-free correlated endpoints
+        run: |
+          cd web
+          (npx next start -p 3107 > "$RUNNER_TEMP/health.log" 2>&1 & echo $! > "$RUNNER_TEMP/health.pid")
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3107/api/health && break
+            sleep 2
+          done
+          echo "--- /api/health ---"
+          HEALTH=$(curl -s http://localhost:3107/api/health)
+          echo "$HEALTH"
+          echo "$HEALTH" | grep -q '"status":"ok"'
+          echo "--- /api/ready ---"
+          READY=$(curl -s http://localhost:3107/api/ready)
+          echo "$READY"
+          echo "$READY" | grep -q '"status":"ready"'
+          echo "--- POST /api/jobs/sample ---"
+          JOB=$(curl -s -X POST http://localhost:3107/api/jobs/sample -H 'content-type: application/json' -d '{"task":"reconcile-sample"}')
+          echo "$JOB"
+          CORR=$(echo "$JOB" | grep -o '"correlationId":"[^"]*"' | cut -d'"' -f4)
+          test -n "$CORR"
+          echo "correlationId=$CORR"
+          sleep 1
+          echo "--- server log correlation ---"
+          grep -q "$CORR" "$RUNNER_TEMP/health.log"
+          echo "--- secret scan (must be empty) ---"
+          ! grep -Ei 'postgres://[^ ]*:[^ @]+@|sk-[A-Za-z0-9]|Bearer [A-Za-z0-9._~+/-]{8,}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' "$RUNNER_TEMP/health.log"
+          kill "$(cat "$RUNNER_TEMP/health.pid")" || true
