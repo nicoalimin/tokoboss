@@ -1,0 +1,16 @@
+{
+  "name": "@tokoboss/neon-preview",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Neon preview-branch lifecycle for Vercel PR previews (UTA-11)",
+  "type": "module",
+  "scripts": {
+    "build": "echo \"Neon preview scripts (no build step)\" && exit 0",
+    "lint": "echo \"Neon preview lint stub\" && exit 0",
+    "typecheck": "echo \"Neon preview typecheck stub (plain Node, no tsc project)\" && exit 0",
+    "test": "node --test preview-lib.test.mjs",
+    "preview:setup": "node preview-setup.mjs",
+    "preview:cleanup": "node preview-cleanup.mjs",
+    "preview:reconcile": "node preview-reconcile.mjs"
+  }
+}
