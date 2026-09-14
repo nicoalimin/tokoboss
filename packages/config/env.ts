@@ -7,13 +7,22 @@ import { z } from 'zod';
  * - Preview: PR preview deployments
  * - Local: development machines
  */
-export const AppEnvironment = z.enum(['production', 'staging', 'preview', 'local']);
+export const AppEnvironment = z.enum([
+  'production',
+  'staging',
+  'preview',
+  'local',
+]);
 export type AppEnvironment = z.infer<typeof AppEnvironment>;
 
 /**
  * Vercel-specific environment values
  */
-export const VercelEnvironment = z.enum(['production', 'preview', 'development']);
+export const VercelEnvironment = z.enum([
+  'production',
+  'preview',
+  'development',
+]);
 export type VercelEnvironment = z.infer<typeof VercelEnvironment>;
 
 /**
@@ -27,7 +36,7 @@ const publicEnvSchema = z.object({
     .optional()
     .default('http://localhost:3000')
     .describe('Public URL of the application'),
-  
+
   NEXT_PUBLIC_APP_ENV: z
     .enum(['production', 'staging', 'preview', 'local'])
     .optional()
@@ -39,21 +48,48 @@ const publicEnvSchema = z.object({
  * These must NEVER be exposed to the client bundle
  */
 const serverEnvSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  
+  NODE_ENV: z
+    .enum(['development', 'production', 'test'])
+    .default('development'),
+
   // Vercel deployment metadata (automatically set by Vercel)
   VERCEL_ENV: VercelEnvironment.optional().describe('Vercel environment type'),
-  VERCEL_DEPLOYMENT_ID: z.string().optional().describe('Unique deployment ID from Vercel'),
-  VERCEL_GIT_COMMIT_SHA: z.string().optional().describe('Git commit SHA of the deployment'),
-  VERCEL_REGION: z.string().optional().describe('Vercel region where the function executes'),
-  VERCEL_URL: z.string().optional().describe('Deployment URL provided by Vercel'),
-  
+  VERCEL_DEPLOYMENT_ID: z
+    .string()
+    .optional()
+    .describe('Unique deployment ID from Vercel'),
+  VERCEL_GIT_COMMIT_SHA: z
+    .string()
+    .optional()
+    .describe('Git commit SHA of the deployment'),
+  VERCEL_REGION: z
+    .string()
+    .optional()
+    .describe('Vercel region where the function executes'),
+  VERCEL_URL: z
+    .string()
+    .optional()
+    .describe('Deployment URL provided by Vercel'),
+
   // Phase 0: Minimal required vars for bootstrap
-  // Note: Additional secrets will be required when UTA-10 lands (Neon DB, Vercel Blob, etc.)
   APP_ENV: z
     .enum(['production', 'staging', 'preview', 'local'])
     .optional()
     .describe('Application environment override'),
+
+  // UTA-10: Neon Postgres connection strings (validated as URLs when set)
+  DATABASE_URL: z
+    .string()
+    .url()
+    .optional()
+    .describe(
+      'Postgres connection string (Neon branch URL outside production)'
+    ),
+  DATABASE_POOL_URL: z
+    .string()
+    .url()
+    .optional()
+    .describe('Pooled Postgres connection string for serverless runtime'),
 });
 
 /**
@@ -61,13 +97,15 @@ const serverEnvSchema = z.object({
  * Preview deployments must NEVER have access to production credentials
  */
 const productionSecretsSchema = z.object({
-  // TODO (UTA-10): Add production database connection strings
-  // DATABASE_URL: z.string().url(),
-  // DATABASE_POOL_URL: z.string().url(),
-  
-  // TODO (UTA-10): Add production blob storage secrets
+  // UTA-10: production must have a real database URL (never in preview!)
+  DATABASE_URL: z
+    .string()
+    .url()
+    .describe('Production Neon Postgres connection string'),
+
+  // TODO: Add production blob storage secrets
   // BLOB_READ_WRITE_TOKEN: z.string(),
-  
+
   // TODO: Add production marketplace API keys
   // TODO: Add production billing/payment secrets
   // TODO: Add production signing keys
@@ -77,30 +115,30 @@ const productionSecretsSchema = z.object({
  * Staging-specific secrets (optional for Phase 0)
  */
 const stagingSecretsSchema = z.object({
-  // TODO (UTA-10): Add staging database connection strings
-  // STAGING_DATABASE_URL: z.string().url(),
+  // UTA-10: staging uses its own database (optional until staging exists)
+  STAGING_DATABASE_URL: z.string().url().optional(),
 });
 
 /**
  * Discriminated environment validation
  * Different environments require different levels of secret validation
- * 
+ *
  * Note: Preview and local environments use minimal config for safety.
  * Real secrets are only required in production/staging.
  */
 function createEnvSchema(env: string | undefined) {
   const baseSchema = serverEnvSchema.merge(publicEnvSchema);
-  
+
   // In production, require all production secrets
   if (env === 'production') {
     return baseSchema.merge(productionSecretsSchema);
   }
-  
+
   // In staging, require staging secrets
   if (env === 'staging') {
     return baseSchema.merge(stagingSecretsSchema);
   }
-  
+
   // Preview and local can work with minimal config
   return baseSchema;
 }
@@ -111,16 +149,20 @@ function createEnvSchema(env: string | undefined) {
  */
 export function validateEnv() {
   const rawEnv = process.env;
-  
+
   // Determine which environment we're running in
-  const detectedEnv = 
-    rawEnv.APP_ENV || 
-    (rawEnv.VERCEL_ENV === 'production' ? 'production' : 
-     rawEnv.VERCEL_ENV === 'preview' ? 'preview' : 
-     rawEnv.NODE_ENV === 'production' ? 'production' : 'local');
-  
+  const detectedEnv =
+    rawEnv.APP_ENV ||
+    (rawEnv.VERCEL_ENV === 'production'
+      ? 'production'
+      : rawEnv.VERCEL_ENV === 'preview'
+        ? 'preview'
+        : rawEnv.NODE_ENV === 'production'
+          ? 'production'
+          : 'local');
+
   const schema = createEnvSchema(detectedEnv);
-  
+
   try {
     const parsed = schema.parse(rawEnv);
     return {
@@ -130,17 +172,17 @@ export function validateEnv() {
     };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const issues = error.errors.map(
-        (err) => `  - ${err.path.join('.')}: ${err.message}`
-      ).join('\n');
-      
+      const issues = error.errors
+        .map((err) => `  - ${err.path.join('.')}: ${err.message}`)
+        .join('\n');
+
       return {
         success: false as const,
         error: `Environment validation failed:\n${issues}`,
         environment: detectedEnv as AppEnvironment,
       };
     }
-    
+
     return {
       success: false as const,
       error: `Unexpected validation error: ${error}`,
@@ -161,7 +203,8 @@ export type ValidatedEnv = z.infer<ReturnType<typeof createEnvSchema>>;
  */
 export function getPublicEnv() {
   return {
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    NEXT_PUBLIC_APP_URL:
+      process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
     NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
   };
 }
@@ -174,7 +217,7 @@ export function assertNoSecretsInClient(obj: Record<string, any>) {
   const secretKeys = Object.keys(obj).filter(
     (key) => !key.startsWith('NEXT_PUBLIC_')
   );
-  
+
   if (secretKeys.length > 0) {
     throw new Error(
       `Security violation: Server-only environment variables must not be exposed to client:\n${secretKeys.join(', ')}`
