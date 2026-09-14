@@ -3,3 +3,5 @@
 
 export * from './repositories';
 export * from './in-memory';
+export * from './db';
+export * from './schema';
