@@ -9,7 +9,7 @@
     "build": "tsc",
     "lint": "echo \"Database lint stub\" && exit 0",
     "typecheck": "tsc --noEmit",
-    "test": "tsc && node --test dist/",
+    "test": "tsc && node --test \"dist/**/*.test.js\"",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:check": "tsc && node dist/scripts/check-migrations.js",
     "db:migrate": "tsc && node dist/scripts/migrate.js",
