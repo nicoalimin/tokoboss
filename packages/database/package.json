@@ -2,6 +2,7 @@
   "name": "@tokoboss/database",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
@@ -10,10 +11,10 @@
     "typecheck": "tsc --noEmit",
     "test": "tsc && node --test dist/",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
-    "db:check": "node scripts/check-migrations.ts",
-    "db:migrate": "node scripts/migrate.ts",
-    "db:migrate:prod": "node scripts/migrate.ts --prod",
-    "db:seed": "node scripts/seed.ts"
+    "db:check": "tsc && node dist/scripts/check-migrations.js",
+    "db:migrate": "tsc && node dist/scripts/migrate.js",
+    "db:migrate:prod": "tsc && node dist/scripts/migrate.js --prod",
+    "db:seed": "tsc && node dist/scripts/seed.js"
   },
   "dependencies": {
     "@tokoboss/domain": "workspace:*",
