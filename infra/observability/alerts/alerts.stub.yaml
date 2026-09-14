@@ -1,0 +1,29 @@
+# UTA-12 alert thresholds (STUB — not wired to any vendor or channel)
+#
+# Intent: document which signals deserve paging vs tickets, so a later issue
+# can wire them without redesigning. Nothing here sends notifications today.
+
+alerts:
+  - name: WebReadinessDegraded
+    severity: page
+    signal: 'readiness probe `ready: false` for > 5 minutes'
+    queryHint: '{service="tokoboss-web"} | json | event="readiness.degraded" | count() by (service, deploymentId) > 0'
+    runbook: ../runbooks/production.md
+
+  - name: JobFailureRateHigh
+    severity: page
+    signal: event `job.failed` rate > 5% over 15 minutes
+    queryHint: 'sum(rate({service=~"tokoboss-.+"} | json | event="job.failed" [15m])) / sum(rate({service=~"tokoboss-.+"} | json | event="job.start" [15m])) > 0.05'
+    runbook: ../runbooks/local-diagnostics.md
+
+  - name: ErrorBudgetBurn
+    severity: ticket
+    signal: level `error` share of lines > 1% over 1 hour
+    queryHint: 'sum(rate({service=~"tokoboss-.+"} | json | level="error" [1h])) / sum(rate({service=~"tokoboss-.+"} [1h])) > 0.01'
+    runbook: ../runbooks/local-diagnostics.md
+
+  - name: IntegrationSyncStalled
+    severity: ticket
+    signal: no `integration.sync` events for a workspace in 60 minutes during business hours
+    queryHint: '{service=~"tokoboss-.+"} | json | event="integration.sync" | count() by (workspaceId)'
+    runbook: ../runbooks/production.md

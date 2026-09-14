@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TokoBoss business-impact dashboard (STUB — UTA-12)",
+  "description": "Placeholder dashboard shape. Source: stdout JSON log lines (no paid vendor). When a vendor is adopted, map each panel's `logql`/`query` hint to it. Grouping keys are the stable correlation vocabulary: event, errorCode, workspaceId, deploymentId.",
+  "panels": [
+    {
+      "title": "Request volume by event",
+      "groupBy": ["event", "service"],
+      "query": "{service=~\"tokoboss-.+\"} | json | event=`request.start` | count by (event, service)"
+    },
+    {
+      "title": "Error rate by errorCode",
+      "groupBy": ["errorCode", "service", "deploymentId"],
+      "query": "{service=~\"tokoboss-.+\"} | json | level=`error` | count by (errorCode, service)"
+    },
+    {
+      "title": "Background job failures",
+      "groupBy": ["jobId", "errorCode", "requestId"],
+      "query": "{service=~\"tokoboss-.+\"} | json | event=`job.failed` | count by (jobId, errorCode)"
+    },
+    {
+      "title": "Readiness degradations",
+      "groupBy": ["service", "deploymentId"],
+      "query": "{service=~\"tokoboss-.+\"} | json | event=`readiness.degraded` | count by (service)"
+    },
+    {
+      "title": "Integration sync volume",
+      "groupBy": ["integrationCorrelationId", "workspaceId"],
+      "query": "{service=~\"tokoboss-.+\"} | json | event=`integration.sync` | count by (workspaceId)"
+    }
+  ]
+}

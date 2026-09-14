@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "test": "node check-boundaries.js"
+    "test": "node check-boundaries.js && node failure-proof.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.5"

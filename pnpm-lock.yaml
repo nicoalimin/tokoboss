@@ -52,6 +52,10 @@ importers:
         version: 5.9.3
 
   packages/application:
+    dependencies:
+      '@tokoboss/domain':
+        specifier: workspace:*
+        version: link:../domain
     devDependencies:
       typescript:
         specifier: ^5.7.3
@@ -74,6 +78,10 @@ importers:
         version: 5.9.3
 
   packages/contracts:
+    dependencies:
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
     devDependencies:
       typescript:
         specifier: ^5.7.3
@@ -125,6 +133,22 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/observability:
+    dependencies:
+      '@tokoboss/config':
+        specifier: workspace:*
+        version: link:../config
+    devDependencies:
+      tsx:
+        specifier: ^4.19.4
+        version: 4.23.13
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.2)(jiti@2.7.0)(lightningcss@1.27.0)(terser@5.51.2)(tsx@4.23.13)
+
   tests/boundary:
     devDependencies:
       '@types/node':
@@ -155,6 +179,9 @@ importers:
       '@tokoboss/design-tokens':
         specifier: workspace:*
         version: link:../packages/design-tokens
+      '@tokoboss/observability':
+        specifier: workspace:*
+        version: link:../packages/observability
       next:
         specifier: ^15.1.6
         version: 15.5.25(@types/node@22.20.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)

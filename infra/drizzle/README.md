@@ -97,3 +97,32 @@ Rules of thumb:
 | `db:migrate`      | advisory-locked migrate + converge check (non-prod)                                  |
 | `db:migrate:prod` | single controlled production step (`APP_ENV=production` + `ALLOW_PROD_MIGRATE=true`) |
 | `db:seed`         | deterministic synthetic seed (refuses `APP_ENV=production`)                          |
+
+## Known issue: `db:check:kit` fails on main (UTA-12 documented, not fixed here)
+
+`pnpm --filter @tokoboss/database db:check:kit` fails with:
+
+```
+[../../infra/drizzle/meta/0001_snapshot.json, ../../infra/drizzle/meta/0002_snapshot.json]
+are pointing to a parent snapshot: ... which is a collision.
+```
+
+Root cause (verified on `main` @ `1e2e466`, independent of UTA-12 changes):
+
+1. `meta/0002_snapshot.json` has `prevId: 00000000-…` (genesis) instead of
+   chaining `0001_snapshot.json`'s id — it was generated as a standalone
+   snapshot, not as a child of 0001.
+2. `0002_snapshot.json` (and `0002_initial_schema.sql`) define
+   `stores`/`products`/`stock_moves`, which are absent from
+   `packages/database/src/schema/*` (only `tenants` + `audit_events`).
+   So even a re-chained snapshot would report schema drift.
+
+Fixing this requires deciding the intended schema state and regenerating
+snapshots — migration-pipeline ownership (UTA-10 follow-up). Until then:
+
+- The **blocking** migration gate in CI (`ci.yml`) is `db:check`
+  (journal↔SQL sync, no dup sequences, tree clean) — green.
+- `db:check:kit` runs in CI as **non-blocking** (`continue-on-error`) so the
+  baseline stays green from a clean checkout while the failure stays visible.
+- Do not "fix" by hand-editing snapshots; regenerate via `db:generate` after
+  the schema source is reconciled, and never renumber `main` migrations.

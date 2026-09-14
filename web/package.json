@@ -13,6 +13,7 @@
   "dependencies": {
     "@tokoboss/config": "workspace:*",
     "@tokoboss/design-tokens": "workspace:*",
+    "@tokoboss/observability": "workspace:*",
     "next": "^15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
