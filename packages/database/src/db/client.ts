@@ -72,6 +72,8 @@ export class DrizzleDatabase implements DatabasePort {
 }
 
 /** Create a transaction-capable database adapter for the given Postgres URL. */
-export function createDatabase(options: CreateDrizzleDatabaseOptions): DrizzleDatabase {
+export function createDatabase(
+  options: CreateDrizzleDatabaseOptions
+): DrizzleDatabase {
   return new DrizzleDatabase(options);
 }

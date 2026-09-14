@@ -23,7 +23,11 @@ describe('DatabasePort transactions (in-memory adapter)', () => {
 
     await withTransaction(db, 'create-tenant', async () => {
       store.insertTenant({ id: 't-1', name: 'Toko Maju' });
-      store.insertAuditEvent({ id: 'e-1', tenantId: 't-1', eventType: 'seed.test' });
+      store.insertAuditEvent({
+        id: 'e-1',
+        tenantId: 't-1',
+        eventType: 'seed.test',
+      });
     });
 
     assert.equal(await countTenants(store), 1);
@@ -56,7 +60,11 @@ describe('DatabasePort transactions (in-memory adapter)', () => {
     await assert.rejects(
       withTransaction(db, 'fk-op', async () => {
         db.insertTenant({ id: 't-3', name: 'Toko FK' });
-        db.insertAuditEvent({ id: 'e-3', tenantId: 'missing-tenant', eventType: 'x' });
+        db.insertAuditEvent({
+          id: 'e-3',
+          tenantId: 'missing-tenant',
+          eventType: 'x',
+        });
       }),
       (error: unknown) => {
         assert.ok(error instanceof TransactionFailedError);
@@ -100,26 +108,25 @@ describe('DatabasePort transactions (in-memory adapter)', () => {
 
 describe('DatabasePort transactions (live Drizzle adapter)', () => {
   const liveUrl = process.env.DATABASE_URL ?? '';
-  const skip = liveUrl === '' ? 'DATABASE_URL not set — skipping live adapter test' : false;
+  const skip =
+    liveUrl === ''
+      ? 'DATABASE_URL not set — skipping live adapter test'
+      : false;
 
-  it(
-    'commits and rolls back through the real driver',
-    { skip },
-    async () => {
-      const db = new DrizzleDatabase({ connectionString: liveUrl });
-      try {
-        await db.ping();
-        const ok = await db.transaction(async () => 'committed');
-        assert.equal(ok, 'committed');
-        await assert.rejects(
-          db.transaction(async () => {
-            throw new Error('live rollback probe');
-          }),
-          /live rollback probe/
-        );
-      } finally {
-        await db.close();
-      }
+  it('commits and rolls back through the real driver', { skip }, async () => {
+    const db = new DrizzleDatabase({ connectionString: liveUrl });
+    try {
+      await db.ping();
+      const ok = await db.transaction(async () => 'committed');
+      assert.equal(ok, 'committed');
+      await assert.rejects(
+        db.transaction(async () => {
+          throw new Error('live rollback probe');
+        }),
+        /live rollback probe/
+      );
+    } finally {
+      await db.close();
     }
-  );
+  });
 });

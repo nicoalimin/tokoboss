@@ -17,7 +17,8 @@ import { Client } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
-const MIGRATIONS_FOLDER = new URL('../../../../infra/drizzle', import.meta.url).pathname;
+const MIGRATIONS_FOLDER = new URL('../../../../infra/drizzle', import.meta.url)
+  .pathname;
 /** Session advisory-lock key for production migrations (arbitrary stable int). */
 const PROD_ADVISORY_LOCK_KEY = 74107210;
 
@@ -35,7 +36,9 @@ async function main(): Promise<void> {
   const connectionString = process.env.DATABASE_URL ?? '';
 
   if (!connectionString) {
-    console.error('❌ DATABASE_URL is not set. Refusing to migrate without an explicit target.');
+    console.error(
+      '❌ DATABASE_URL is not set. Refusing to migrate without an explicit target.'
+    );
     process.exit(1);
   }
 
@@ -47,13 +50,17 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  console.log(`🔄 Migrating ${redactUrl(connectionString)}${isProd ? ' (PRODUCTION, locked)' : ''}...`);
+  console.log(
+    `🔄 Migrating ${redactUrl(connectionString)}${isProd ? ' (PRODUCTION, locked)' : ''}...`
+  );
 
   const client = new Client({ connectionString });
   await client.connect();
   try {
     if (isProd) {
-      await client.query('select pg_advisory_lock($1)', [PROD_ADVISORY_LOCK_KEY]);
+      await client.query('select pg_advisory_lock($1)', [
+        PROD_ADVISORY_LOCK_KEY,
+      ]);
       console.log('🔒 Acquired production migration advisory lock.');
     }
 
@@ -68,7 +75,9 @@ async function main(): Promise<void> {
     );
   } finally {
     if (isProd) {
-      await client.query('select pg_advisory_unlock($1)', [PROD_ADVISORY_LOCK_KEY]);
+      await client.query('select pg_advisory_unlock($1)', [
+        PROD_ADVISORY_LOCK_KEY,
+      ]);
       console.log('🔓 Released production migration advisory lock.');
     }
     await client.end();
@@ -76,6 +85,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error('❌ Migration failed:', error instanceof Error ? error.message : error);
+  console.error(
+    '❌ Migration failed:',
+    error instanceof Error ? error.message : error
+  );
   process.exit(1);
 });

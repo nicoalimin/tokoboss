@@ -22,7 +22,10 @@ const SEED_TENANT_COUNT = 3;
 const SEED_EVENTS_PER_TENANT = 2;
 
 function isProduction(): boolean {
-  return process.env.APP_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+  return (
+    process.env.APP_ENV === 'production' ||
+    process.env.VERCEL_ENV === 'production'
+  );
 }
 
 /** Deterministic PRNG (mulberry32) so seeds are reproducible. */
@@ -51,10 +54,13 @@ interface SeedEvent {
 
 function buildSeedData(): { tenantList: SeedTenant[]; eventList: SeedEvent[] } {
   const rand = seededRandom(0x70_60_80_55);
-  const tenantList: SeedTenant[] = Array.from({ length: SEED_TENANT_COUNT }, (_, i) => ({
-    id: randomUUID(),
-    name: `SEED_Tenant_${String(i + 1).padStart(3, '0')}`,
-  }));
+  const tenantList: SeedTenant[] = Array.from(
+    { length: SEED_TENANT_COUNT },
+    (_, i) => ({
+      id: randomUUID(),
+      name: `SEED_Tenant_${String(i + 1).padStart(3, '0')}`,
+    })
+  );
   const eventTypes = ['seed.tenant.created', 'seed.inventory.adjusted'];
   const eventList: SeedEvent[] = tenantList.flatMap((tenant, ti) =>
     Array.from({ length: SEED_EVENTS_PER_TENANT }, (_, ei) => ({
@@ -117,19 +123,26 @@ async function seedMemory(): Promise<void> {
 
 async function main(): Promise<void> {
   if (isProduction()) {
-    console.error('❌ Seed refuses to run in production (APP_ENV/VERCEL_ENV=production).');
+    console.error(
+      '❌ Seed refuses to run in production (APP_ENV/VERCEL_ENV=production).'
+    );
     process.exit(1);
   }
   const connectionString = process.env.DATABASE_URL ?? '';
   if (connectionString) {
     await seedLive(connectionString);
   } else {
-    console.log('ℹ️  DATABASE_URL not set — seeding in-memory adapter (no database touched).');
+    console.log(
+      'ℹ️  DATABASE_URL not set — seeding in-memory adapter (no database touched).'
+    );
     await seedMemory();
   }
 }
 
 main().catch((error) => {
-  console.error('❌ Seed failed:', error instanceof Error ? error.message : error);
+  console.error(
+    '❌ Seed failed:',
+    error instanceof Error ? error.message : error
+  );
   process.exit(1);
 });

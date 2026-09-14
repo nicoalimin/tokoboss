@@ -67,7 +67,9 @@ function main(): void {
   const seenTags = new Set<string>();
   sorted.forEach((entry, position) => {
     if (entry.idx !== position) {
-      fail(`journal idx gap: entry at position ${position} has idx ${entry.idx}`);
+      fail(
+        `journal idx gap: entry at position ${position} has idx ${entry.idx}`
+      );
     }
     if (seenIdx.has(entry.idx)) {
       fail(`duplicate journal idx ${entry.idx}`);
@@ -86,7 +88,9 @@ function main(): void {
         fail(`migration file is empty: ${expectedFile}`);
       }
     } catch {
-      fail(`journal entry idx ${entry.idx} references missing file ${expectedFile}`);
+      fail(
+        `journal entry idx ${entry.idx} references missing file ${expectedFile}`
+      );
       return;
     }
 
@@ -109,8 +113,8 @@ function main(): void {
     }
   }
 
-  const snapshots = readdirSync(join(MIGRATIONS_DIR.pathname, 'meta')).filter((f) =>
-    /^\d+_snapshot\.json$/.test(f)
+  const snapshots = readdirSync(join(MIGRATIONS_DIR.pathname, 'meta')).filter(
+    (f) => /^\d+_snapshot\.json$/.test(f)
   );
   if (snapshots.length === 0) {
     fail('no drizzle snapshot found under infra/drizzle/meta');
@@ -130,7 +134,9 @@ function report(): void {
     }
     process.exit(1);
   }
-  console.log('✅ Migration history is consistent (journal gap-free, SQL files match).');
+  console.log(
+    '✅ Migration history is consistent (journal gap-free, SQL files match).'
+  );
 }
 
 main();
