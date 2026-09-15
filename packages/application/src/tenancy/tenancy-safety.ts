@@ -68,6 +68,14 @@ const SAFE_TENANCY_KEY = new Set([
   'actorId',
   'actorType',
   'correlationId',
+  'inviteId',
+  'invite_id',
+  'invitedBy',
+  'invited_by',
+  'expiresAt',
+  'expires_at',
+  'acceptedAt',
+  'accepted_at',
 ]);
 
 function scanValue(path: string, value: unknown): void {

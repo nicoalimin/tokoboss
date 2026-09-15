@@ -184,7 +184,7 @@ export class DrizzleTenancyAuditSink implements TenancyAuditSink {
   async append(input: {
     workspaceId: string;
     action: string;
-    category: 'membership' | 'workspace' | 'security';
+    category: 'membership' | 'workspace' | 'security' | 'invite';
     actorType?: string;
     actorId?: string;
     correlationId?: string;

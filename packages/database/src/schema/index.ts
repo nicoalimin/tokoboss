@@ -6,6 +6,7 @@ export * from './audit-events';
 export * from './jobs';
 export * from './file-uploads';
 export * from './workspace-members';
+export * from './workspace-invites';
 export * from './auth';
 export * from './legacy-store';
 
@@ -15,6 +16,7 @@ import { fileUploads } from './file-uploads';
 import { jobEvents, jobs } from './jobs';
 import { products, stockMoves, stores } from './legacy-store';
 import { tenants } from './tenants';
+import { workspaceInvites } from './workspace-invites';
 import { workspaceMembers } from './workspace-members';
 
 export const schema = {
@@ -24,6 +26,7 @@ export const schema = {
   jobEvents,
   fileUploads,
   workspaceMembers,
+  workspaceInvites,
   authUsers,
   authSessions,
   authPasswordResets,
