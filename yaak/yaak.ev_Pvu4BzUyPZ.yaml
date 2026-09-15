@@ -3,7 +3,7 @@ model: environment
 id: ev_Pvu4BzUyPZ
 workspaceId: wk_8G49M8nz5p
 createdAt: 2026-09-15T16:05:42.262396
-updatedAt: 2026-09-15T16:07:42.982325
+updatedAt: 2026-09-15T16:12:53.508592
 name: Production
 public: true
 base: false
@@ -18,5 +18,17 @@ variables:
   name: bootstrap_password
   value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3RUpJRmZlcE5UWjNRSlRaS3JQVEFPMXpNcVd2QzdUM3MyaS9aMTZoc3BZUjkyckkxOVR6UkRZQjNXRWdtakFDdGszeGlTbGpNRUFXRWhnUTNWTVZuNjM4amVVUEI2ZUl4Zz0') ]}
   id: p5tt6btTQB
+- enabled: true
+  name: workspace_id
+  value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3RVdldVh1WjRQZnUrOXhacytvbyt6VGxCSjVCazJmMndUVHBwWmtZRExKTHM1cUhhNEdNNHhBVlI4QmJzNVBHUT09') ]}
+  id: Re5eSz7NB9
+- enabled: true
+  name: login_email
+  value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3SEFaTGVGZ1dZU2t3ZUVtU0plN0tLc2NGVVZWSkVGVXBtK2s1dWFyTThTSzd4Qmh6dm1adGNGdHFqTERjQVZOV2w4RjVISmNnVWRIbWd3QWhRPQ') ]}
+  id: R6HxMGjD3V
+- enabled: true
+  name: login_password
+  value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3RWlZZ2dVQk5SeUtYOHN1eW5WTU90SnRWWE5mVkhKZ2lsb3hUR1JxM2tKV3FiSXRZdmJma1VGTEZEL1hEa2VWYXNoNm8ybnZrengyRXpIQnNKQ05xOTlvcmhwZWRlZWp3QT0') ]}
+  id: BN9sN0VZxf
 color: var(--danger)
 sortPriority: 0.0

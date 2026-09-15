@@ -51,6 +51,10 @@ export class DrizzleTenantRepository implements Repository<
     return row ? toEntity(row) : null;
   }
 
+  async listWorkspaces(): Promise<Array<{ id: string; name: string; slug: string }>> {
+    return (await this.db.select().from(tenants)).map(toEntity);
+  }
+
   async findWorkspaceById(
     id: string
   ): Promise<{ id: string; name: string; slug: string } | null> {

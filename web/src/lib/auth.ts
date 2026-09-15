@@ -44,6 +44,7 @@ import {
   type SessionStore,
   type TenancyAuditSink,
   type WorkspaceMemberStore,
+  type WorkspaceStore,
 } from '@tokoboss/application';
 
 export const SESSION_COOKIE_NAME = 'tb_session';
@@ -190,6 +191,14 @@ export function getPasswordResetStore(): PasswordResetStore {
 export function getMemberStore(): WorkspaceMemberStore {
   if (storageKind() === 'postgres') {
     return new DrizzleWorkspaceMemberStore(getDbHandle().db);
+  }
+  return getMemoryTenancy();
+}
+
+/** Workspace metadata store paired with the membership store. */
+export function getWorkspaceStore(): WorkspaceStore {
+  if (storageKind() === 'postgres') {
+    return new DrizzleTenantRepository(getDbHandle().db);
   }
   return getMemoryTenancy();
 }

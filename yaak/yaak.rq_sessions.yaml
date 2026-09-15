@@ -1,12 +1,12 @@
 type: http_request
 model: http_request
 id: rq_tokoboss_sessions
-createdAt: 2026-09-15T00:00:00.000000
-updatedAt: 2026-09-15T00:00:00.000000
+createdAt: 2026-09-15T00:00:00
+updatedAt: 2026-09-15T16:14:40.933185
 workspaceId: wk_8G49M8nz5p
 folderId: fl_tokoboss_auth
 authentication:
-  token: ${[access_token]}
+  token: ${[ response.body.path(request='rq_tokoboss_sign_in_mobile', behavior='smart', ttl='0', result='first', join=b64'LCA') ]}
 authenticationType: bearer
 body: {}
 bodyType: null

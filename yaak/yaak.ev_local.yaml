@@ -3,20 +3,12 @@ model: environment
 id: ev_tokoboss_local
 workspaceId: wk_8G49M8nz5p
 createdAt: 2026-09-15T00:00:00
-updatedAt: 2026-09-15T16:07:11.945117
+updatedAt: 2026-09-15T16:16:12.179174
 name: Local development
 public: true
 base: true
 parentModel: workspace
 parentId: null
-variables:
-- enabled: true
-  name: workspace_id
-  value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3SGIvaDYwTEwyZVVhTUgzSWQxNWZUZGcwUGFHMWhrQlBaWEVCQ294VUF4WVQ3RVpJQzZKcnBIMHNsSA') ]}
-  id: JngvxDTx9v
-- enabled: true
-  name: access_token
-  value: ''
-  id: smjShK6YGc
+variables: []
 color: null
 sortPriority: 0.0

@@ -1,0 +1,35 @@
+type: http_request
+model: http_request
+id: rq_tokoboss_list_workspaces
+workspaceId: wk_8G49M8nz5p
+folderId: fl_tokoboss_workspaces
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+description: Lists the active workspaces available to the signed-in user.
+headers:
+- enabled: true
+  name: X-Bootstrap-Password
+  value: ${[bootstrap_password]}
+  id: null
+method: GET
+name: List workspaces
+sortPriority: 1.0
+url: ${[base_url]}/api/workspaces
+urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0

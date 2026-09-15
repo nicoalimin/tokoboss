@@ -1,8 +1,8 @@
 type: http_request
 model: http_request
 id: rq_tokoboss_sign_in_mobile
-createdAt: 2026-09-15T00:00:00.000000
-updatedAt: 2026-09-15T00:00:00.000000
+createdAt: 2026-09-15T00:00:00
+updatedAt: 2026-09-15T16:14:55.838719
 workspaceId: wk_8G49M8nz5p
 folderId: fl_tokoboss_auth
 authentication: {}
@@ -10,8 +10,8 @@ authenticationType: null
 body:
   text: |-
     {
-      "email": "owner@tokoboss.local",
-      "password": "change-this-user-password",
+      "email": "${[ login_email ]}",
+      "password": "${[ login_password ]}",
       "workspaceId": "${[workspace_id]}",
       "platform": "mobile",
       "deviceLabel": "Yaak"

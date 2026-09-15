@@ -60,6 +60,10 @@ export class InMemoryTenancyStore
 
   // WorkspaceStore
 
+  async listWorkspaces(): Promise<Array<{ id: string; name: string; slug: string }>> {
+    return [...this.workspaces.values()].map(clone);
+  }
+
   async createWorkspace(input: {
     name: string;
     slug: string;

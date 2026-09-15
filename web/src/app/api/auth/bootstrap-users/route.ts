@@ -1,18 +1,7 @@
-import { timingSafeEqual } from 'node:crypto';
 import { AuthBootstrapUserBodySchema } from '@tokoboss/contracts';
 import { createBootstrapUser, storageKind } from '@/lib/auth';
 import { authJson, routeContext } from '@/lib/auth-routes';
-
-function hasValidBootstrapPassword(request: Request): boolean {
-  const configured = process.env['AUTH_BOOTSTRAP_PASSWORD'];
-  const supplied = request.headers.get('x-bootstrap-password');
-  if (!configured || !supplied) return false;
-  const expected = Buffer.from(configured);
-  const actual = Buffer.from(supplied);
-  return (
-    expected.length === actual.length && timingSafeEqual(expected, actual)
-  );
-}
+import { hasValidBootstrapPassword } from '@/lib/bootstrap-auth';
 
 /**
  * Create a workspace and its initial Admin account.

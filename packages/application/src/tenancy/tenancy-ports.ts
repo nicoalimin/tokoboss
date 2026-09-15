@@ -42,6 +42,7 @@ export interface WorkspaceMemberStore {
 
 /** Minimal workspace (tenant) store for create/update use-cases. */
 export interface WorkspaceStore {
+  listWorkspaces(): Promise<Array<{ id: string; name: string; slug: string }>>;
   createWorkspace(input: { name: string; slug: string }): Promise<{
     id: string;
     name: string;

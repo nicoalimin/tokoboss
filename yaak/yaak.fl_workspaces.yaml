@@ -1,0 +1,11 @@
+type: folder
+model: folder
+id: fl_tokoboss_workspaces
+workspaceId: wk_8G49M8nz5p
+folderId: null
+authentication: {}
+authenticationType: null
+description: Workspace discovery and management requests.
+headers: []
+name: Workspaces
+sortPriority: 2000.0
