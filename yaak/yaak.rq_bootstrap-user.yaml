@@ -1,8 +1,8 @@
 type: http_request
 model: http_request
 id: rq_tokoboss_bootstrap_user
-createdAt: 2026-09-15T00:00:00.000000
-updatedAt: 2026-09-15T00:00:00.000000
+createdAt: 2026-09-15T00:00:00
+updatedAt: 2026-09-15T16:08:05.018984
 workspaceId: wk_8G49M8nz5p
 folderId: fl_tokoboss_auth
 authentication: {}
@@ -10,9 +10,9 @@ authenticationType: null
 body:
   text: |-
     {
-      "email": "owner@tokoboss.local",
-      "password": "change-this-user-password",
-      "workspaceName": "TokoBoss Demo Store"
+      "email": "nicoalimin@gmail.com",
+      "password": "5GCKx4t86ozm7TmRZLt1C4bn36QF9o4u",
+      "workspaceName": "Demo"
     }
 bodyType: application/json
 description: Creates a new workspace and its initial Admin. Copy workspaceId from the response into the Local development environment before signing in.

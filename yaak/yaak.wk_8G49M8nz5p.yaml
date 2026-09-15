@@ -2,13 +2,13 @@ type: workspace
 model: workspace
 id: wk_8G49M8nz5p
 createdAt: 2026-09-15T15:46:41.369909
-updatedAt: 2026-09-15T15:46:41.369910
+updatedAt: 2026-09-15T16:02:53.526549
 authentication: {}
 authenticationType: null
 description: ''
 headers: []
 name: Tokoboss
-encryptionKeyChallenge: null
+encryptionKeyChallenge: eUE0azNuQwF4vYR2Ji5GH8VgOh/3xs8hzijjDAsBDusCphlRUqMfyx1TVbuRm/9c++1F5enU91U4veCDWJQtJwD5phDz38sYYAZBNnCAbglL44NnW78b2VhGil558nWEYWc=
 settingValidateCertificates: true
 settingFollowRedirects: true
 settingRequestTimeout: 0

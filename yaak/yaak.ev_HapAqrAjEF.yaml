@@ -1,0 +1,22 @@
+type: environment
+model: environment
+id: ev_HapAqrAjEF
+workspaceId: wk_8G49M8nz5p
+createdAt: 2026-09-15T16:05:34.487828
+updatedAt: 2026-09-15T16:07:44.797220
+name: Development
+public: true
+base: false
+parentModel: environment
+parentId: null
+variables:
+- enabled: true
+  name: base_url
+  value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3R3NpZTBpbS9BWXErWlBKd1BjaFA5Y2ZpMzNURU55cFVoM1F6dnNLUzI3MDZjeHBVNmp0YkFPcUZPVDIzdkZpNjg0T2Evd003MmU5b1lTdmZjSg') ]}
+  id: A4NHCiT8Sp
+- enabled: true
+  name: bootstrap_password
+  value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3R2NvVFpuSzJ3TmZ2cG5XdjU5eml4RmIwU3B3MXNIdUJETFlHSEVWdnMwZDFwSjhQdDU5VjIrSjVaRE1KR0VFd1NQT2Z6eXZwOEtZWGFZZXFUZSthRFc3VGtQb01zSGtGQT0') ]}
+  id: AI7Aa3pqHd
+color: var(--success)
+sortPriority: 0.0
