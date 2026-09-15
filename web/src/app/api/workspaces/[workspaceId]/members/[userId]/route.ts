@@ -61,10 +61,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         workspaceId: admin.value.ctx.workspaceId,
         targetUserId: userId,
         role: parsed.data.role,
-        warehouseScope:
-          parsed.data.warehouseScope !== undefined
-            ? parsed.data.warehouseScope
-            : undefined,
+        warehouseScope: parsed.data.warehouseScope,
         correlationId,
       },
       getAuthAudit()
