@@ -170,10 +170,17 @@ importers:
         version: 5.9.3
 
   packages/integrations:
+    dependencies:
+      '@tokoboss/domain':
+        specifier: workspace:*
+        version: link:../domain
     devDependencies:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.2)(jiti@2.7.0)(lightningcss@1.27.0)(terser@5.51.2)(tsx@4.23.13)
 
   packages/observability:
     dependencies:
@@ -227,6 +234,12 @@ importers:
       '@tokoboss/design-tokens':
         specifier: workspace:*
         version: link:../packages/design-tokens
+      '@tokoboss/domain':
+        specifier: workspace:*
+        version: link:../packages/domain
+      '@tokoboss/integrations':
+        specifier: workspace:*
+        version: link:../packages/integrations
       '@tokoboss/observability':
         specifier: workspace:*
         version: link:../packages/observability
