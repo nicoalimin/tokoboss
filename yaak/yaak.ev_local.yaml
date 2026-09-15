@@ -1,9 +1,9 @@
 type: environment
 model: environment
 id: ev_tokoboss_local
-workspaceId: wk_tokoboss
-createdAt: 2026-09-15T00:00:00.000000Z
-updatedAt: 2026-09-15T00:00:00.000000Z
+workspaceId: wk_8G49M8nz5p
+createdAt: 2026-09-15T00:00:00.000000
+updatedAt: 2026-09-15T00:00:00.000000
 name: Local development
 public: true
 base: true

@@ -1,9 +1,9 @@
 type: http_request
 model: http_request
 id: rq_tokoboss_sessions
-createdAt: 2026-09-15T00:00:00.000000Z
-updatedAt: 2026-09-15T00:00:00.000000Z
-workspaceId: wk_tokoboss
+createdAt: 2026-09-15T00:00:00.000000
+updatedAt: 2026-09-15T00:00:00.000000
+workspaceId: wk_8G49M8nz5p
 folderId: fl_tokoboss_auth
 authentication:
   token: ${[access_token]}
@@ -17,3 +17,18 @@ name: List sessions
 sortPriority: 3.0
 url: ${[base_url]}/api/auth/sessions
 urlParameters: []
+settingSendCookies:
+  enabled: false
+  value: true
+settingStoreCookies:
+  enabled: false
+  value: true
+settingValidateCertificates:
+  enabled: false
+  value: true
+settingFollowRedirects:
+  enabled: false
+  value: true
+settingRequestTimeout:
+  enabled: false
+  value: 0
