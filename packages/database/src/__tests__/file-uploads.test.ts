@@ -26,6 +26,7 @@ const CHAIN = [
   '0002_initial_schema.sql',
   '0003_jobs_job_events.sql',
   '0004_file_uploads.sql',
+  '0005_workspace_tenancy_audit.sql',
 ];
 
 async function createMigratedDb() {

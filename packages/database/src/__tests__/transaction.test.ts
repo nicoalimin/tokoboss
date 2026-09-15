@@ -24,21 +24,31 @@ import { insertSyntheticSeed } from '../seed';
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../../../infra/drizzle');
 
+// Full committed chain in journal order — mirrors a real deploy. UTA-19
+// appends 0005 (workspace_members + audit actor columns); the repository
+// port reads/writes the current schema so the harness must too.
+const CHAIN = [
+  '0001_initial.sql',
+  '0002_initial_schema.sql',
+  '0003_jobs_job_events.sql',
+  '0004_file_uploads.sql',
+  '0005_workspace_tenancy_audit.sql',
+];
+
 async function createMigratedDb() {
   const client = new PGlite();
   // NOTE: no `CREATE EXTENSION "pgcrypto"` — PGlite builds do not ship it,
   // and `gen_random_uuid()` is built into modern Postgres core (Neon included).
-  const sql = await readFile(
-    path.join(MIGRATIONS_DIR, '0001_initial.sql'),
-    'utf8'
-  );
-  // Split the reviewed migration into statements (drizzle splits on `--> statement-breakpoint`).
-  const statements = sql
-    .split(/-->\s*statement-breakpoint/g)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  for (const stmt of statements) {
-    await client.exec(stmt);
+  for (const file of CHAIN) {
+    const sql = await readFile(path.join(MIGRATIONS_DIR, file), 'utf8');
+    // Split the reviewed migration into statements (drizzle splits on `--> statement-breakpoint`).
+    const statements = sql
+      .split(/-->\s*statement-breakpoint/g)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const stmt of statements) {
+      await client.exec(stmt);
+    }
   }
   const db = drizzle(client, { schema });
   return { client, db };

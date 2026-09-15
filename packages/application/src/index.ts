@@ -5,3 +5,4 @@ export * from './use-cases';
 export * from './dto';
 export * from './jobs';
 export * from './uploads';
+export * from './tenancy';
