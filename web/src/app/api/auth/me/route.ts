@@ -78,7 +78,8 @@ export async function GET(request: Request) {
  *
  * Body: `{ displayName?, avatarUploadId? }` (at least one). There is no
  * target-user parameter — cross-user updates are structurally impossible;
- * extra `userId` fields are rejected by the contract schema. `avatarUploadId`
+ * extra `userId` fields in the body are ignored (stripped by the contract
+ * schema), never used as a target. `avatarUploadId`
  * must reference a completed image `file_uploads` row in the caller's
  * workspace (private Blob reference, never bytes or URLs).
  */

@@ -105,6 +105,21 @@ export async function POST(request: Request) {
         correlationId
       );
     }
+    if (
+      typeof err === 'object' &&
+      err !== null &&
+      (err as { code?: unknown }).code === 'TENANCY_VALIDATION'
+    ) {
+      return authJson(
+        {
+          error: err instanceof Error ? err.message : 'Invalid request.',
+          errorCode: 'TENANCY_VALIDATION',
+        },
+        400,
+        requestId,
+        correlationId
+      );
+    }
     log.warn('password change failed', {
       route: '/api/auth/password/change',
       errorCode: 'AUTH_PASSWORD_CHANGE_FAILED',
