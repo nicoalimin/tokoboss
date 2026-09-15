@@ -8,6 +8,7 @@ export * from './file-uploads';
 export * from './workspace-members';
 export * from './workspace-invites';
 export * from './auth';
+export * from './user-profiles';
 export * from './legacy-store';
 
 import { auditEvents } from './audit-events';
@@ -16,6 +17,7 @@ import { fileUploads } from './file-uploads';
 import { jobEvents, jobs } from './jobs';
 import { products, stockMoves, stores } from './legacy-store';
 import { tenants } from './tenants';
+import { userProfiles } from './user-profiles';
 import { workspaceInvites } from './workspace-invites';
 import { workspaceMembers } from './workspace-members';
 
@@ -30,6 +32,7 @@ export const schema = {
   authUsers,
   authSessions,
   authPasswordResets,
+  userProfiles,
   stores,
   products,
   stockMoves,

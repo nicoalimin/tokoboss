@@ -24,6 +24,7 @@ export const FILE_UPLOAD_PURPOSES = [
   'return',
   'export',
   'fixture',
+  'avatar',
 ] as const;
 export type FileUploadPurpose = (typeof FILE_UPLOAD_PURPOSES)[number];
 
@@ -74,6 +75,9 @@ export interface ObjectStoragePort {
   readonly kind: string;
   readonly access: BlobAccess;
   issueUploadToken(input: IssueUploadTokenInput): Promise<UploadToken>;
-  createDownloadGrant(pathname: string, workspaceId: string): Promise<DownloadGrant>;
+  createDownloadGrant(
+    pathname: string,
+    workspaceId: string
+  ): Promise<DownloadGrant>;
   deleteObject(pathname: string): Promise<void>;
 }

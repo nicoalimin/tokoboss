@@ -25,10 +25,7 @@ import {
   InMemoryUploadStore,
   type FileUploadStore,
 } from '@tokoboss/application';
-import {
-  MemoryBlobAdapter,
-  VercelBlobAdapter,
-} from '@tokoboss/integrations';
+import { MemoryBlobAdapter, VercelBlobAdapter } from '@tokoboss/integrations';
 
 let memoryStore: InMemoryUploadStore | null = null;
 let dbHandle: DbHandle | null = null;
@@ -88,6 +85,20 @@ export function getStoragePort(): ObjectStoragePort {
   }
   if (!memoryBlob) memoryBlob = new MemoryBlobAdapter();
   return memoryBlob;
+}
+
+/**
+ * Reset process-local upload state. Test seam for `web/src/__tests__`;
+ * call alongside `__resetAuthForTests`. Refuses production.
+ */
+export function __resetUploadsForTests(): void {
+  if (
+    process.env['APP_ENV'] === 'production' ||
+    process.env['VERCEL_ENV'] === 'production'
+  ) {
+    throw new Error('Refusing fixture reset in production');
+  }
+  memoryStore = new InMemoryUploadStore();
 }
 
 /** Test/local escape hatch: the shared fixture blob adapter. */

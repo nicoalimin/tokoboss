@@ -7,3 +7,4 @@ export * from './jobs';
 export * from './uploads';
 export * from './tenancy';
 export * from './auth';
+export * from './profile';
