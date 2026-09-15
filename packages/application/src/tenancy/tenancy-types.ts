@@ -13,8 +13,7 @@ export const WORKSPACE_ROLES = ['admin', 'manager', 'staff'] as const;
 export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
 
 export const WORKSPACE_MEMBER_STATUSES = ['active', 'deactivated'] as const;
-export type WorkspaceMemberStatus =
-  (typeof WORKSPACE_MEMBER_STATUSES)[number];
+export type WorkspaceMemberStatus = (typeof WORKSPACE_MEMBER_STATUSES)[number];
 
 export function isWorkspaceRole(value: unknown): value is WorkspaceRole {
   return (

@@ -3,10 +3,7 @@ import type {
   WorkspaceMemberStore,
   WorkspaceStore,
 } from './tenancy-ports';
-import type {
-  WorkspaceContext,
-  WorkspaceMemberRecord,
-} from './tenancy-types';
+import type { WorkspaceContext, WorkspaceMemberRecord } from './tenancy-types';
 
 function clone<T>(value: T): T {
   if (value instanceof Date) return new Date(value.getTime()) as T;
@@ -30,7 +27,10 @@ function clone<T>(value: T): T {
 export class InMemoryTenancyStore
   implements WorkspaceMemberStore, WorkspaceStore, TenancyAuditSink
 {
-  private workspaces = new Map<string, { id: string; name: string; slug: string }>();
+  private workspaces = new Map<
+    string,
+    { id: string; name: string; slug: string }
+  >();
   private members = new Map<string, WorkspaceMemberRecord>();
   private byWorkspaceUser = new Map<string, string>();
   private seq = 0;

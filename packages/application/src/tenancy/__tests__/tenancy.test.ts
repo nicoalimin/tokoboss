@@ -135,9 +135,7 @@ describe('cross-workspace deny at the application boundary', () => {
       userId: 'user_admin_a',
     });
     expect(ctxA).not.toBeNull();
-    expect(() => assertSameWorkspace(ctxA, wsB)).toThrow(
-      TenancyForbiddenError
-    );
+    expect(() => assertSameWorkspace(ctxA, wsB)).toThrow(TenancyForbiddenError);
 
     // Member mutations across workspaces are denied (never leaked).
     await expect(
@@ -290,7 +288,9 @@ describe('audit baseline without secrets/PII', () => {
       { ctx, workspaceId: ws, userId: 'user_staff_7', role: 'staff' },
       store.audit
     );
-    const added = store.auditEvents.find((e) => e.action === 'membership.added');
+    const added = store.auditEvents.find(
+      (e) => e.action === 'membership.added'
+    );
     expect(added).toBeDefined();
     expect(added?.category).toBe('membership');
     const serialized = JSON.stringify(added);

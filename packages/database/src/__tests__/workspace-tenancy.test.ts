@@ -115,9 +115,10 @@ describe('workspace tenancy migration + drizzle stores', () => {
       });
       // Same user id, other workspace → null (use-cases map this to deny).
       expect(await store.findByWorkspaceAndUser(wsB, 'user_1')).toBeNull();
-      expect(
-        await store.findByWorkspaceAndUser(wsA, 'user_1')
-      ).toMatchObject({ role: 'staff', authVersion: 1 });
+      expect(await store.findByWorkspaceAndUser(wsA, 'user_1')).toMatchObject({
+        role: 'staff',
+        authVersion: 1,
+      });
     } finally {
       await client.close();
     }
@@ -165,7 +166,9 @@ describe('workspace tenancy migration + drizzle stores', () => {
         category: 'membership',
         actorId: 'user_admin_1',
       });
-      expect(JSON.stringify(rows[0])).not.toMatch(/password|Bearer|@example\.com/);
+      expect(JSON.stringify(rows[0])).not.toMatch(
+        /password|Bearer|@example\.com/
+      );
     } finally {
       await client.close();
     }

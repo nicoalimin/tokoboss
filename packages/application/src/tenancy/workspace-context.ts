@@ -2,10 +2,7 @@ import {
   TenancyForbiddenError,
   TenancyValidationError,
 } from './tenancy-errors';
-import {
-  requireWarehouseScope,
-  requireWorkspaceId,
-} from './tenancy-safety';
+import { requireWarehouseScope, requireWorkspaceId } from './tenancy-safety';
 import type { WorkspaceMemberStore } from './tenancy-ports';
 import type {
   WorkspaceContext,

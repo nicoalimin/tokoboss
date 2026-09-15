@@ -45,10 +45,7 @@ export const workspaceMembers = pgTable(
       t.userId
     ),
     index('workspace_members_workspace_role_idx').on(t.workspaceId, t.role),
-    index('workspace_members_workspace_status_idx').on(
-      t.workspaceId,
-      t.status
-    ),
+    index('workspace_members_workspace_status_idx').on(t.workspaceId, t.status),
     index('workspace_members_user_idx').on(t.userId),
   ]
 );

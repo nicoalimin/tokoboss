@@ -23,7 +23,9 @@ function toRecord(row: WorkspaceMemberRow): WorkspaceMemberRecord {
     row.status === 'active' || row.status === 'deactivated'
       ? row.status
       : (() => {
-          throw new Error(`WORKSPACE_MEMBER_CORRUPT: unknown status ${row.status}`);
+          throw new Error(
+            `WORKSPACE_MEMBER_CORRUPT: unknown status ${row.status}`
+          );
         })();
   return {
     id: row.id,
@@ -143,7 +145,10 @@ export class DrizzleWorkspaceMemberStore implements WorkspaceMemberStore {
       .update(workspaceMembers)
       .set({ ...patch })
       .where(
-        and(eq(workspaceMembers.id, id), eq(workspaceMembers.workspaceId, workspaceId))
+        and(
+          eq(workspaceMembers.id, id),
+          eq(workspaceMembers.workspaceId, workspaceId)
+        )
       )
       .returning();
     const row = updated[0];
@@ -155,7 +160,10 @@ export class DrizzleWorkspaceMemberStore implements WorkspaceMemberStore {
     await this.db
       .delete(workspaceMembers)
       .where(
-        and(eq(workspaceMembers.id, id), eq(workspaceMembers.workspaceId, workspaceId))
+        and(
+          eq(workspaceMembers.id, id),
+          eq(workspaceMembers.workspaceId, workspaceId)
+        )
       );
   }
 }

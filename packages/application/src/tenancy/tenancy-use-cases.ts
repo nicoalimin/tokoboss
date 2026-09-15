@@ -5,6 +5,7 @@ import type {
 } from './tenancy-ports';
 import {
   LastAdminError,
+  TenancyForbiddenError,
   TenancyValidationError,
 } from './tenancy-errors';
 import {
@@ -76,8 +77,10 @@ export async function createWorkspace(
 ): Promise<{ workspaceId: string; admin: WorkspaceMemberRecord }> {
   const name = (input.name ?? '').trim();
   const slug = (input.slug ?? '').trim();
-  if (name.length === 0) throw new TenancyValidationError('name must not be empty');
-  if (slug.length === 0) throw new TenancyValidationError('slug must not be empty');
+  if (name.length === 0)
+    throw new TenancyValidationError('name must not be empty');
+  if (slug.length === 0)
+    throw new TenancyValidationError('slug must not be empty');
   const adminUserId = requireUserId(input.initialAdminUserId);
   const ws = await workspaces.createWorkspace({ name, slug });
   const admin = await members.create({
@@ -121,18 +124,19 @@ export async function updateWorkspace(
 ): Promise<{ id: string; name: string; slug: string }> {
   assertSameWorkspace(input.ctx, input.workspaceId);
   if (input.ctx.role !== 'admin') {
-    const { TenancyForbiddenError } = await import('./tenancy-errors');
     throw new TenancyForbiddenError('Only Admin may update the workspace');
   }
   const patch: { name?: string; slug?: string } = {};
   if (input.name !== undefined) {
     const name = input.name.trim();
-    if (name.length === 0) throw new TenancyValidationError('name must not be empty');
+    if (name.length === 0)
+      throw new TenancyValidationError('name must not be empty');
     patch.name = name;
   }
   if (input.slug !== undefined) {
     const slug = input.slug.trim();
-    if (slug.length === 0) throw new TenancyValidationError('slug must not be empty');
+    if (slug.length === 0)
+      throw new TenancyValidationError('slug must not be empty');
     patch.slug = slug;
   }
   const updated = await workspaces.updateWorkspace(input.workspaceId, patch);
@@ -171,7 +175,6 @@ export async function addMember(
 ): Promise<WorkspaceMemberRecord> {
   assertSameWorkspace(input.ctx, input.workspaceId);
   if (input.ctx.role !== 'admin') {
-    const { TenancyForbiddenError } = await import('./tenancy-errors');
     throw new TenancyForbiddenError('Only Admin may add members');
   }
   const workspaceId = requireWorkspaceId(input.workspaceId);
@@ -226,23 +229,27 @@ export async function changeMember(
 ): Promise<WorkspaceMemberRecord> {
   assertSameWorkspace(input.ctx, input.workspaceId);
   if (input.ctx.role !== 'admin') {
-    const { TenancyForbiddenError } = await import('./tenancy-errors');
     throw new TenancyForbiddenError('Only Admin may change members');
   }
   const workspaceId = requireWorkspaceId(input.workspaceId);
   const targetUserId = requireUserId(input.targetUserId);
-  const current = await members.findByWorkspaceAndUser(workspaceId, targetUserId);
+  const current = await members.findByWorkspaceAndUser(
+    workspaceId,
+    targetUserId
+  );
   if (!current) {
-    const { TenancyForbiddenError } = await import('./tenancy-errors');
     throw new TenancyForbiddenError();
   }
-  const nextRole = input.role !== undefined ? requireRole(input.role) : current.role;
-  const nextScope =
-    input.warehouseScope !== undefined
-      ? requireWarehouseScope(nextRole, input.warehouseScope)
-      : input.role !== undefined && input.warehouseScope === undefined
-        ? requireWarehouseScope(nextRole, current.warehouseScope)
-        : current.warehouseScope;
+  const nextRole =
+    input.role !== undefined ? requireRole(input.role) : current.role;
+  // Re-validate the carried-over scope when the role itself changes
+  // (e.g. promoting to Admin with a stale scope must fail loudly).
+  let nextScope = current.warehouseScope;
+  if (input.warehouseScope !== undefined) {
+    nextScope = requireWarehouseScope(nextRole, input.warehouseScope);
+  } else if (input.role !== undefined) {
+    nextScope = requireWarehouseScope(nextRole, current.warehouseScope);
+  }
   const nextStatus =
     input.status !== undefined ? requireStatus(input.status) : current.status;
 
@@ -255,7 +262,8 @@ export async function changeMember(
   // Final-active-Admin invariant: cannot demote/deactivate/remove the last one.
   if (current.role === 'admin' && current.status === 'active') {
     const all = await members.listByWorkspace(workspaceId);
-    const demotesOrDeactivates = nextRole !== 'admin' || nextStatus !== 'active';
+    const demotesOrDeactivates =
+      nextRole !== 'admin' || nextStatus !== 'active';
     if (demotesOrDeactivates && countActiveAdmins(all, targetUserId) === 0) {
       throw new LastAdminError();
     }
@@ -274,7 +282,8 @@ export async function changeMember(
     if ((nextScope ?? null) !== (current.warehouseScope ?? null)) {
       actions.push('membership.scope_changed');
     }
-    if (nextStatus !== current.status) actions.push('membership.status_changed');
+    if (nextStatus !== current.status)
+      actions.push('membership.status_changed');
     for (const action of actions) {
       await audit.append({
         workspaceId,
@@ -292,7 +301,11 @@ export async function changeMember(
               warehouseScope: current.warehouseScope,
               status: current.status,
             },
-            to: { role: nextRole, warehouseScope: nextScope, status: nextStatus },
+            to: {
+              role: nextRole,
+              warehouseScope: nextScope,
+              status: nextStatus,
+            },
             authVersion: updated.authVersion,
           },
           action
@@ -319,14 +332,15 @@ export async function removeMember(
 ): Promise<void> {
   assertSameWorkspace(input.ctx, input.workspaceId);
   if (input.ctx.role !== 'admin') {
-    const { TenancyForbiddenError } = await import('./tenancy-errors');
     throw new TenancyForbiddenError('Only Admin may remove members');
   }
   const workspaceId = requireWorkspaceId(input.workspaceId);
   const targetUserId = requireUserId(input.targetUserId);
-  const current = await members.findByWorkspaceAndUser(workspaceId, targetUserId);
+  const current = await members.findByWorkspaceAndUser(
+    workspaceId,
+    targetUserId
+  );
   if (!current) {
-    const { TenancyForbiddenError } = await import('./tenancy-errors');
     throw new TenancyForbiddenError();
   }
   if (current.role === 'admin' && current.status === 'active') {
@@ -371,14 +385,15 @@ export async function forceSignOut(
 ): Promise<WorkspaceMemberRecord> {
   assertSameWorkspace(input.ctx, input.workspaceId);
   if (input.ctx.role !== 'admin') {
-    const { TenancyForbiddenError } = await import('./tenancy-errors');
     throw new TenancyForbiddenError('Only Admin may force sign-out');
   }
   const workspaceId = requireWorkspaceId(input.workspaceId);
   const targetUserId = requireUserId(input.targetUserId);
-  const current = await members.findByWorkspaceAndUser(workspaceId, targetUserId);
+  const current = await members.findByWorkspaceAndUser(
+    workspaceId,
+    targetUserId
+  );
   if (!current) {
-    const { TenancyForbiddenError } = await import('./tenancy-errors');
     throw new TenancyForbiddenError();
   }
   const updated = await members.update(current.id, workspaceId, {
