@@ -16,7 +16,6 @@ import {
 import {
   PURPOSE_MAX_BYTES,
   PURPOSE_MIME_ALLOWLIST,
-  isFileUploadStatus,
   isUploadAllowedRole,
   type FileUploadPurpose,
   type FileUploadRecord,
@@ -91,6 +90,12 @@ export async function requestUploadToken(
   );
 
   const purpose = input.purpose as FileUploadPurpose;
+  if (
+    input.retentionUntil !== undefined &&
+    !(input.retentionUntil instanceof Date && !Number.isNaN(input.retentionUntil.getTime()))
+  ) {
+    throw new UploadValidationError('retentionUntil must be a valid date');
+  }
   const idempotencyKey =
     input.idempotencyKey && input.idempotencyKey.trim().length > 0
       ? input.idempotencyKey.trim()
@@ -368,5 +373,3 @@ export function assertMimeAllowed(purpose: FileUploadPurpose, contentType: strin
     );
   }
 }
-
-export { isFileUploadStatus };
