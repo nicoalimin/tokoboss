@@ -16,13 +16,19 @@ export default function HomePage() {
         </div>
         <nav
           aria-label="Account"
-          className="mt-8 flex items-center justify-center gap-4 text-sm"
+          className="mt-8 flex flex-wrap items-center justify-center gap-4 text-sm"
         >
           <Link
             href="/sign-in"
             className="rounded-lg bg-primary-500 px-6 py-3 min-h-[44px] inline-flex items-center font-semibold text-white hover:bg-primary-600"
           >
             Sign in
+          </Link>
+          <Link
+            href="/profil"
+            className="rounded-lg bg-primary-500 px-6 py-3 min-h-[44px] inline-flex items-center font-semibold text-white hover:bg-primary-600"
+          >
+            Profil
           </Link>
           <Link
             href="/sessions"
