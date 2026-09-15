@@ -17,6 +17,7 @@
 import {
   DrizzleCredentialStore,
   DrizzlePasswordResetStore,
+  DrizzleProfileStore,
   DrizzleSessionStore,
   DrizzleTenancyAuditSink,
   DrizzleTenantRepository,
@@ -27,6 +28,7 @@ import {
 import {
   InMemoryCredentialStore,
   InMemoryPasswordResetStore,
+  InMemoryProfileStore,
   InMemorySessionStore,
   InMemoryTenancyStore,
   ScryptPasswordHasher,
@@ -41,6 +43,7 @@ import {
   type AuthPlatform,
   type CredentialStore,
   type PasswordResetStore,
+  type ProfileStore,
   type SessionStore,
   type TenancyAuditSink,
   type WorkspaceMemberStore,
@@ -134,6 +137,7 @@ let memoryTenancy: InMemoryTenancyStore | null = null;
 let memoryCredentials: InMemoryCredentialStore | null = null;
 let memorySessions: InMemorySessionStore | null = null;
 let memoryResets: InMemoryPasswordResetStore | null = null;
+let memoryProfiles: InMemoryProfileStore | null = null;
 let rateLimiter: SignInRateLimiter | null = null;
 const hasher = new ScryptPasswordHasher();
 
@@ -162,6 +166,11 @@ function getMemoryResets(): InMemoryPasswordResetStore {
   return memoryResets;
 }
 
+function getMemoryProfiles(): InMemoryProfileStore {
+  if (!memoryProfiles) memoryProfiles = new InMemoryProfileStore();
+  return memoryProfiles;
+}
+
 export function getRateLimiter(): SignInRateLimiter {
   if (!rateLimiter) rateLimiter = new SignInRateLimiter();
   return rateLimiter;
@@ -186,6 +195,13 @@ export function getPasswordResetStore(): PasswordResetStore {
     return new DrizzlePasswordResetStore(getDbHandle().db);
   }
   return getMemoryResets();
+}
+
+export function getProfileStore(): ProfileStore {
+  if (storageKind() === 'postgres') {
+    return new DrizzleProfileStore(getDbHandle().db);
+  }
+  return getMemoryProfiles();
 }
 
 export function getMemberStore(): WorkspaceMemberStore {
@@ -336,6 +352,7 @@ export function __resetAuthForTests(): void {
   memoryCredentials = new InMemoryCredentialStore();
   memorySessions = new InMemorySessionStore();
   memoryResets = new InMemoryPasswordResetStore();
+  memoryProfiles = new InMemoryProfileStore();
   rateLimiter = new SignInRateLimiter();
 }
 

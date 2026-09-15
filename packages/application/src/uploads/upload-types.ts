@@ -38,8 +38,15 @@ export function isUploadAllowedRole(value: unknown): value is UploadRole {
 }
 
 /** MIME allowlist per purpose — rejected before any token is issued. */
-export const PURPOSE_MIME_ALLOWLIST: Record<FileUploadPurpose, readonly string[]> = {
-  import: ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+export const PURPOSE_MIME_ALLOWLIST: Record<
+  FileUploadPurpose,
+  readonly string[]
+> = {
+  import: [
+    'text/csv',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ],
   'manual-order': ['text/csv', 'application/pdf', 'image/png', 'image/jpeg'],
   'sku-picture': ['image/png', 'image/jpeg', 'image/webp'],
   label: ['application/pdf', 'image/png'],
@@ -47,6 +54,7 @@ export const PURPOSE_MIME_ALLOWLIST: Record<FileUploadPurpose, readonly string[]
   return: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'],
   export: ['text/csv', 'application/pdf'],
   fixture: ['text/plain', 'application/octet-stream', 'image/png'],
+  avatar: ['image/png', 'image/jpeg', 'image/webp'],
 };
 
 /** Max accepted bytes per purpose (validated before token issuance). */
@@ -59,6 +67,7 @@ export const PURPOSE_MAX_BYTES: Record<FileUploadPurpose, number> = {
   return: 10 * 1024 * 1024,
   export: 25 * 1024 * 1024,
   fixture: 1 * 1024 * 1024,
+  avatar: 5 * 1024 * 1024,
 };
 
 export const MAX_FILENAME_LEN = 255;
