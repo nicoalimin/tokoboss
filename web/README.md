@@ -201,8 +201,10 @@ in JS storage or logs).
 | `/accept-invite`| Token-gated accept form (`?token=` prefill); optional new password for first sign-in                                              |
 
 Rules reflected in UX: Admin invites/updates force an empty warehouse scope
-(server re-enforces); demoting/deactivating the last active Admin surfaces
-the dedicated last-Admin message; unknown/consumed tickets share one generic
+(server re-enforces); the last active Admin's row is locked in the UI (role,
+scope, save, and deactivate controls render disabled with banner + badge,
+and demote/deactivate handlers no-op with the dedicated message) with the
+server 409 (`TENANCY_LAST_ADMIN`) as the authority for stale lists; unknown/consumed tickets share one generic
 invalid message and expired tickets their own; the create-response ticket
 renders once with a copy button and is never logged.
 

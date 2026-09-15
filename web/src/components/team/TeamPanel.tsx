@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   TeamClientError,
+  countActiveAdmins,
   createInvite,
   deactivateMember,
+  isLastActiveAdmin,
   listInvites,
   listMembers,
   normalizeScope,
@@ -94,10 +96,7 @@ export function TeamPanel() {
   }, []);
 
   const activeAdminCount = useMemo(
-    () =>
-      (members ?? []).filter(
-        (m) => m.role === 'admin' && m.status === 'active'
-      ).length,
+    () => countActiveAdmins(members ?? []),
     [members]
   );
 
@@ -203,6 +202,16 @@ export function TeamPanel() {
   async function onSaveMember(m: MemberView) {
     const ws = workspaceId.trim();
     const edit = editFor(m);
+    // Last-Admin lock (controls are also disabled): demoting the sole
+    // active Admin no-ops here with a clear message; the server 409 stays
+    // the authority for stale lists.
+    if (
+      edit.role !== 'admin' &&
+      isLastActiveAdmin(members ?? [], m.userId)
+    ) {
+      setError(copy.lastAdminError);
+      return;
+    }
     const nextScope = normalizeScope(edit.scope);
     if (!validateScopeForRole(edit.role, nextScope)) {
       setError(copy.adminScopeNote);
@@ -234,6 +243,12 @@ export function TeamPanel() {
 
   async function onDeactivate(m: MemberView) {
     const ws = workspaceId.trim();
+    // Last-Admin lock (controls are also disabled): deactivating the sole
+    // active Admin no-ops here with a clear message.
+    if (isLastActiveAdmin(members ?? [], m.userId)) {
+      setError(copy.lastAdminError);
+      return;
+    }
     setError(null);
     setNotice(null);
     setRowBusy(m.userId);
@@ -485,11 +500,13 @@ export function TeamPanel() {
           <ul className="mt-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200">
             {members.map((m) => {
               const edit = editFor(m);
-              const isLastAdmin =
-                m.role === 'admin' &&
-                m.status === 'active' &&
-                activeAdminCount <= 1;
+              // Last-Admin lock: the sole active Admin's demote/deactivate
+              // controls render disabled (plus banner + badge); the server
+              // 409 stays the authority for stale lists.
+              const isLastAdmin = isLastActiveAdmin(members, m.userId);
               const busy = rowBusy === m.userId;
+              const locked = isLastAdmin;
+              const lockTitle = locked ? copy.lastAdminError : undefined;
               return (
                 <li
                   key={m.userId}
@@ -531,7 +548,8 @@ export function TeamPanel() {
                       <select
                         aria-label={`${copy.roleLabel} ${m.userId}`}
                         value={edit.role}
-                        disabled={busy}
+                        disabled={busy || locked}
+                        title={lockTitle}
                         onChange={(e) =>
                           setEdits((prev) => ({
                             ...prev,
@@ -545,7 +563,7 @@ export function TeamPanel() {
                             },
                           }))
                         }
-                        className={smallInputClass}
+                        className={`${smallInputClass} disabled:bg-neutral-100 disabled:text-neutral-500`}
                       >
                         <option value="admin">{copy.roleAdmin}</option>
                         <option value="manager">{copy.roleManager}</option>
@@ -555,7 +573,8 @@ export function TeamPanel() {
                         aria-label={`${copy.scopeLabel} ${m.userId}`}
                         type="text"
                         autoComplete="off"
-                        disabled={busy || edit.role === 'admin'}
+                        disabled={busy || locked || edit.role === 'admin'}
+                        title={lockTitle}
                         placeholder={copy.scopePlaceholder}
                         value={edit.role === 'admin' ? '' : edit.scope}
                         onChange={(e) =>
@@ -568,7 +587,8 @@ export function TeamPanel() {
                       />
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={busy || locked}
+                        title={lockTitle}
                         onClick={() => void onSaveMember(m)}
                         className="rounded-lg bg-primary-500 px-4 py-2 min-h-[44px] text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-60"
                       >
@@ -598,7 +618,8 @@ export function TeamPanel() {
                       ) : (
                         <button
                           type="button"
-                          disabled={busy}
+                          disabled={busy || locked}
+                          title={lockTitle}
                           onClick={() => setConfirmTarget(m.userId)}
                           className="rounded-lg border border-error-300 bg-white px-4 py-2 min-h-[44px] text-sm font-semibold text-error-700 hover:bg-error-50 disabled:opacity-60"
                         >

@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   TeamClientError,
   acceptInvite,
+  countActiveAdmins,
   createInvite,
   deactivateMember,
+  isLastActiveAdmin,
   listInvites,
   listMembers,
   normalizeScope,
@@ -11,6 +13,7 @@ import {
   toTeamClientError,
   updateMember,
   validateScopeForRole,
+  type MemberView,
 } from '../lib/team-client';
 import { getTeamCopy, teamCopyKeys } from '../lib/team-copy';
 
@@ -202,6 +205,62 @@ describe('team-client (UTA-71 UI)', () => {
     expect(validateScopeForRole('manager', 'wh_jkt_1')).toBe(true);
     expect(normalizeScope('   ')).toBe(null);
     expect(normalizeScope('wh_jkt_1 ')).toBe('wh_jkt_1');
+  });
+
+  it('locks the last active Admin row: demote/deactivate controls bind disabled', async () => {
+    const member = (
+      userId: string,
+      role: MemberView['role'],
+      status: MemberView['status']
+    ): MemberView => ({
+      id: `m_${userId}`,
+      workspaceId: 'ws_1',
+      userId,
+      role,
+      warehouseScope: null,
+      status,
+      authVersion: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    const soleAdmin = [member('u_admin', 'admin', 'active')];
+    const twoAdmins = [
+      member('u_admin', 'admin', 'active'),
+      member('u_admin2', 'admin', 'active'),
+      member('u_staff', 'staff', 'active'),
+    ];
+    const demoted = [
+      member('u_admin', 'admin', 'deactivated'),
+      member('u_admin2', 'admin', 'active'),
+    ];
+
+    // Counts drive the banner + the row lock.
+    expect(countActiveAdmins(soleAdmin)).toBe(1);
+    expect(countActiveAdmins(twoAdmins)).toBe(2);
+    expect(countActiveAdmins([])).toBe(0);
+
+    // Sole active Admin: locked — the panel disables role/scope/save and
+    // the deactivate button for this row (no submit possible).
+    expect(isLastActiveAdmin(soleAdmin, 'u_admin')).toBe(true);
+
+    // Two active Admins: either may be demoted/deactivated — not locked.
+    expect(isLastActiveAdmin(twoAdmins, 'u_admin')).toBe(false);
+    expect(isLastActiveAdmin(twoAdmins, 'u_admin2')).toBe(false);
+
+    // Non-admins and deactivated rows are never locked…
+    expect(isLastActiveAdmin(twoAdmins, 'u_staff')).toBe(false);
+    expect(isLastActiveAdmin(demoted, 'u_admin')).toBe(false);
+    // …and unknown ids lock nothing (stale-list safe).
+    expect(isLastActiveAdmin(soleAdmin, 'u_ghost')).toBe(false);
+
+    // The lock message is the dedicated last-Admin copy (never a raw 409).
+    expect(
+      toTeamClientError(
+        409,
+        { errorCode: 'TENANCY_LAST_ADMIN' },
+        'en'
+      ).message
+    ).toBe(getTeamCopy('en').lastAdminError);
   });
 
   it('en/id copy stays in sync with no secret wording', () => {

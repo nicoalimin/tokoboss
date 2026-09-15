@@ -184,6 +184,31 @@ export function validateScopeForRole(
   return true;
 }
 
+/** Count active Admins in a member list (drives the last-Admin lock). */
+export function countActiveAdmins(members: MemberView[]): number {
+  return members.filter(
+    (m) => m.role === 'admin' && m.status === 'active'
+  ).length;
+}
+
+/**
+ * True when `userId` is the workspace's sole active Admin.
+ *
+ * The Team UI binds `disabled` on that row's demote/deactivate controls to
+ * this predicate (UTA-71 review) — the server 409 (`TENANCY_LAST_ADMIN`)
+ * remains the authority for stale lists or direct API callers.
+ */
+export function isLastActiveAdmin(
+  members: MemberView[],
+  userId: string
+): boolean {
+  const target = members.find((m) => m.userId === userId);
+  if (!target || target.role !== 'admin' || target.status !== 'active') {
+    return false;
+  }
+  return countActiveAdmins(members) <= 1;
+}
+
 /** Normalize the scope input: empty string → null (unscoped). */
 export function normalizeScope(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
