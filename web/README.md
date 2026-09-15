@@ -183,6 +183,41 @@ Password-reset tickets need a mailer in production; locally start dev with
 ### Tests
 
 ```bash
-pnpm --filter @tokoboss/web test      # route (auth.test.ts) + UI client (auth-ui.test.ts)
+pnpm --filter @tokoboss/web test      # route (auth.test.ts, invite-members.test.ts) + UI clients (auth-ui.test.ts, team-ui.test.ts)
 pnpm --filter @tokoboss/web typecheck # must pass before push
+```
+
+## Team & Access UI (UTA-71, Story 19)
+
+Admin-only team management over the UTA-70 invite/membership APIs.
+Design tokens via Tailwind; copy in `src/lib/team-copy.ts` (EN default +
+ID); browser calls in `src/lib/team-client.ts` (`credentials:
+"same-origin"` so the HttpOnly `tb_session` cookie rides along — no tokens
+in JS storage or logs).
+
+| Route           | Screen                                                                                                                            |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `/team`         | Workspace loader, invite-create form (email + role + warehouse scope), member list with role/scope save + deactivate-with-confirm, pending invites with revoke, last-Admin warning |
+| `/accept-invite`| Token-gated accept form (`?token=` prefill); optional new password for first sign-in                                              |
+
+Rules reflected in UX: Admin invites/updates force an empty warehouse scope
+(server re-enforces); demoting/deactivating the last active Admin surfaces
+the dedicated last-Admin message; unknown/consumed tickets share one generic
+invalid message and expired tickets their own; the create-response ticket
+renders once with a copy button and is never logged.
+
+### Local preview runbook (memory mode, no `DATABASE_URL`)
+
+```bash
+pnpm --filter @tokoboss/web dev
+# 1. Open http://localhost:3000/sign-in and sign in as a seeded Admin
+#    (seed via `seedFixtureCredential` as above; copy its workspace ID).
+# 2. Open http://localhost:3000/team, paste the workspace ID, Load team.
+# 3. Invite a teammate (role staff/manager + optional scope `wh_jkt_1`);
+#    copy the once-only ticket.
+# 4. In a private window open http://localhost:3000/accept-invite?token=<ticket>,
+#    accept with a new password, then sign in as the new member.
+# 5. Back as Admin on /team: change a role/scope (Save), revoke a pending
+#    invite, deactivate a member (confirm) — the last active Admin stays
+#    protected with a warning + error.
 ```

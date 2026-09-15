@@ -30,6 +30,12 @@ export default function HomePage() {
           >
             Active sessions
           </Link>
+          <Link
+            href="/team"
+            className="rounded-lg border border-neutral-300 bg-white px-6 py-3 min-h-[44px] inline-flex items-center font-semibold text-neutral-800 hover:bg-neutral-100"
+          >
+            Team &amp; Access
+          </Link>
         </nav>
       </div>
     </main>
