@@ -1,0 +1,19 @@
+type: http_request
+model: http_request
+id: rq_tokoboss_sessions
+createdAt: 2026-09-15T00:00:00.000000Z
+updatedAt: 2026-09-15T00:00:00.000000Z
+workspaceId: wk_tokoboss
+folderId: fl_tokoboss_auth
+authentication:
+  token: ${[access_token]}
+authenticationType: bearer
+body: {}
+bodyType: null
+description: Lists active sessions for the token created by Sign in (mobile token).
+headers: []
+method: GET
+name: List sessions
+sortPriority: 3.0
+url: ${[base_url]}/api/auth/sessions
+urlParameters: []

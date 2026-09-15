@@ -20,6 +20,16 @@ export const AuthSignInBodySchema = z.object({
 });
 export type AuthSignInBody = z.infer<typeof AuthSignInBodySchema>;
 
+/** POST /api/auth/bootstrap-users (server-secret protected). */
+export const AuthBootstrapUserBodySchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  workspaceName: z.string().trim().min(1).max(120).optional(),
+});
+export type AuthBootstrapUserBody = z.infer<
+  typeof AuthBootstrapUserBodySchema
+>;
+
 /** Client-safe session projection (no hashes, no tokens). */
 export const AuthSessionViewSchema = z.object({
   id: z.string().min(1),

@@ -1,0 +1,18 @@
+type: environment
+model: environment
+id: ev_tokoboss_local
+workspaceId: wk_tokoboss
+createdAt: 2026-09-15T00:00:00.000000Z
+updatedAt: 2026-09-15T00:00:00.000000Z
+name: Local development
+public: true
+base: true
+parentModel: workspace
+parentId: null
+variables:
+  - { enabled: true, name: base_url, value: "http://localhost:3000", id: null }
+  - { enabled: true, name: bootstrap_password, value: "", id: null }
+  - { enabled: true, name: workspace_id, value: "", id: null }
+  - { enabled: true, name: access_token, value: "", id: null }
+color: null
+sortPriority: 0.0

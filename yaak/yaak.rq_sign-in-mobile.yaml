@@ -1,0 +1,30 @@
+type: http_request
+model: http_request
+id: rq_tokoboss_sign_in_mobile
+createdAt: 2026-09-15T00:00:00.000000Z
+updatedAt: 2026-09-15T00:00:00.000000Z
+workspaceId: wk_tokoboss
+folderId: fl_tokoboss_auth
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "email": "owner@tokoboss.local",
+      "password": "change-this-user-password",
+      "workspaceId": "${[workspace_id]}",
+      "platform": "mobile",
+      "deviceLabel": "Yaak"
+    }
+bodyType: application/json
+description: Creates a mobile session and returns a bearer token. Copy token to access_token to call authenticated endpoints.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+method: POST
+name: Sign in (mobile token)
+sortPriority: 2.0
+url: ${[base_url]}/api/auth/sign-in
+urlParameters: []

@@ -180,6 +180,16 @@ Password-reset tickets need a mailer in production; locally start dev with
 `POST /api/auth/password-reset/request`, then paste it as
 `/reset-password?token=<ticket>`. Resetting revokes all sessions.
 
+### Bootstrap a user through the API
+
+Set `AUTH_BOOTSTRAP_PASSWORD` to a long random server-only value. Then call
+`POST /api/auth/bootstrap-users` with that value in the
+`X-Bootstrap-Password` header and a body containing `email`, `password`, and
+an optional `workspaceName`. The endpoint creates a workspace and its initial
+Admin account, returning `workspaceId` for the normal sign-in endpoint. It is
+disabled when the environment variable is unset. Import the tracked `yaak/`
+folder into Yaak for ready-made bootstrap and sign-in requests.
+
 ### Tests
 
 ```bash

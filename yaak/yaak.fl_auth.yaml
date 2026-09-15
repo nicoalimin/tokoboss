@@ -1,0 +1,11 @@
+type: folder
+model: folder
+id: fl_tokoboss_auth
+workspaceId: wk_tokoboss
+folderId: null
+authentication: {}
+authenticationType: null
+description: Bootstrap an initial workspace Admin, then sign in.
+headers: []
+name: Auth
+sortPriority: 1000.0

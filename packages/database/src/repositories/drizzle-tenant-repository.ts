@@ -1,4 +1,5 @@
 import type { Repository } from '@tokoboss/domain';
+import type { WorkspaceStore } from '@tokoboss/application';
 import { eq } from 'drizzle-orm';
 import type { DatabaseHandle, Transaction } from '../db';
 import { auditEvents, tenants } from '../schema/index';
@@ -32,7 +33,7 @@ function toEntity(row: typeof tenants.$inferSelect): TenantEntity {
 export class DrizzleTenantRepository implements Repository<
   TenantEntity,
   string
-> {
+>, WorkspaceStore {
   constructor(private readonly db: DbOrTx) {}
 
   /** Rebind this repository to a transaction handle. */
@@ -48,6 +49,40 @@ export class DrizzleTenantRepository implements Repository<
       .limit(1);
     const row = rows[0];
     return row ? toEntity(row) : null;
+  }
+
+  async findWorkspaceById(
+    id: string
+  ): Promise<{ id: string; name: string; slug: string } | null> {
+    return this.findById(id);
+  }
+
+  async createWorkspace(input: { name: string; slug: string }): Promise<{
+    id: string;
+    name: string;
+    slug: string;
+  }> {
+    const rows = await this.db
+      .insert(tenants)
+      .values({ name: input.name, slug: input.slug })
+      .returning();
+    const created = rows[0];
+    if (!created) throw new Error('Failed to create workspace');
+    return toEntity(created);
+  }
+
+  async updateWorkspace(
+    id: string,
+    patch: { name?: string; slug?: string }
+  ): Promise<{ id: string; name: string; slug: string }> {
+    const rows = await this.db
+      .update(tenants)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(eq(tenants.id, id))
+      .returning();
+    const updated = rows[0];
+    if (!updated) throw new Error(`WORKSPACE_NOT_FOUND: ${id}`);
+    return toEntity(updated);
   }
 
   async findBySlug(slug: string): Promise<TenantEntity | null> {

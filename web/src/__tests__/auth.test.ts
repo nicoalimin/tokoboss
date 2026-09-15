@@ -6,6 +6,7 @@ import { POST as signOutAll } from '../app/api/auth/sign-out-all/route';
 import { GET as listRoute } from '../app/api/auth/sessions/route';
 import { POST as resetRequest } from '../app/api/auth/password-reset/request/route';
 import { POST as resetConfirm } from '../app/api/auth/password-reset/confirm/route';
+import { POST as bootstrapUser } from '../app/api/auth/bootstrap-users/route';
 
 /**
  * Auth Route Handler flow (UTA-67) through the memory wiring:
@@ -62,6 +63,40 @@ describe('auth routes (memory wiring)', () => {
     // Response-safe: no password, no hash, no email echo of secrets.
     expect(JSON.stringify(body)).not.toContain(PASSWORD);
     expect(JSON.stringify(body)).not.toMatch(/passwordHash|tokenHash/);
+  });
+
+  it('bootstraps a workspace Admin only with the configured shared password', async () => {
+    process.env['AUTH_BOOTSTRAP_PASSWORD'] = 'local-bootstrap-password-123';
+    const body = {
+      email: 'new-owner@fixture.test',
+      password: 'new-owner-password-123',
+      workspaceName: 'New Fixture Store',
+    };
+
+    const denied = await bootstrapUser(
+      jsonRequest('/api/auth/bootstrap-users', body)
+    );
+    expect(denied.status).toBe(404);
+
+    const created = await bootstrapUser(
+      jsonRequest('/api/auth/bootstrap-users', body, {
+        'x-bootstrap-password': process.env['AUTH_BOOTSTRAP_PASSWORD'],
+      })
+    );
+    expect(created.status).toBe(201);
+    const createdBody = (await created.json()) as { workspaceId: string };
+    expect(createdBody.workspaceId).toMatch(/^ws_/);
+
+    const signedIn = await signIn(
+      jsonRequest('/api/auth/sign-in', {
+        email: body.email,
+        password: body.password,
+        workspaceId: createdBody.workspaceId,
+        platform: 'mobile',
+      })
+    );
+    expect(signedIn.status).toBe(200);
+    delete process.env['AUTH_BOOTSTRAP_PASSWORD'];
   });
 
   it('mobile sign-in returns the bearer token and lists sessions', async () => {
