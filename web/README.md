@@ -135,3 +135,54 @@ const styles = StyleSheet.create({
 ### Configuration
 
 The Tailwind configuration is in `tailwind.config.ts` and maps all design tokens to Tailwind's theme. Any updates to `packages/design-tokens/index.ts` will automatically be reflected in Tailwind utilities.
+
+## Auth UI (UTA-69, Story 21)
+
+Web sign-in / sign-out / recover-access screens wired to the UTA-67
+Route Handlers. Design tokens via Tailwind; copy in `src/lib/auth-copy.ts`
+(EN default + ID).
+
+| Route                     | Screen                                                                                                                                 |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `/sign-in`                | Sign-in form; generic error on failure (no enumeration); `?expired=1` re-auth notice after 30m web idle, `?signedOut=1` after sign-out |
+| `/forgot-password`        | Recover-access request; always the same generic success shape                                                                          |
+| `/reset-password?token=…` | New-password confirm (min 8 + denylist, server-enforced)                                                                               |
+| `/sessions`               | Active sessions list, sign out this device / all devices, security-activity affordance; 401s redirect to `/sign-in?expired=1`          |
+
+Client calls live in `src/lib/auth-client.ts`: `credentials:
+"same-origin"` so the HttpOnly `tb_session` cookie rides along; opaque
+tokens are never stored in JS or logged. Components are in
+`src/components/auth/`.
+
+### Run against the local / fixture API
+
+Without `DATABASE_URL` the auth routes use process-local memory stores
+(`storage: "memory"` in responses). Seed one login in a dev console, then
+use its workspace ID in the sign-in form:
+
+```ts
+import { __resetAuthForTests, seedFixtureCredential } from '@/lib/auth';
+
+__resetAuthForTests();
+const { workspaceId } = await seedFixtureCredential({
+  email: 'owner@fixture.test',
+  password: 'sari-roti-88!',
+});
+```
+
+```bash
+pnpm --filter @tokoboss/web dev
+# open http://localhost:3000/sign-in
+```
+
+Password-reset tickets need a mailer in production; locally start dev with
+`AUTH_INCLUDE_RESET_TOKEN=true` to receive the single-use ticket from
+`POST /api/auth/password-reset/request`, then paste it as
+`/reset-password?token=<ticket>`. Resetting revokes all sessions.
+
+### Tests
+
+```bash
+pnpm --filter @tokoboss/web test      # route (auth.test.ts) + UI client (auth-ui.test.ts)
+pnpm --filter @tokoboss/web typecheck # must pass before push
+```
