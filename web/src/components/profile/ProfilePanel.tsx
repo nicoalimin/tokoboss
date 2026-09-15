@@ -97,9 +97,15 @@ export function ProfilePanel() {
     }
     setSaving(true);
     try {
+      // Clearing the avatar field removes the reference (null) when one is
+      // set; a blank display name is omitted (blank names are invalid).
       const updated = await updateProfile({
         ...(name ? { displayName: name } : {}),
-        ...(avatar ? { avatarUploadId: avatar } : {}),
+        ...(avatar
+          ? { avatarUploadId: avatar }
+          : profile?.avatarUploadId
+            ? { avatarUploadId: null }
+            : {}),
       });
       setProfile(updated);
       setDisplayName(updated.displayName ?? '');
