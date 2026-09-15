@@ -13,6 +13,7 @@
   "dependencies": {
     "@tokoboss/application": "workspace:*",
     "@tokoboss/config": "workspace:*",
+    "@tokoboss/contracts": "workspace:*",
     "@tokoboss/database": "workspace:*",
     "@tokoboss/design-tokens": "workspace:*",
     "@tokoboss/domain": "workspace:*",

@@ -6,3 +6,4 @@ export * from './dto';
 export * from './jobs';
 export * from './uploads';
 export * from './tenancy';
+export * from './auth';

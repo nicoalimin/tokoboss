@@ -36,6 +36,13 @@
       "when": 1789464700131,
       "tag": "0005_workspace_tenancy_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789467891882,
+      "tag": "0006_auth_sessions",
+      "breakpoints": true
     }
   ]
 }

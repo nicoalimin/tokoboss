@@ -228,6 +228,9 @@ importers:
       '@tokoboss/config':
         specifier: workspace:*
         version: link:../packages/config
+      '@tokoboss/contracts':
+        specifier: workspace:*
+        version: link:../packages/contracts
       '@tokoboss/database':
         specifier: workspace:*
         version: link:../packages/database

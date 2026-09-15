@@ -68,3 +68,13 @@ export interface TenancyAuditSink {
     payload: Record<string, unknown>;
   }): Promise<void>;
 }
+
+/**
+ * Minimal session-revocation port so membership changes (deactivate,
+ * forced sign-out) can revoke server-side session rows. Deliberately
+ * narrow — `@tokoboss/application`'s auth `SessionStore` satisfies it
+ * structurally, and tenancy never imports the auth module (no cycle).
+ */
+export interface SessionRevoker {
+  revokeAllByUser(userId: string, revokedAt: Date): Promise<number>;
+}
