@@ -193,7 +193,7 @@ folder into Yaak for ready-made bootstrap and sign-in requests.
 ### Tests
 
 ```bash
-pnpm --filter @tokoboss/web test      # route (auth.test.ts, invite-members.test.ts) + UI clients (auth-ui.test.ts, team-ui.test.ts)
+pnpm --filter @tokoboss/web test      # route (auth.test.ts, invite-members.test.ts, profile.test.ts) + UI clients (auth-ui.test.ts, team-ui.test.ts, profile-ui.test.ts)
 pnpm --filter @tokoboss/web typecheck # must pass before push
 ```
 
@@ -205,10 +205,10 @@ ID); browser calls in `src/lib/team-client.ts` (`credentials:
 "same-origin"` so the HttpOnly `tb_session` cookie rides along — no tokens
 in JS storage or logs).
 
-| Route           | Screen                                                                                                                            |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `/team`         | Workspace loader, invite-create form (email + role + warehouse scope), member list with role/scope save + deactivate-with-confirm, pending invites with revoke, last-Admin warning |
-| `/accept-invite`| Token-gated accept form (`?token=` prefill); optional new password for first sign-in                                              |
+| Route            | Screen                                                                                                                                                                             |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/team`          | Workspace loader, invite-create form (email + role + warehouse scope), member list with role/scope save + deactivate-with-confirm, pending invites with revoke, last-Admin warning |
+| `/accept-invite` | Token-gated accept form (`?token=` prefill); optional new password for first sign-in                                                                                               |
 
 Rules reflected in UX: Admin invites/updates force an empty warehouse scope
 (server re-enforces); the last active Admin's row is locked in the UI (role,
@@ -233,3 +233,50 @@ pnpm --filter @tokoboss/web dev
 #    invite, deactivate a member (confirm) — the last active Admin stays
 #    protected with a warning + error.
 ```
+
+## Profil UI (UTA-73, Story 25)
+
+Personal profile over the UTA-72 read/update + change-password APIs
+(UTA-67 sessions read-only below). Design tokens via Tailwind; copy in
+`src/lib/profile-copy.ts` (EN default + ID); browser calls in
+`src/lib/profile-client.ts` (`credentials: "same-origin"` so the HttpOnly
+session cookie rides along — no tokens in JS storage or logs).
+
+| Route      | Screen                                                                                                                                                                                                                            |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/profil`  | Canonical Profil screen: header (avatar initial + display name + email), profile form (display name + optional avatar upload ID), change-password form (current + new + confirm), active-sessions card via shared `SessionsPanel` |
+| `/profile` | English alias rendering the same panel                                                                                                                                                                                            |
+
+Entry matches the approved mockup: the bottom-left overflow menu (global
+`AppNav` in the root layout) shows `•••` on desktop and `Lainnya` on
+mobile; the menu links to Profil, Active sessions, Team & Access, and
+Sign in. The home page also links to `/profil`.
+
+Rules reflected in UX: profile reads/updates hit `GET`/`PATCH
+/api/auth/me` (own profile only — no target-user parameter; avatar IDs
+stay opaque references, never bytes or URLs); wrong current passwords map
+to one generic message; weak replacements surface the server policy
+detail; any 401 `INVALID_SESSION` redirects to `/sign-in?expired=1`;
+password change revokes ALL sessions and clears the cookie, so success
+redirects to re-auth with a notice.
+
+### Local preview runbook (memory mode, no `DATABASE_URL`)
+
+```bash
+pnpm --filter @tokoboss/web dev
+# 1. Sign in at http://localhost:3000/sign-in as a seeded user
+#    (seed via `seedFixtureCredential` as above; copy its workspace ID).
+# 2. Open http://localhost:3000/profil via the bottom-left ••• / Lainnya
+#    menu — header shows the avatar initial + email.
+# 3. Save a display name (e.g. Budi Santoso); optionally paste a completed
+#    avatar `file_uploads` ID from the same workspace (unknown IDs → 403).
+# 4. Change password (current + new + confirm): weak values → policy error,
+#    wrong current → generic error, success → redirect to /sign-in?expired=1
+#    (all sessions revoked, cookie cleared) — sign back in with the new value.
+# 5. Sessions card below mirrors /sessions (this-device badge, sign out
+#    this/all, security-activity note).
+```
+
+With `DATABASE_URL` set the same screens run against Postgres (Drizzle
+stores); without it responses carry `storage: "memory"` for fixture
+evidence.
