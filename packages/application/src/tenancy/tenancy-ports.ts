@@ -56,12 +56,12 @@ export interface WorkspaceStore {
   ): Promise<{ id: string; name: string; slug: string } | null>;
 }
 
-/** Audit sink for membership/workspace/security events. */
+/** Audit sink for membership/workspace/security/invite events. */
 export interface TenancyAuditSink {
   append(input: {
     workspaceId: string;
     action: string;
-    category: 'membership' | 'workspace' | 'security';
+    category: 'membership' | 'workspace' | 'security' | 'invite';
     actorType?: string;
     actorId?: string;
     correlationId?: string;

@@ -77,7 +77,7 @@ export interface WorkspaceContext {
 export interface TenancyAuditEvent {
   workspaceId: string;
   action: string;
-  category: 'membership' | 'workspace' | 'security';
+  category: 'membership' | 'workspace' | 'security' | 'invite';
   actorType?: string;
   actorId?: string;
   correlationId?: string;

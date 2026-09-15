@@ -38,7 +38,7 @@ export class InMemoryTenancyStore
   readonly auditEvents: Array<{
     workspaceId: string;
     action: string;
-    category: 'membership' | 'workspace' | 'security';
+    category: 'membership' | 'workspace' | 'security' | 'invite';
     actorType?: string;
     actorId?: string;
     correlationId?: string;
@@ -196,7 +196,7 @@ export class InMemoryTenancyStore
   async append(input: {
     workspaceId: string;
     action: string;
-    category: 'membership' | 'workspace' | 'security';
+    category: 'membership' | 'workspace' | 'security' | 'invite';
     actorType?: string;
     actorId?: string;
     correlationId?: string;
