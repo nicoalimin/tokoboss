@@ -19,6 +19,7 @@ import {
   DrizzlePasswordResetStore,
   DrizzleSessionStore,
   DrizzleTenancyAuditSink,
+  DrizzleTenantRepository,
   DrizzleWorkspaceMemberStore,
   createDb,
   type DbHandle,
@@ -210,6 +211,61 @@ export function getAuthDeps(): AuthDeps {
     audit: getAuthAudit(),
     rateLimiter: getRateLimiter(),
   };
+}
+
+/**
+ * Provision an initial workspace Admin for the shared-secret bootstrap API.
+ * The caller is responsible for authenticating the bootstrap secret.
+ */
+export async function createBootstrapUser(input: {
+  email: string;
+  password: string;
+  workspaceName?: string;
+  correlationId?: string;
+}): Promise<{ workspaceId: string; userId: string }> {
+  validatePassword(input.password);
+  const userId = `user_${crypto.randomUUID()}`;
+  const slug = `workspace-${crypto.randomUUID().replaceAll('-', '').slice(0, 12)}`;
+  const workspaceName = input.workspaceName?.trim() || 'TokoBoss Workspace';
+  const email = normalizeEmail(input.email);
+  const passwordHash = await hasher.hash(input.password);
+
+  const create = async (
+    workspaces: Parameters<typeof createWorkspace>[0],
+    members: WorkspaceMemberStore,
+    credentials: CredentialStore,
+    audit: TenancyAuditSink
+  ) => {
+    const { workspaceId } = await createWorkspace(
+      workspaces,
+      members,
+      {
+        name: workspaceName,
+        slug,
+        initialAdminUserId: userId,
+        actorType: 'bootstrap',
+        actorId: 'bootstrap',
+        correlationId: input.correlationId,
+      },
+      audit
+    );
+    await credentials.create({ email, userId, passwordHash });
+    return { workspaceId, userId };
+  };
+
+  if (storageKind() === 'memory') {
+    const tenancy = getMemoryTenancy();
+    return create(tenancy, tenancy, getMemoryCredentials(), tenancy.audit);
+  }
+
+  return getDbHandle().withTransaction(async (tx) =>
+    create(
+      new DrizzleTenantRepository(tx),
+      new DrizzleWorkspaceMemberStore(tx),
+      new DrizzleCredentialStore(tx),
+      new DrizzleTenancyAuditSink(tx)
+    )
+  );
 }
 
 export interface ValidatedRequest {

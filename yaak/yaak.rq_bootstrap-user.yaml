@@ -1,0 +1,32 @@
+type: http_request
+model: http_request
+id: rq_tokoboss_bootstrap_user
+createdAt: 2026-09-15T00:00:00.000000Z
+updatedAt: 2026-09-15T00:00:00.000000Z
+workspaceId: wk_tokoboss
+folderId: fl_tokoboss_auth
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "email": "owner@tokoboss.local",
+      "password": "change-this-user-password",
+      "workspaceName": "TokoBoss Demo Store"
+    }
+bodyType: application/json
+description: Creates a new workspace and its initial Admin. Copy workspaceId from the response into the Local development environment before signing in.
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
+- enabled: true
+  name: X-Bootstrap-Password
+  value: ${[bootstrap_password]}
+  id: null
+method: POST
+name: Bootstrap workspace Admin
+sortPriority: 1.0
+url: ${[base_url]}/api/auth/bootstrap-users
+urlParameters: []
