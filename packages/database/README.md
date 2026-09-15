@@ -58,3 +58,21 @@ APP_ENV=production ALLOW_PROD_MIGRATE=true DATABASE_URL=… pnpm --filter @tokob
 
 Post-#16/#17 pipeline check: worktree recreated cleanly, `db:check` +
 `drizzle-kit check` + vitest re-run green on this branch. No product change.
+
+## UTA-19 — workspace tenancy + audit baseline
+
+- Migration `0005_workspace_tenancy_audit.sql`: creates `workspace_members`
+  (`workspace_id → tenants.id`, role `admin|manager|staff`, optional
+  `warehouse_scope`, `status`, `auth_version`) and adds nullable
+  `actor_type / actor_id / category / correlation_id` to `audit_events`.
+  Additive only — no drops, no renames of `main` migrations.
+- `src/schema/legacy-store.ts` re-declares the `0002` store-catalog tables
+  (`stores`, `products`, `stock_moves`) so `drizzle-kit generate` sees the
+  full production shape and stays non-interactive. Those tables have no
+  repository yet; catalog work lands in a later workstream.
+- `src/repositories/drizzle-workspace-member-repository.ts`:
+  `DrizzleWorkspaceMemberStore` (workspace-scoped reads, `(workspace_id,
+  user_id)` uniqueness) + `DrizzleTenancyAuditSink` (persists
+  membership/workspace/security events).
+- Usage contract for later WS1 tickets:
+  `packages/application/src/tenancy/README.md`.
