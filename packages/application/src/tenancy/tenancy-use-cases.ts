@@ -1,4 +1,5 @@
 import type {
+  SessionRevoker,
   TenancyAuditSink,
   WorkspaceMemberStore,
   WorkspaceStore,
@@ -221,11 +222,19 @@ export interface ChangeMemberInput {
  * denied. Every effective change bumps `auth_version` so sessions can be
  * invalidated. Deactivating or demoting the last active Admin is rejected
  * (`LastAdminError`).
+ *
+ * When the status transitions active → deactivated and a `sessions`
+ * revoker is provided, every session row for the user is revoked and
+ * `security.forced_sign_out` (`admin_deactivate`) is emitted — matching
+ * the password-reset revoke-all. Callers that manage members (admin
+ * routes) must pass the session store; without it only the `auth_version`
+ * bump invalidates sessions (lazy, on next validation).
  */
 export async function changeMember(
   members: WorkspaceMemberStore,
   input: ChangeMemberInput,
-  audit?: TenancyAuditSink
+  audit?: TenancyAuditSink,
+  sessions?: SessionRevoker
 ): Promise<WorkspaceMemberRecord> {
   assertSameWorkspace(input.ctx, input.workspaceId);
   if (input.ctx.role !== 'admin') {
@@ -313,6 +322,30 @@ export async function changeMember(
       });
     }
   }
+
+  // Active → deactivated: revoke every session row now (not lazily on next
+  // validation) and audit it, mirroring the password-reset revoke-all.
+  if (current.status === 'active' && nextStatus === 'deactivated' && sessions) {
+    await sessions.revokeAllByUser(targetUserId, new Date());
+    if (audit) {
+      await audit.append({
+        workspaceId,
+        action: 'security.forced_sign_out',
+        category: 'security',
+        actorType: input.actorType ?? 'user',
+        actorId: input.ctx.userId,
+        correlationId: input.correlationId,
+        payload: auditPayload(
+          {
+            workspaceId,
+            userId: targetUserId,
+            reason: 'admin_deactivate',
+          },
+          'security.forced_sign_out'
+        ),
+      });
+    }
+  }
   return updated;
 }
 
@@ -368,9 +401,10 @@ export async function removeMember(
 
 /**
  * Forced sign-out hook (UTA-17 freeze: revoke-all on password reset /
- * Admin deactivate). Bumps the member's `auth_version` so every session
- * minted before the bump fails validation, and emits
- * `security.forced_sign_out` for audit.
+ * Admin deactivate). Revokes every session row for the user (when a
+ * `sessions` revoker is provided), bumps the member's `auth_version` so
+ * sessions minted before the bump fail validation even if a row was
+ * missed, and emits `security.forced_sign_out` for audit.
  */
 export async function forceSignOut(
   members: WorkspaceMemberStore,
@@ -381,7 +415,8 @@ export async function forceSignOut(
     reason: 'password_reset' | 'admin_deactivate' | 'admin_revoke';
     correlationId?: string;
   },
-  audit?: TenancyAuditSink
+  audit?: TenancyAuditSink,
+  sessions?: SessionRevoker
 ): Promise<WorkspaceMemberRecord> {
   assertSameWorkspace(input.ctx, input.workspaceId);
   if (input.ctx.role !== 'admin') {
@@ -399,6 +434,9 @@ export async function forceSignOut(
   const updated = await members.update(current.id, workspaceId, {
     authVersion: current.authVersion + 1,
   });
+  if (sessions) {
+    await sessions.revokeAllByUser(targetUserId, new Date());
+  }
   if (audit) {
     await audit.append({
       workspaceId,

@@ -276,6 +276,77 @@ describe('auth-version bump on role/scope/status change', () => {
       'security.forced_sign_out'
     );
   });
+
+  it('revokes session rows when a revoker is provided (deactivate parity)', async () => {
+    const store = new InMemoryTenancyStore();
+    const ws = await newWorkspaceWithAdmin(store);
+    const ctx = adminContext(ws, 'user_admin_1');
+    await addMember(
+      store,
+      { ctx, workspaceId: ws, userId: 'user_staff_9', role: 'staff' },
+      store.audit
+    );
+    const revoked: Array<{ userId: string; at: Date }> = [];
+    await forceSignOut(
+      store,
+      {
+        ctx,
+        workspaceId: ws,
+        targetUserId: 'user_staff_9',
+        reason: 'admin_deactivate',
+      },
+      store.audit,
+      {
+        revokeAllByUser: async (userId: string, at: Date) => {
+          revoked.push({ userId, at });
+          return 2;
+        },
+      }
+    );
+    expect(revoked).toHaveLength(1);
+    expect(revoked[0]?.userId).toBe('user_staff_9');
+  });
+
+  it('revokes session rows + emits forced_sign_out on Admin deactivate', async () => {
+    const store = new InMemoryTenancyStore();
+    const ws = await newWorkspaceWithAdmin(store);
+    const ctx = adminContext(ws, 'user_admin_1');
+    await addMember(
+      store,
+      { ctx, workspaceId: ws, userId: 'user_staff_9', role: 'staff' },
+      store.audit
+    );
+    const revoked: string[] = [];
+    await changeMember(
+      store,
+      {
+        ctx,
+        workspaceId: ws,
+        targetUserId: 'user_staff_9',
+        status: 'deactivated',
+      },
+      store.audit,
+      {
+        revokeAllByUser: async (userId: string) => {
+          revoked.push(userId);
+          return 1;
+        },
+      }
+    );
+    expect(revoked).toEqual(['user_staff_9']);
+    const forced = store.auditEvents.filter(
+      (e) => e.action === 'security.forced_sign_out'
+    );
+    expect(forced).toHaveLength(1);
+    expect(forced[0]).toMatchObject({
+      category: 'security',
+      payload: {
+        workspaceId: ws,
+        userId: 'user_staff_9',
+        reason: 'admin_deactivate',
+      },
+    });
+  });
 });
 
 describe('audit baseline without secrets/PII', () => {

@@ -234,7 +234,7 @@ describe('revocation', () => {
     );
   });
 
-  it('invalidates sessions when membership auth_version bumps (Admin deactivate)', async () => {
+  it('revokes sessions on Admin deactivate: rows revoked, list empty, forced_sign_out emitted', async () => {
     const f = await newFixture();
     const signed = await signIn(f.deps, {
       email: f.email,
@@ -243,6 +243,7 @@ describe('revocation', () => {
       platform: 'web',
     });
     expect(await validateSession(f.deps, signed.token)).not.toBeNull();
+    expect(await listSessions(f.deps, f.userId)).toHaveLength(1);
 
     await changeMember(
       f.deps.members,
@@ -252,10 +253,27 @@ describe('revocation', () => {
         targetUserId: f.userId,
         status: 'deactivated',
       },
-      f.deps.audit
+      f.deps.audit,
+      f.deps.sessions
     );
-    // Stale auth_version + deactivated status → rejected even within idle.
+    // Session rows are revoked (not only auth-stale): validation fails…
     expect(await validateSession(f.deps, signed.token)).toBeNull();
+    // …and the list no longer shows them as active inventory…
+    expect(await listSessions(f.deps, f.userId)).toHaveLength(0);
+    // …with a forced_sign_out audit event matching password-reset parity.
+    const forced = f.tenancy.auditEvents.filter(
+      (e) => e.action === 'security.forced_sign_out'
+    );
+    expect(forced).toHaveLength(1);
+    expect(forced[0]).toMatchObject({
+      category: 'security',
+      actorId: 'user_admin_seed',
+      payload: {
+        workspaceId: f.workspaceId,
+        userId: f.userId,
+        reason: 'admin_deactivate',
+      },
+    });
     // Sign-in after deactivate fails generically.
     await expect(
       signIn(f.deps, {
@@ -265,6 +283,31 @@ describe('revocation', () => {
         platform: 'web',
       })
     ).rejects.toBeInstanceOf(InvalidCredentialsError);
+  });
+
+  it('hides auth-stale sessions from the list even without row revocation', async () => {
+    const f = await newFixture();
+    await signIn(f.deps, {
+      email: f.email,
+      password: f.password,
+      workspaceId: f.workspaceId,
+      platform: 'web',
+    });
+    expect(await listSessions(f.deps, f.userId)).toHaveLength(1);
+
+    // Role change without a session revoker: rows survive, but the stale
+    // auth_version must still drop them from the active list.
+    await changeMember(
+      f.deps.members,
+      {
+        ctx: adminContext(f.workspaceId, 'user_admin_seed'),
+        workspaceId: f.workspaceId,
+        targetUserId: f.userId,
+        role: 'staff',
+      },
+      f.deps.audit
+    );
+    expect(await listSessions(f.deps, f.userId)).toHaveLength(0);
   });
 });
 

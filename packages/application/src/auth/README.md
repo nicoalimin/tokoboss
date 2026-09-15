@@ -9,22 +9,24 @@ web/mobile clients authenticate through `web/src/app/api/auth/*`.
   Activity slides `last_seen`; idle past the window rejects the session.
 - Unlimited concurrent devices; list active sessions; sign out this / all.
 - Password **min 8 + common-password denylist**; no MFA/SSO.
-- Revoke-all on password reset / Admin deactivate (membership
-  `auth_version` bump; sessions snapshot it at sign-in).
+- Revoke-all on password reset / Admin deactivate: session rows are
+  revoked and `security.forced_sign_out` is emitted (`changeMember`
+  takes the session store for this; the membership `auth_version` bump
+  additionally invalidates any row a revocation misses).
 - MVP security events via the UTA-19 `emitSecurityEvent` hook:
   `security.sign_in_succeeded`, `security.sign_in_failed` (rate-limited,
   identifier-free), `security.password_reset`, `security.forced_sign_out`.
 
 ## Layout
 
-| File | Purpose |
-| ---- | ------- |
-| `auth-types.ts` | Records, idle TTLs, client-safe `SessionView` |
-| `password-policy.ts` | Min 8 + denylist (`validatePassword`) |
-| `crypto.ts` | scrypt hasher (stdlib-only) + token hashing/minting |
-| `rate-limit.ts` | Sliding-window `SignInRateLimiter` (5 fails / 15m per email\|ip) |
-| `auth-use-cases.ts` | `signIn`, `validateSession`, `signOut`, `signOutAll`, `listSessions`, `requestPasswordReset`, `confirmPasswordReset` |
-| `in-memory-auth-store.ts` | Test doubles mirroring the Postgres contracts |
+| File                      | Purpose                                                                                                              |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `auth-types.ts`           | Records, idle TTLs, client-safe `SessionView`                                                                        |
+| `password-policy.ts`      | Min 8 + denylist (`validatePassword`)                                                                                |
+| `crypto.ts`               | scrypt hasher (stdlib-only) + token hashing/minting                                                                  |
+| `rate-limit.ts`           | Sliding-window `SignInRateLimiter` (5 fails / 15m per email\|ip)                                                     |
+| `auth-use-cases.ts`       | `signIn`, `validateSession`, `signOut`, `signOutAll`, `listSessions`, `requestPasswordReset`, `confirmPasswordReset` |
+| `in-memory-auth-store.ts` | Test doubles mirroring the Postgres contracts                                                                        |
 
 Postgres implementations live in
 `@tokoboss/database` (`drizzle-auth-repository.ts`); the schema diff is

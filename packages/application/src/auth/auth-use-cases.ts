@@ -256,17 +256,33 @@ export async function signOutAll(
   return { revokedCount };
 }
 
-/** List active (non-revoked, idle-fresh) sessions for a user. */
+/**
+ * List active sessions for a user: non-revoked, idle-fresh, AND bound to a
+ * live membership (active status, current `auth_version`). Auth-stale rows
+ * (post-reset / post-deactivate) never appear as active inventory — they
+ * are rejected on next validation too.
+ */
 export async function listSessions(
   deps: AuthDeps,
   userId: string,
   nowMs = Date.now()
 ): Promise<SessionView[]> {
-  const rows = await deps.sessions.listByUser(userId);
+  const [rows, memberships] = await Promise.all([
+    deps.sessions.listByUser(userId),
+    deps.members.listByUser(userId),
+  ]);
+  const liveByWorkspace = new Map(
+    memberships
+      .filter((m) => m.status === 'active')
+      .map((m) => [m.workspaceId, m.authVersion] as const)
+  );
   return rows
-    .filter(
-      (r) => !r.revokedAt && !isIdleExpired(r.platform, r.lastSeenAt, nowMs)
-    )
+    .filter((r) => {
+      if (r.revokedAt || isIdleExpired(r.platform, r.lastSeenAt, nowMs)) {
+        return false;
+      }
+      return liveByWorkspace.get(r.workspaceId) === r.authVersion;
+    })
     .sort((a, b) => b.lastSeenAt.getTime() - a.lastSeenAt.getTime())
     .map(toSessionView);
 }
