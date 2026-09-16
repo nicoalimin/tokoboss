@@ -201,6 +201,10 @@ export function SkuDrawer({
         if (cancelled) return;
         if (err instanceof BundleClientError && err.status === 404) {
           setBundleMissing(true);
+        } else if (err instanceof BundleClientError && err.needsReauth) {
+          // Session expired between the main drawer load and this
+          // adjacent read — surface it like the main load does.
+          setError(copy.expiredNotice);
         }
         // Other BOM failures stay silent here — the Bundles page
         // surfaces them honestly on open.
@@ -209,6 +213,9 @@ export function SkuDrawer({
     return () => {
       cancelled = true;
     };
+    // copy.expiredNotice is a stable string; excluded to avoid refiring
+    // on every render (same pattern as the adjWarehouse exclusion above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, variant?.id]);
 
   useEffect(() => {

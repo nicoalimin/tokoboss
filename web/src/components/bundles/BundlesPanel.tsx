@@ -220,8 +220,19 @@ export function BundlesPanel({
 
   async function onOpen(bundleVariantId: string) {
     if (!loadedWorkspace) return;
+    // Toggle: clicking the open bundle collapses the detail instead of
+    // re-fetching it (the button label already reads "Close BOM").
+    if (selectedId === bundleVariantId) {
+      setSelectedId(null);
+      setDetail(null);
+      setDetailError(null);
+      return;
+    }
     setSelectedId(bundleVariantId);
     setNotice(null);
+    // Clear the previous BOM so its lines don't flash under loading.
+    setDetail(null);
+    setDetailError(null);
     await loadDetail(loadedWorkspace, bundleVariantId);
   }
 
