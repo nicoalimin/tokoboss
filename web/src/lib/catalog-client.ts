@@ -230,6 +230,13 @@ export function toCatalogClientError(
       message: copy.lockError,
     });
   }
+  if (status === 422 && code === 'BUNDLE_NO_DIRECT_STOCK') {
+    return new CatalogClientError({
+      status,
+      errorCode: code,
+      message: copy.bundleStockError,
+    });
+  }
   if (status === 400 || status === 422) {
     return new CatalogClientError({
       status,

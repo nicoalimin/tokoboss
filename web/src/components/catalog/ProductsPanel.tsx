@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   CatalogClientError,
@@ -331,6 +332,18 @@ export function ProductsPanel() {
               className="mt-4 rounded-lg border border-info-500 bg-info-500/10 px-4 py-3 text-sm text-neutral-800"
             >
               {copy.readOnlyNote}
+            </p>
+          ) : null}
+
+          {loadedWorkspace ? (
+            <p className="mt-4 text-sm">
+              <Link
+                href={`/produk/bundles?workspaceId=${encodeURIComponent(loadedWorkspace)}`}
+                data-testid="products-bundles-link"
+                className="text-secondary-700 underline underline-offset-2 hover:text-secondary-800"
+              >
+                Manage bundles / BOM
+              </Link>
             </p>
           ) : null}
 

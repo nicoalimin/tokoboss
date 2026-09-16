@@ -104,6 +104,11 @@ export interface CatalogCopy {
   validationError: string;
   versionConflictError: string;
   lockError: string;
+  bundleStockError: string;
+  bundleSectionTitle: string;
+  bundleSectionSubtitle: string;
+  bundleSectionEmpty: string;
+  bundleOpenLink: string;
   genericError: string;
   forbiddenError: string;
   expiredNotice: string;
@@ -208,6 +213,13 @@ const en: CatalogCopy = {
     'Someone else changed this row first. Close and reopen the drawer, then try again.',
   lockError:
     'That change is locked by earlier stock or mappings. The drawer shows what can still be edited.',
+  bundleStockError:
+    'Bundle shells hold no direct stock — adjust the component SKUs instead.',
+  bundleSectionTitle: 'Bundle BOM',
+  bundleSectionSubtitle:
+    'Derived from the bundle API. This variant is a bundle shell or a component.',
+  bundleSectionEmpty: 'No BOM for this variant yet. Managers create it under Bundles.',
+  bundleOpenLink: 'Open in Bundles',
   genericError: 'Something went wrong. Try again.',
   forbiddenError: 'You do not have access to this workspace.',
   expiredNotice: 'Your session ended. Sign in again to continue.',
@@ -314,6 +326,13 @@ const id: CatalogCopy = {
     'Orang lain mengubah baris ini lebih dulu. Tutup dan buka lagi drawer-nya, lalu coba lagi.',
   lockError:
     'Perubahan itu terkunci oleh stok atau pemetaan sebelumnya. Drawer menunjukkan yang masih bisa diubah.',
+  bundleStockError:
+    'Varian bundel tidak menyimpan stok langsung — sesuaikan SKU komponennya.',
+  bundleSectionTitle: 'BOM Bundel',
+  bundleSectionSubtitle:
+    'Diturunkan dari API bundel. Varian ini adalah bundel atau komponen.',
+  bundleSectionEmpty: 'Belum ada BOM untuk varian ini. Manager membuatnya di Bundel.',
+  bundleOpenLink: 'Buka di Bundel',
   genericError: 'Terjadi kesalahan. Coba lagi.',
   forbiddenError: 'Anda tidak punya akses ke workspace ini.',
   expiredNotice: 'Sesi Anda berakhir. Masuk kembali untuk lanjut.',

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   CatalogClientError,
   adjustStock,
@@ -16,6 +17,11 @@ import {
   type VariantView,
   type WarehouseView,
 } from '@/lib/catalog-client';
+import {
+  BundleClientError,
+  getBundle as getBundleDetail,
+  type BundleWire,
+} from '@/lib/bundles-client';
 import { getCatalogCopy } from '@/lib/catalog-copy';
 
 const inputClass =
@@ -104,6 +110,10 @@ export function SkuDrawer({
   const [adjusting, setAdjusting] = useState(false);
   const [adjError, setAdjError] = useState<string | null>(null);
 
+  // Bundle BOM adjacency (UTA-80): best-effort read of this variant's BOM.
+  const [bundle, setBundle] = useState<BundleWire | null>(null);
+  const [bundleMissing, setBundleMissing] = useState(false);
+
   const selectedVariantId =
     variant?.id ?? initialVariantId ?? product?.variants?.[0]?.id ?? null;
 
@@ -175,6 +185,31 @@ export function SkuDrawer({
   useEffect(() => {
     void load(initialVariantId ?? null);
   }, [load, initialVariantId]);
+
+  // Adjacent BOM read: honest missing state, never blocks the drawer.
+  useEffect(() => {
+    const variantId = variant?.id;
+    if (!variantId) return;
+    let cancelled = false;
+    setBundle(null);
+    setBundleMissing(false);
+    void (async () => {
+      try {
+        const found = await getBundleDetail(workspaceId, variantId);
+        if (!cancelled) setBundle(found);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof BundleClientError && err.status === 404) {
+          setBundleMissing(true);
+        }
+        // Other BOM failures stay silent here — the Bundles page
+        // surfaces them honestly on open.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, variant?.id]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -743,6 +778,63 @@ export function SkuDrawer({
                     ))}
                   </ul>
                 )}
+              </section>
+
+              <section
+                aria-labelledby="drawer-bundle-title"
+                data-testid="drawer-bundle-section"
+                className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4"
+              >
+                <h3
+                  id="drawer-bundle-title"
+                  className="text-base font-semibold text-neutral-900"
+                >
+                  {copy.bundleSectionTitle}
+                </h3>
+                <p className="text-xs text-neutral-500">
+                  {copy.bundleSectionSubtitle}
+                </p>
+                {bundle ? (
+                  <ul
+                    data-testid="drawer-bundle-list"
+                    className="mt-2 divide-y divide-neutral-100"
+                  >
+                    {bundle.components.map((c) => (
+                      <li
+                        key={c.line.id}
+                        data-testid="drawer-bundle-row"
+                        className="flex items-center justify-between py-1 text-sm"
+                      >
+                        <span className="font-mono font-semibold text-neutral-900">
+                          {c.componentSkuCode}
+                        </span>
+                        <span className="font-mono text-neutral-700">
+                          ×{c.line.qty}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : bundleMissing ? (
+                  <p
+                    data-testid="drawer-bundle-empty"
+                    className="mt-2 text-sm text-neutral-500"
+                  >
+                    {copy.bundleSectionEmpty}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm text-neutral-500">—</p>
+                )}
+                {variant ? (
+                  <p className="mt-2 text-sm">
+                    <Link
+                      href={`/produk/bundles?workspaceId=${encodeURIComponent(workspaceId)}&bundleVariantId=${encodeURIComponent(variant.id)}`}
+                      data-testid="drawer-bundle-link"
+                      className="text-secondary-700 underline underline-offset-2 hover:text-secondary-800"
+                    >
+                      {copy.bundleOpenLink}
+                    </Link>
+                  </p>
+                ) : null}
               </section>
 
               <section

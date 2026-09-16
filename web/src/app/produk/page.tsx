@@ -38,6 +38,13 @@ export default function ProdukPage() {
           <ProductsPanel />
           <p className="mt-6 flex flex-wrap justify-center gap-4 text-center text-sm">
             <Link
+              href="/produk/bundles"
+              data-testid="produk-bundles-link"
+              className="text-secondary-700 underline underline-offset-2 hover:text-secondary-800"
+            >
+              Manage bundles / BOM
+            </Link>
+            <Link
               href="/produk/impor"
               data-testid="produk-import-link"
               className="text-secondary-700 underline underline-offset-2 hover:text-secondary-800"
