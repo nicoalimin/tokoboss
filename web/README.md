@@ -193,7 +193,7 @@ folder into Yaak for ready-made bootstrap and sign-in requests.
 ### Tests
 
 ```bash
-pnpm --filter @tokoboss/web test      # route (auth.test.ts, invite-members.test.ts, profile.test.ts) + UI clients (auth-ui.test.ts, team-ui.test.ts, profile-ui.test.ts)
+pnpm --filter @tokoboss/web test      # route (auth.test.ts, invite-members.test.ts, profile.test.ts, catalog.test.ts) + UI clients (auth-ui.test.ts, team-ui.test.ts, profile-ui.test.ts, produk-ui.test.ts)
 pnpm --filter @tokoboss/web typecheck # must pass before push
 ```
 
@@ -280,3 +280,42 @@ pnpm --filter @tokoboss/web dev
 With `DATABASE_URL` set the same screens run against Postgres (Drizzle
 stores); without it responses carry `storage: "memory"` for fixture
 evidence.
+
+## Produk & Stok UI (UTA-76, Story 01 web)
+
+Product list + right-side SKU drawer over the UTA-75 catalog APIs.
+Design tokens via Tailwind; copy in `src/lib/catalog-copy.ts` (EN default +
+ID); browser calls in `src/lib/catalog-client.ts` (`credentials:
+"same-origin"` so the HttpOnly session cookie rides along — no tokens in
+JS storage or logs).
+
+| Route     | Screen                                                                                                                                                                                                                                                     |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/produk` | Workspace loader, cross-identifier search (name / SKU TokoBoss / barcode / Store SKU hint / listing name), dense product rows (primary SKU, prices, total stock, status), create (≥1 variant), confirm-gated archive, SKU drawer overlay (list stays open) |
+
+Rules reflected in UX: search hits one query across every identifier;
+the drawer keeps SKU TokoBoss visually primary with editable details
+(price, HPP/cost-source, barcode, listing name, unit, pictures as opaque
+upload IDs), Admin-only SKU-code edit with the locked note after stock
+or mappings (server 422), read-only Store mappings (no live channel
+calls), per-warehouse quantities, and an adjustment form that requires
+warehouse + non-zero delta + reason before saving straight to the
+ledger; duplicates surface the conflict copy with the existing-product
+route; Manager/Admin write, Staff reads (+ scoped drawer adjustments);
+401 `INVALID_SESSION` redirects to `/sign-in?expired=1`. Full runbook:
+`src/components/catalog/RUNBOOK.md`.
+
+### Local preview runbook (memory mode, no `DATABASE_URL`)
+
+```bash
+pnpm --filter @tokoboss/web dev
+# 1. Sign in at http://localhost:3000/sign-in as a seeded user
+#    (seed via `seedFixtureCredential` as above; copy its workspace ID).
+# 2. Open http://localhost:3000/produk via the bottom-left ••• / Lainnya
+#    menu, paste the workspace ID, Load products.
+# 3. Create a product (name + SKU TokoBoss + price); re-creating the same
+#    SKU shows the duplicate copy with the existing-product route.
+# 4. Search any identifier, open the drawer (list stays open), edit
+#    details, adjust stock (warehouse + delta + reason), watch the ledger.
+# 5. Archive (confirm) — the row flips to Archived with history intact.
+```

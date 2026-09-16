@@ -49,6 +49,7 @@ export interface ProfileCopy {
   viewSessionsLink: string;
   navMenuLabel: string;
   navMoreLabel: string;
+  navProducts: string;
   navProfile: string;
   navSessions: string;
   navTeam: string;
@@ -91,6 +92,7 @@ const en: ProfileCopy = {
   viewSessionsLink: 'Open full sessions screen',
   navMenuLabel: 'More menu',
   navMoreLabel: 'Lainnya',
+  navProducts: 'Produk & Stok',
   navProfile: 'Profil',
   navSessions: 'Active sessions',
   navTeam: 'Team & Access',
@@ -133,6 +135,7 @@ const id: ProfileCopy = {
   viewSessionsLink: 'Buka layar sesi lengkap',
   navMenuLabel: 'Menu lainnya',
   navMoreLabel: 'Lainnya',
+  navProducts: 'Produk & Stok',
   navProfile: 'Profil',
   navSessions: 'Sesi aktif',
   navTeam: 'Tim & Akses',
