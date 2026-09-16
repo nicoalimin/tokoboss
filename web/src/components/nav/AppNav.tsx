@@ -11,7 +11,7 @@ import { useMembership } from '@/lib/use-membership';
  *
  * - Desktop shows the `•••` ellipsis button; mobile shows the `Lainnya`
  *   label next to it (same button, responsive text).
- * - The menu links to Pengaturan (`/pengaturan`), Profil (`/profil`),
+ * - The menu links to Produk & Stok (`/produk`), Pengaturan (`/pengaturan`), Profil (`/profil`),
  *   Active sessions (`/sessions`), Team & Access (`/team`), and Sign in
  *   (`/sign-in`). Rendered globally from the root layout so every screen
  *   has the mockup entry point.
@@ -49,6 +49,11 @@ export function AppNav() {
   }, [open]);
 
   const links = [
+    {
+      href: '/produk',
+      label: copy.navProducts,
+      testId: 'nav-link-produk',
+    },
     {
       href: '/pengaturan',
       label: copy.navSettings,
