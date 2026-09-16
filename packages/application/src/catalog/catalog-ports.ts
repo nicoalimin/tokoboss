@@ -165,8 +165,8 @@ export interface CatalogStore {
    * reuse with a different payload).
    *
    * When `idempotencyKey` is present and already recorded for the
-   * workspace, the original `{ level, entry }` is returned without
-   * applying the delta again; a key reused with a different
+   * workspace, the original entry plus the CURRENT level are returned
+   * without applying the delta again; a key reused with a different
    * variant/warehouse/delta/reason throws `CATALOG_CONFLICT`.
    */
   adjustLevel(input: {

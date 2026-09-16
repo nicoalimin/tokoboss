@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Catalog wire contracts (UTA-75, Story 01).
+ * Catalog wire contracts (UTA-75, Story 01; UTA-81, Story 05).
  *
  * Server-side only validation — these schemas gate Route Handler bodies;
  * tenancy, RBAC, SKU-code edit rules, and optimistic-concurrency checks are

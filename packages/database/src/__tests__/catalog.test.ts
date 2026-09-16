@@ -5,9 +5,9 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Catalog migration + store integration (UTA-75, Story 01).
+ * Catalog migration + store integration (UTA-75, Story 01; UTA-81, Story 05).
  *
- * Applies the committed chain 0001 → 0011 to an empty PGlite database
+ * Applies the committed chain 0001 → 0012 to an empty PGlite database
  * (no Neon credentials) and proves:
  * 1. `0009_catalog_skus.sql` applies cleanly on top of main's migrations.
  * 2. Product + variants commit atomically; duplicate SKU codes reject
