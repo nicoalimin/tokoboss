@@ -327,7 +327,7 @@ export function SkuDrawer({
     }
     setAdjusting(true);
     try {
-      const { level, entry } = await adjustStock(workspaceId, variant.id, {
+      const { entry } = await adjustStock(workspaceId, variant.id, {
         warehouseId: adjWarehouse,
         delta,
         reason: adjReason.trim(),
@@ -336,7 +336,6 @@ export function SkuDrawer({
       setVariant(full);
       syncVariantFields(full);
       setLedger((prev) => [entry, ...prev]);
-      void level;
       setAdjDelta('');
       setAdjReason('');
       setNotice(copy.adjustedNotice);

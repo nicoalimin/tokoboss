@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   CatalogClientError,
@@ -75,39 +75,64 @@ export function ProductsPanel() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [archivingId, setArchivingId] = useState<string | null>(null);
 
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const reauth = useCallback(() => {
     router.replace('/sign-in?expired=1');
   }, [router]);
 
-  function handleClientError(err: unknown): void {
-    if (err instanceof CatalogClientError && err.needsReauth) {
-      reauth();
-      return;
-    }
-    if (err instanceof CatalogClientError) {
-      setError(err.message);
-      return;
-    }
-    setError(copy.genericError);
-  }
+  const handleClientError = useCallback(
+    (err: unknown): void => {
+      if (err instanceof CatalogClientError && err.needsReauth) {
+        reauth();
+        return;
+      }
+      if (err instanceof CatalogClientError) {
+        setError(err.message);
+        return;
+      }
+      setError(copy.genericError);
+    },
+    [reauth, copy.genericError]
+  );
 
-  const refresh = useCallback(
-    async (ws: string) => {
-      setLoading(true);
-      setError(null);
+  /**
+   * Reload the list for `ws`, honoring the current search text: empty
+   * queries list everything, anything else re-runs the cross-identifier
+   * search (variant-only hits lift their parent rows). Drawer saves reuse
+   * this so an active filter survives edits.
+   */
+  const loadList = useCallback(
+    async (ws: string, searchText: string) => {
+      const needle = searchText.trim();
+      if (!needle) {
+        setLoading(true);
+        setError(null);
+        try {
+          setProducts(await listProducts(ws));
+        } catch (err) {
+          handleClientError(err);
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+      setSearching(true);
       try {
-        setProducts(await listProducts(ws));
+        const { products: found, variants } = await searchCatalog(ws, needle);
+        if (found.length > 0) {
+          setProducts(found);
+        } else {
+          const ids = new Set(variants.map((v) => v.productId));
+          const all = await listProducts(ws);
+          setProducts(all.filter((p) => ids.has(p.id)));
+        }
+        setError(null);
       } catch (err) {
         handleClientError(err);
       } finally {
-        setLoading(false);
+        setSearching(false);
       }
     },
-    // handleClientError/reauth are stable-by-construction here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [copy.genericError]
+    [handleClientError]
   );
 
   async function onLoad(e?: React.FormEvent) {
@@ -120,53 +145,37 @@ export function ProductsPanel() {
     setNotice(null);
     setDuplicatePath(null);
     setDrawerProductId(null);
-    setLoadedWorkspace(ws);
+    // Membership is best-effort chrome: unknown → treat as reader until
+    // the server answers (every deep call stays server-gated).
     try {
-      // Membership is best-effort chrome: unknown → treat as reader until
-      // the server answers (every deep call stays server-gated).
-      try {
-        setMembership(await getMyMembership());
-      } catch {
-        setMembership(null);
-      }
-      await refresh(ws);
-    } catch (err) {
-      handleClientError(err);
+      setMembership(await getMyMembership());
+    } catch {
+      setMembership(null);
+    }
+    if (ws === loadedWorkspace) {
+      // Same workspace re-loaded: the effect below won't refire, so load
+      // explicitly (a fresh workspace loads through the effect — one fetch).
+      await loadList(ws, query);
+    } else {
+      setLoadedWorkspace(ws);
     }
   }
 
-  // Debounced cross-identifier search; empty query falls back to list.
+  // Cross-identifier search (debounced); empty query falls back to list.
+  // This effect owns every fresh-workspace load so workspace switches cost
+  // exactly one fetch.
   useEffect(() => {
     if (!loadedWorkspace) return;
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    const q = query.trim();
-    if (!q) {
-      void refresh(loadedWorkspace);
+    const needle = query.trim();
+    if (!needle) {
+      void loadList(loadedWorkspace, '');
       return;
     }
-    setSearching(true);
-    searchTimer.current = setTimeout(() => {
-      searchCatalog(loadedWorkspace, q)
-        .then(({ products: found, variants }) => {
-          if (found.length > 0) {
-            setProducts(found);
-          } else {
-            // Search hits variants: lift their parent rows via list + filter.
-            const ids = new Set(variants.map((v) => v.productId));
-            void listProducts(loadedWorkspace).then((all) =>
-              setProducts(all.filter((p) => ids.has(p.id)))
-            );
-          }
-          setError(null);
-        })
-        .catch(handleClientError)
-        .finally(() => setSearching(false));
+    const timer = setTimeout(() => {
+      void loadList(loadedWorkspace, needle);
     }, 300);
-    return () => {
-      if (searchTimer.current) clearTimeout(searchTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, loadedWorkspace]);
+    return () => clearTimeout(timer);
+  }, [query, loadedWorkspace, loadList]);
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -544,7 +553,7 @@ export function ProductsPanel() {
             setDrawerVariantId(null);
           }}
           onChanged={() => {
-            if (loadedWorkspace) void refresh(loadedWorkspace);
+            if (loadedWorkspace) void loadList(loadedWorkspace, query);
           }}
         />
       ) : null}

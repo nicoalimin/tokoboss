@@ -335,7 +335,7 @@ describe('catalog-client (UTA-76 UI)', () => {
     expect(JSON.stringify(err)).not.toMatch(/89912345|initial stock|Bearer/);
   });
 
-  it('formats IDR from integer cents without floats', async () => {
+  it('formats IDR from integer cents without floats', () => {
     expect(formatIdr(99000)).toContain('99');
     expect(formatIdr(null)).toBe('—');
     expect(formatIdr(undefined)).toBe('—');
