@@ -50,6 +50,10 @@ CATALOG_WAREHOUSE_INACTIVE`).
 `GET|POST /warehouses` · `PATCH /warehouses/:id` · `GET
 /search?q=` (name, SKU TokoBoss, barcode, Store SKU hint, listing name).
 
+Bundle/BOM endpoints (UTA-79, Story 13) live under the same prefix —
+see `../bundles/README.md`: `GET|POST /bundles` · `GET|PATCH|DELETE(405)
+/bundles/:bundleVariantId` · `POST …/archive`.
+
 ## Runbook — memory vs `DATABASE_URL`
 
 - **Memory mode** (no `DATABASE_URL`): route handlers use the
@@ -63,7 +67,7 @@ CATALOG_WAREHOUSE_INACTIVE`).
   Apply migrations first (`pnpm --filter @tokoboss/database db:migrate`
   against the branch), then run the app. PGlite integration coverage lives
   in `packages/database/src/__tests__/catalog.test.ts` (applies
-  `0001 → 0009` with zero Neon credentials).
+  `0001 → 0011` with zero Neon credentials).
 - Verify: `pnpm --filter @tokoboss/application test`,
   `pnpm --filter @tokoboss/database test`, `pnpm --filter web test`,
   `pnpm typecheck`.

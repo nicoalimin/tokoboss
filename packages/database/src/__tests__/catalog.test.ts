@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * Catalog migration + store integration (UTA-75, Story 01).
  *
- * Applies the committed chain 0001 → 0009 to an empty PGlite database
+ * Applies the committed chain 0001 → 0011 to an empty PGlite database
  * (no Neon credentials) and proves:
  * 1. `0009_catalog_skus.sql` applies cleanly on top of main's migrations.
  * 2. Product + variants commit atomically; duplicate SKU codes reject
@@ -42,6 +42,8 @@ const CHAIN = [
   '0007_workspace_invites.sql',
   '0008_user_profiles.sql',
   '0009_catalog_skus.sql',
+  '0010_product_imports.sql',
+  '0011_bundle_bom.sql',
 ];
 
 async function createMigratedDb() {

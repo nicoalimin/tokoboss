@@ -10,11 +10,13 @@ export * from './workspace-invites';
 export * from './auth';
 export * from './user-profiles';
 export * from './catalog';
+export * from './bundles';
 export * from './product-imports';
 export * from './legacy-store';
 
 import { auditEvents } from './audit-events';
 import { authPasswordResets, authSessions, authUsers } from './auth';
+import { catalogBundleLines } from './bundles';
 import {
   catalogChannelMappings,
   catalogInventoryLevels,
@@ -55,4 +57,5 @@ export const schema = {
   catalogChannelMappings,
   productImportBatches,
   productImportRows,
+  catalogBundleLines,
 };

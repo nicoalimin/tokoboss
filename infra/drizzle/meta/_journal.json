@@ -71,6 +71,13 @@
       "when": 1789536424879,
       "tag": "0010_product_imports",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789537827095,
+      "tag": "0011_bundle_bom",
+      "breakpoints": true
     }
   ]
 }

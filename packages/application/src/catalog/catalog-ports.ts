@@ -10,6 +10,10 @@ import type {
   WarehouseRecord,
   WarehouseStatus,
 } from './catalog-types';
+import type {
+  BundleLineRecord,
+  NewBundleLineInput,
+} from '../bundles/bundle-types';
 
 /**
  * Persistence port for the catalog (UTA-75, Story 01).
@@ -210,4 +214,51 @@ export interface CatalogStore {
   countMappings(workspaceId: string, variantId: string): Promise<number>;
 
   deleteMapping(workspaceId: string, mappingId: string): Promise<void>;
+
+  // Bundle BOM (UTA-79, Story 13)
+  //
+  // A bundle is a variant whose BOM is the set of lines where it is the
+  // `bundleVariantId`. A variant with ≥1 lines is a bundle; a variant with
+  // none is a plain component SKU. All methods are workspace-scoped like
+  // the rest of the port.
+  //
+  // `replaceBundleLines` / `clearBundleLines` are atomic units of work:
+  // they check `expectedVersion` against the bundle variant's version
+  // (409 `BUNDLE_VERSION_CONFLICT` with `currentVersion` on stale writes)
+  // and bump the bundle variant's version alongside the line changes, so
+  // concurrent BOM edits never silently overwrite each other.
+
+  /**
+   * Replace the full BOM of a bundle variant (empty array clears it).
+   * Returns the stored lines plus the bumped bundle variant version.
+   */
+  replaceBundleLines(
+    workspaceId: string,
+    bundleVariantId: string,
+    lines: NewBundleLineInput[],
+    expectedVersion: number
+  ): Promise<{ lines: BundleLineRecord[]; bundleVersion: number }>;
+
+  /** Remove every BOM line of a bundle variant (archive path). */
+  clearBundleLines(
+    workspaceId: string,
+    bundleVariantId: string,
+    expectedVersion: number
+  ): Promise<{ bundleVersion: number }>;
+
+  listBundleLines(
+    workspaceId: string,
+    bundleVariantId: string
+  ): Promise<BundleLineRecord[]>;
+
+  listBundlesByWorkspace(workspaceId: string): Promise<BundleLineRecord[]>;
+
+  /** Every BOM line that consumes `componentVariantId`. */
+  listBundlesUsingComponent(
+    workspaceId: string,
+    componentVariantId: string
+  ): Promise<BundleLineRecord[]>;
+
+  /** True when the variant holds ≥1 BOM lines (i.e. it is a bundle). */
+  isBundleVariant(workspaceId: string, variantId: string): Promise<boolean>;
 }

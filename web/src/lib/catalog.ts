@@ -21,6 +21,8 @@ import {
 import {
   InMemoryCatalogStore,
   toContext,
+  type BundleDetail,
+  type BundleSummary,
   type CatalogStore,
   type ChannelMappingRecord,
   type CatalogProductRecord,
@@ -35,6 +37,8 @@ import {
   type WorkspaceContext,
 } from '@tokoboss/application';
 import type {
+  BundleLineView,
+  BundleView,
   ChannelMappingView,
   InventoryLevelView,
   LedgerEntryView,
@@ -194,20 +198,27 @@ export function catalogErrorStatus(err: unknown): {
       : '';
   switch (code) {
     case 'CATALOG_VALIDATION':
-      return { status: 400, errorCode: 'CATALOG_VALIDATION' };
+    case 'BUNDLE_VALIDATION':
+      return { status: 400, errorCode: code };
     case 'TENANCY_FORBIDDEN':
     case 'CATALOG_FORBIDDEN':
       return { status: 403, errorCode: 'TENANCY_FORBIDDEN' };
     case 'CATALOG_NOT_FOUND':
-      return { status: 404, errorCode: 'CATALOG_NOT_FOUND' };
+    case 'BUNDLE_NOT_FOUND':
+      return { status: 404, errorCode: code };
     case 'CATALOG_NO_HARD_DELETE':
       return { status: 405, errorCode: 'CATALOG_NO_HARD_DELETE' };
     case 'CATALOG_CONFLICT':
-      return { status: 409, errorCode: 'CATALOG_CONFLICT' };
+    case 'BUNDLE_CONFLICT':
+      return { status: 409, errorCode: code };
     case 'CATALOG_VERSION_CONFLICT':
-      return { status: 409, errorCode: 'CATALOG_VERSION_CONFLICT' };
+    case 'BUNDLE_VERSION_CONFLICT':
+      return { status: 409, errorCode: code };
     case 'CATALOG_SKU_LOCKED':
       return { status: 422, errorCode: 'CATALOG_SKU_LOCKED' };
+    case 'BUNDLE_CYCLE':
+    case 'BUNDLE_NO_DIRECT_STOCK':
+      return { status: 422, errorCode: code };
     case 'CATALOG_WAREHOUSE_INACTIVE':
       return { status: 422, errorCode: 'CATALOG_WAREHOUSE_INACTIVE' };
     case 'CATALOG_INSUFFICIENT_STOCK':
@@ -339,5 +350,58 @@ export function toMappingView(m: ChannelMappingRecord): ChannelMappingView {
     barcodeHint: m.barcodeHint,
     listingName: m.listingName,
     createdAt: iso(m.createdAt),
+  };
+}
+
+function toBundleLineView(
+  line: BundleDetail['lines'][number]['line']
+): BundleLineView {
+  return {
+    id: line.id,
+    workspaceId: line.workspaceId,
+    bundleVariantId: line.bundleVariantId,
+    componentVariantId: line.componentVariantId,
+    qty: line.qty,
+    createdAt: iso(line.createdAt),
+    updatedAt: iso(line.updatedAt),
+  };
+}
+
+/** Bundle detail → wire view (UTA-79, Story 13). */
+export function toBundleView(detail: BundleDetail): BundleView {
+  return {
+    bundleVariantId: detail.bundle.id,
+    workspaceId: detail.bundle.workspaceId,
+    skuCode: detail.bundle.skuCode,
+    status: detail.bundle.status,
+    version: detail.bundle.version,
+    components: detail.lines.map((l) => ({
+      line: toBundleLineView(l.line),
+      componentSkuCode: l.component.skuCode,
+      componentName: l.component.name,
+      componentStatus: l.component.status,
+    })),
+    availability: detail.availability.map((a) => ({
+      warehouseId: a.warehouseId,
+      available: a.available,
+    })),
+  };
+}
+
+/** Bundle list item → wire view (no availability; fetch detail for it). */
+export function toBundleSummaryView(summary: BundleSummary): BundleView {
+  return {
+    bundleVariantId: summary.bundle.id,
+    workspaceId: summary.bundle.workspaceId,
+    skuCode: summary.bundle.skuCode,
+    status: summary.bundle.status,
+    version: summary.bundle.version,
+    components: summary.lines.map((l) => ({
+      line: toBundleLineView(l.line),
+      componentSkuCode: l.component.skuCode,
+      componentName: l.component.name,
+      componentStatus: l.component.status,
+    })),
+    availability: [],
   };
 }
