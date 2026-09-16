@@ -9,10 +9,19 @@ export * from './workspace-members';
 export * from './workspace-invites';
 export * from './auth';
 export * from './user-profiles';
+export * from './catalog';
 export * from './legacy-store';
 
 import { auditEvents } from './audit-events';
 import { authPasswordResets, authSessions, authUsers } from './auth';
+import {
+  catalogChannelMappings,
+  catalogInventoryLevels,
+  catalogProducts,
+  catalogStockLedger,
+  catalogVariants,
+  catalogWarehouses,
+} from './catalog';
 import { fileUploads } from './file-uploads';
 import { jobEvents, jobs } from './jobs';
 import { products, stockMoves, stores } from './legacy-store';
@@ -36,4 +45,10 @@ export const schema = {
   stores,
   products,
   stockMoves,
+  catalogProducts,
+  catalogVariants,
+  catalogWarehouses,
+  catalogInventoryLevels,
+  catalogStockLedger,
+  catalogChannelMappings,
 };
