@@ -10,6 +10,7 @@ export * from './workspace-invites';
 export * from './auth';
 export * from './user-profiles';
 export * from './catalog';
+export * from './product-imports';
 export * from './legacy-store';
 
 import { auditEvents } from './audit-events';
@@ -25,6 +26,7 @@ import {
 import { fileUploads } from './file-uploads';
 import { jobEvents, jobs } from './jobs';
 import { products, stockMoves, stores } from './legacy-store';
+import { productImportBatches, productImportRows } from './product-imports';
 import { tenants } from './tenants';
 import { userProfiles } from './user-profiles';
 import { workspaceInvites } from './workspace-invites';
@@ -51,4 +53,6 @@ export const schema = {
   catalogInventoryLevels,
   catalogStockLedger,
   catalogChannelMappings,
+  productImportBatches,
+  productImportRows,
 };
