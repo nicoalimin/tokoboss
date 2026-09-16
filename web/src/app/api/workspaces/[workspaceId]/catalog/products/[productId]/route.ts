@@ -1,4 +1,8 @@
-import { getProductDetail, updateProduct } from '@tokoboss/application';
+import {
+  catalogNoHardDelete,
+  getProductDetail,
+  updateProduct,
+} from '@tokoboss/application';
 import { UpdateProductBodySchema } from '@tokoboss/contracts';
 import {
   catalogErrorStatus,
@@ -167,12 +171,14 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       correlationId
     );
   }
+  const err = catalogNoHardDelete();
+  const mapped = catalogErrorStatus(err);
   return authJson(
     {
-      error: 'Catalog rows are never hard-deleted. Archive instead.',
-      errorCode: 'CATALOG_NO_HARD_DELETE',
+      error: err.message,
+      errorCode: mapped.errorCode,
     },
-    405,
+    mapped.status,
     requestId,
     correlationId,
     slideForMember(member.value)

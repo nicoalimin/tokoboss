@@ -15,9 +15,11 @@ for Story 03–04).
 | `catalog_stock_ledger`     | append-only source of truth (`delta`, `balance_after`, `reason`, actor, correlation)                                                           |
 | `catalog_channel_mappings` | `UNIQUE (workspace_id, channel, shop_ext_id, platform_sku_id)` → variant; hints only                                                           |
 
-Removal is archive-only (`status = 'archived'`, idempotent). `DELETE`
-answers `405 CATALOG_NO_HARD_DELETE`. Archiving a product archives its
-active variants; ledger/mapping history is untouched.
+Removal is archive-only (`status = 'archived'`, idempotent, cascaded
+atomically to active variants). `DELETE` on products/variants answers
+`405 CATALOG_NO_HARD_DELETE`. Channel mappings are links, not master
+data: deleting one un-locks SKU code edits and never touches ledger
+history.
 
 ## Freeze rules (server-side, both stores)
 

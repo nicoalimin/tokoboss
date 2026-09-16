@@ -35,8 +35,11 @@ export const CatalogRules = {
   },
 
   // Archiving (soft-delete) is always allowed and idempotent — it is the
-  // ONLY removal path when stock or orders exist. Hard delete is banned
-  // outright (405 `CATALOG_NO_HARD_DELETE` at the web boundary).
+  // ONLY removal path for catalog master data (products, variants,
+  // warehouses, levels) when stock or orders exist. Hard delete of master
+  // data and ledger rows is banned outright (405 `CATALOG_NO_HARD_DELETE`
+  // at the web boundary). Channel mappings are links, not master data:
+  // removing one un-locks SKU code edits and never touches the ledger.
 
   /** Adjustments must carry an explicit warehouse + reason + non-zero delta. */
   assertAdjustmentAllowed(input: {

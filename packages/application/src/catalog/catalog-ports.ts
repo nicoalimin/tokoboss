@@ -27,6 +27,12 @@ import type {
  * `currentVersion` in details) instead of silently overwriting.
  * Uniqueness violations throw `CATALOG_CONFLICT` with the existing row's
  * path in details.
+ *
+ * Caller contract: composite inputs (`createVariant`'s `productId`,
+ * `adjustLevel`'s `variantId`/`warehouseId`) must already be resolved
+ * inside `workspaceId` — the use-cases verify this with scoped finds
+ * before calling. Stores re-check on read-modify-write paths but do not
+ * re-resolve foreign rows.
  */
 export interface CatalogStore {
   // Products
@@ -68,6 +74,18 @@ export interface CatalogStore {
     expectedVersion: number
   ): Promise<CatalogProductRecord>;
 
+  /**
+   * Atomic cascade archive: compare-and-set the product to `archived`
+   * (throwing `CATALOG_VERSION_CONFLICT` on a stale `expectedVersion`)
+   * plus every active variant, in one unit of work. Idempotent — an
+   * already-archived product returns as-is.
+   */
+  archiveProductCascade(
+    workspaceId: string,
+    productId: string,
+    expectedVersion: number
+  ): Promise<CatalogProductRecord>;
+
   // Variants (SKU TokoBoss)
 
   createVariant(
@@ -101,7 +119,6 @@ export interface CatalogStore {
       name?: string | null;
       barcode?: string | null;
       sellingPriceCents?: number;
-      currency?: string;
       hppCents?: number | null;
       costSource?: string | null;
       listingName?: string | null;
@@ -145,7 +162,6 @@ export interface CatalogStore {
     variantId: string;
     warehouseId: string;
     delta: number;
-    balanceCheck?: { currentQty: number };
     reason: string;
     actorId: string | null;
     correlationId?: string;

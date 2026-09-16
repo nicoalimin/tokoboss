@@ -421,7 +421,8 @@ export async function updateProduct(
 
 /**
  * Archive a product (idempotent soft-delete). Active variants archive
- * alongside it so list views stay consistent; stock history is untouched.
+ * alongside it in one atomic store unit of work so list views stay
+ * consistent; stock history is untouched.
  */
 export async function archiveProduct(
   store: CatalogStore,
@@ -435,27 +436,11 @@ export async function archiveProduct(
   );
   if (!product) throw catalogNotFound('Product');
   if (product.status === 'archived') return product;
-  const archived = await store.updateProduct(
+  return store.archiveProductCascade(
     input.workspaceId,
     product.id,
-    { status: 'archived' },
     product.version
   );
-  const variants = await store.listVariantsByProduct(
-    input.workspaceId,
-    product.id
-  );
-  for (const variant of variants) {
-    if (variant.status === 'active') {
-      await store.updateVariant(
-        input.workspaceId,
-        variant.id,
-        { status: 'archived' },
-        variant.version
-      );
-    }
-  }
-  return archived;
 }
 
 // Variants
@@ -664,6 +649,9 @@ export async function adjustStock(
   assertWarehouseAccess(input.ctx, warehouse.id);
   const delta = input.delta;
   const reason = typeof input.reason === 'string' ? input.reason : '';
+  if (reason.trim().length > 500) {
+    throw catalogValidation('Reason must be at most 500 characters');
+  }
   try {
     CatalogRules.assertAdjustmentAllowed({
       delta: typeof delta === 'number' ? delta : Number.NaN,

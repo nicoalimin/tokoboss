@@ -105,7 +105,11 @@ export function catalogInsufficientStock(): Error & { code: string } {
   return err as Error & { code: string };
 }
 
-/** Hard delete attempt → 405. Catalog only archives (soft-delete). */
+/**
+ * Hard delete attempt on catalog master data / ledger → 405. Catalog
+ * only archives (soft-delete). Channel mappings are links, not master
+ * data, and are exempt (removing one un-locks SKU code edits).
+ */
 export function catalogNoHardDelete(): Error & { code: string } {
   const err = new Error(
     'Catalog rows are never hard-deleted. Archive instead.'

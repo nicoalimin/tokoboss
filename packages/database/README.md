@@ -68,11 +68,27 @@ Post-#16/#17 pipeline check: worktree recreated cleanly, `db:check` +
   Additive only — no drops, no renames of `main` migrations.
 - `src/schema/legacy-store.ts` re-declares the `0002` store-catalog tables
   (`stores`, `products`, `stock_moves`) so `drizzle-kit generate` sees the
-  full production shape and stays non-interactive. Those tables have no
-  repository yet; catalog work lands in a later workstream.
+  full production shape and stays non-interactive. Those legacy tables
+  have no repository and are untouched by catalog work (left for a
+  dedicated cleanup workstream).
 - `src/repositories/drizzle-workspace-member-repository.ts`:
   `DrizzleWorkspaceMemberStore` (workspace-scoped reads, `(workspace_id,
-  user_id)` uniqueness) + `DrizzleTenancyAuditSink` (persists
+user_id)` uniqueness) + `DrizzleTenancyAuditSink` (persists
   membership/workspace/security events).
 - Usage contract for later WS1 tickets:
   `packages/application/src/tenancy/README.md`.
+
+## UTA-75 — catalog domain + SKU TokoBoss API (Story 01)
+
+- Migration `0009_catalog_skus.sql`: workspace-scoped `catalog_products`
+  → `catalog_variants` (SKU TokoBoss `UNIQUE (workspace_id, sku_code)`),
+  `catalog_warehouses` (`active`/`deactivated`), `catalog_inventory_levels`
+  (SoT read model), append-only `catalog_stock_ledger`, and stub-ready
+  `catalog_channel_mappings`
+  (`UNIQUE (workspace_id, channel, shop_ext_id, platform_sku_id)`).
+  Additive only — every row references `tenants.id`.
+- `src/schema/catalog.ts` + `src/repositories/drizzle-catalog-repository.ts`:
+  `DrizzleCatalogStore` (workspace-scoped reads, compare-and-set
+  `version` checks, unique violations mapped to `CATALOG_CONFLICT` with
+  the existing row's path, composite writes in one transaction).
+- Usage contract: `packages/application/src/catalog/README.md`.

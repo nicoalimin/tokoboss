@@ -1,3 +1,4 @@
+import { BusinessRuleViolationError, CatalogRules } from '@tokoboss/domain';
 import {
   catalogConflict,
   catalogInsufficientStock,
@@ -49,7 +50,6 @@ export class InMemoryCatalogStore implements CatalogStore {
   private skuIndex = new Map<string, string>();
   private warehouseCodeIndex = new Map<string, string>();
   private mappingKeyIndex = new Map<string, string>();
-  private ledgerByVariant = new Map<string, number>();
 
   private seq = 0;
 
@@ -192,6 +192,47 @@ export class InMemoryCatalogStore implements CatalogStore {
     return clone(updated);
   }
 
+  async archiveProductCascade(
+    workspaceId: string,
+    productId: string,
+    expectedVersion: number
+  ): Promise<CatalogProductRecord> {
+    // Single synchronous unit of work: version check, then product +
+    // every active variant flip together — no partial archive possible.
+    const record = this.products.get(productId);
+    if (!record || record.workspaceId !== workspaceId) {
+      throw catalogNotFound('Product');
+    }
+    if (record.status === 'archived') return clone(record);
+    if (record.version !== expectedVersion) {
+      throw catalogVersionConflict(record.version);
+    }
+    const now = new Date();
+    this.products.set(productId, {
+      ...record,
+      status: 'archived',
+      version: record.version + 1,
+      updatedAt: now,
+    });
+    for (const variant of this.variants.values()) {
+      if (
+        variant.workspaceId === workspaceId &&
+        variant.productId === productId &&
+        variant.status === 'active'
+      ) {
+        this.variants.set(variant.id, {
+          ...variant,
+          status: 'archived',
+          version: variant.version + 1,
+          updatedAt: now,
+        });
+      }
+    }
+    const archived = this.products.get(productId);
+    if (!archived) throw catalogNotFound('Product');
+    return clone(archived);
+  }
+
   // Variants
 
   async createVariant(
@@ -289,7 +330,6 @@ export class InMemoryCatalogStore implements CatalogStore {
       name?: string | null;
       barcode?: string | null;
       sellingPriceCents?: number;
-      currency?: string;
       hppCents?: number | null;
       costSource?: string | null;
       listingName?: string | null;
@@ -329,9 +369,6 @@ export class InMemoryCatalogStore implements CatalogStore {
       ...(patch.barcode !== undefined ? { barcode: patch.barcode } : {}),
       ...(patch.sellingPriceCents !== undefined
         ? { sellingPriceCents: patch.sellingPriceCents }
-        : {}),
-      ...(patch.currency !== undefined
-        ? { currency: patch.currency.toUpperCase() }
         : {}),
       ...(patch.hppCents !== undefined ? { hppCents: patch.hppCents } : {}),
       ...(patch.costSource !== undefined
@@ -424,7 +461,6 @@ export class InMemoryCatalogStore implements CatalogStore {
     variantId: string;
     warehouseId: string;
     delta: number;
-    balanceCheck?: { currentQty: number };
     reason: string;
     actorId: string | null;
     correlationId?: string;
@@ -452,8 +488,13 @@ export class InMemoryCatalogStore implements CatalogStore {
       throw catalogVersionConflict(0);
     }
     const currentQty = current?.qty ?? 0;
-    if (currentQty + input.delta < 0) {
-      throw catalogInsufficientStock();
+    try {
+      CatalogRules.assertBalanceAllowed({ currentQty, delta: input.delta });
+    } catch (err) {
+      if (err instanceof BusinessRuleViolationError) {
+        throw catalogInsufficientStock();
+      }
+      throw err;
     }
     const now = new Date();
     const entry: StockLedgerRecord = {
@@ -469,10 +510,6 @@ export class InMemoryCatalogStore implements CatalogStore {
       createdAt: now,
     };
     this.ledger.push(entry);
-    this.ledgerByVariant.set(
-      input.variantId,
-      (this.ledgerByVariant.get(input.variantId) ?? 0) + 1
-    );
     const level: InventoryLevelRecord = current
       ? {
           ...current,
@@ -541,8 +578,11 @@ export class InMemoryCatalogStore implements CatalogStore {
     workspaceId: string,
     variantId: string
   ): Promise<number> {
-    void workspaceId;
-    return this.ledgerByVariant.get(variantId) ?? 0;
+    let n = 0;
+    for (const e of this.ledger) {
+      if (e.workspaceId === workspaceId && e.variantId === variantId) n += 1;
+    }
+    return n;
   }
 
   // Mappings
