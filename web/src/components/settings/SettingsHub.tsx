@@ -16,8 +16,9 @@ import { useMembership } from '@/lib/use-membership';
  * Seven clickable rows: Profil, Tim & Akses (live) plus Gudang, Integrasi,
  * Bahasa, Notifikasi, Paket & Tagihan (honest coming-soon stubs). Admin-only
  * rows carry a text badge; when the signed-in role is known non-Admin the
- * Tim & Akses row shows the read-only hint. Every row is a real link so
- * deep links stay testable; stubs render an honest empty state.
+ * Tim & Akses row shows the read-only hint. Every row stays a real link by
+ * design so deep links resolve to either the working screen or an honest
+ * stub / no-access state.
  */
 export function SettingsHub({ lang = 'en' }: { lang?: SettingsLang }) {
   const copy = getSettingsCopy(lang);
@@ -38,7 +39,6 @@ export function SettingsHub({ lang = 'en' }: { lang?: SettingsLang }) {
               <Link
                 href={row.href}
                 data-testid={`settings-link-${row.slug}`}
-                aria-disabled={locked || undefined}
                 className="flex items-center justify-between gap-3 px-4 py-4 min-h-[44px] hover:bg-neutral-50"
               >
                 <span className="min-w-0">

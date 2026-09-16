@@ -14,7 +14,7 @@ import {
   canViewBilling,
   capabilityLabel,
   matrixAccess,
-  roleCardTone,
+  roleCardTones,
 } from '../lib/role-matrix';
 import { TeamClientError, getMyMembership } from '../lib/team-client';
 import { __resetAuthForTests, seedFixtureCredential } from '../lib/auth';
@@ -168,7 +168,9 @@ describe('permission matrix (UTA-74)', () => {
           ).toBeGreaterThan(0);
         }
       }
-      expect(new Set(MATRIX_ROLES.map(roleCardTone)).size).toBe(3);
+      expect(new Set(MATRIX_ROLES.map((r) => roleCardTones(r).card)).size).toBe(
+        3
+      );
     }
   });
 

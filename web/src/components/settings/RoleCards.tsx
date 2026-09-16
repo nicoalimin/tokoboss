@@ -1,5 +1,9 @@
 import { getSettingsCopy, type SettingsLang } from '@/lib/settings-copy';
-import { MATRIX_ROLES, roleCardTone, type MatrixRole } from '@/lib/role-matrix';
+import {
+  MATRIX_ROLES,
+  roleCardTones,
+  type MatrixRole,
+} from '@/lib/role-matrix';
 
 function roleTitle(
   copy: ReturnType<typeof getSettingsCopy>,
@@ -35,22 +39,23 @@ export function RoleCards({ lang = 'en' }: { lang?: SettingsLang }) {
       </h2>
       <p className="mt-1 text-sm text-neutral-600">{copy.rolesSubtitle}</p>
       <ul className="mt-4 grid gap-3 sm:grid-cols-3">
-        {MATRIX_ROLES.map((role) => (
-          <li
-            key={role}
-            data-testid={`role-card-${role}`}
-            className={`rounded-xl border border-neutral-200 px-4 py-4 ${roleCardTone(role).split(' ')[0]}`}
-          >
-            <p
-              className={`text-sm font-semibold ${roleCardTone(role).split(' ')[1]}`}
+        {MATRIX_ROLES.map((role) => {
+          const tones = roleCardTones(role);
+          return (
+            <li
+              key={role}
+              data-testid={`role-card-${role}`}
+              className={`rounded-xl border border-neutral-200 px-4 py-4 ${tones.card}`}
             >
-              {roleTitle(copy, role)}
-            </p>
-            <p className="mt-1 text-sm text-neutral-700">
-              {roleBody(copy, role)}
-            </p>
-          </li>
-        ))}
+              <p className={`text-sm font-semibold ${tones.text}`}>
+                {roleTitle(copy, role)}
+              </p>
+              <p className="mt-1 text-sm text-neutral-700">
+                {roleBody(copy, role)}
+              </p>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

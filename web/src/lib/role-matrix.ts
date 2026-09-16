@@ -113,9 +113,15 @@ export function accessLabel(copy: SettingsCopy, access: MatrixAccess): string {
   }
 }
 
-/** Pastel card tone per role (readable, paired with a text label). */
-export function roleCardTone(role: MatrixRole): string {
-  if (role === 'admin') return 'bg-primary-100 text-primary-800';
-  if (role === 'manager') return 'bg-info-100 text-info-800';
-  return 'bg-neutral-100 text-neutral-700';
+/** Pastel card tones per role (readable, always paired with a text label). */
+export interface RoleCardTones {
+  card: string;
+  text: string;
+}
+
+export function roleCardTones(role: MatrixRole): RoleCardTones {
+  if (role === 'admin')
+    return { card: 'bg-primary-100', text: 'text-primary-800' };
+  if (role === 'manager') return { card: 'bg-info-100', text: 'text-info-800' };
+  return { card: 'bg-neutral-100', text: 'text-neutral-700' };
 }

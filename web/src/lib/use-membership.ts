@@ -14,8 +14,9 @@ export interface MembershipState {
  *
  * Fetches `GET /api/auth/membership` once over the session cookie. Never
  * throws: unknown/signed-out states resolve to `{ membership: null }` so
- * navigation falls back to hiding Admin-only entries (deny-by-default) and
- * pages render their no-access states. The server remains the authority.
+ * chrome falls back to showing all entries until the role is known
+ * (chrome fail-open for first-run/fixture flows; the server stays
+ * deny-by-default and gates every deep link).
  */
 export function useMembership(): MembershipState {
   const [membership, setMembership] = useState<MyMembershipView | null>(null);
