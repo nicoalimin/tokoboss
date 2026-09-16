@@ -353,6 +353,16 @@ describe('catalog use-cases (Story 01)', () => {
         reason: 'x',
       })
     ).rejects.toMatchObject({ code: 'CATALOG_VALIDATION' });
+    await expect(
+      adjustStock(store, {
+        ctx: staff(WS),
+        workspaceId: WS,
+        variantId,
+        warehouseId: warehouse.id,
+        delta: 1,
+        reason: `overlong-${'x'.repeat(500)}`,
+      })
+    ).rejects.toMatchObject({ code: 'CATALOG_VALIDATION' });
 
     // Negative balances are rejected; the ledger is newest-first.
     await expect(
@@ -553,6 +563,16 @@ describe('catalog use-cases (Story 01)', () => {
         mappingId: mapping.id,
       })
     ).rejects.toMatchObject({ code: 'CATALOG_NOT_FOUND' });
+    // Mappings are links, not master data: removing the only mapping
+    // un-locks SKU code edits again.
+    const renamed = await updateVariant(store, {
+      ctx: admin(WS),
+      workspaceId: WS,
+      variantId,
+      skuCode: 'UNLINKED-OK',
+      expectedVersion: 1,
+    });
+    expect(renamed.skuCode).toBe('UNLINKED-OK');
   });
 
   it('denies staff writes but allows staff reads and scoped adjustments', async () => {

@@ -14,7 +14,11 @@ import { z } from 'zod';
  * - Mutations on versioned rows require `expectedVersion` (optimistic
  *   concurrency); mismatches surface as 409 `CATALOG_VERSION_CONFLICT`.
  * - Status changes go through the dedicated archive endpoints, never PATCH.
- * - There is no hard delete anywhere in catalog (405 `CATALOG_NO_HARD_DELETE`).
+ * - There is no hard delete for catalog master data (products, variants,
+ *   warehouses, levels) or the ledger (405 `CATALOG_NO_HARD_DELETE`).
+ *   Channel mappings are links, not master data: they can be removed
+ *   (which intentionally un-locks SKU code edits) while ledger history
+ *   is untouched.
  */
 
 export const CatalogStatusSchema = z.enum(['active', 'archived']);

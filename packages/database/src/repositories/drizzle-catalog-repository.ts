@@ -1,3 +1,4 @@
+import { BusinessRuleViolationError, CatalogRules } from '@tokoboss/domain';
 import {
   catalogConflict,
   catalogInsufficientStock,
@@ -19,7 +20,7 @@ import type {
   WarehouseRecord,
   WarehouseStatus,
 } from '@tokoboss/application';
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq, sql } from 'drizzle-orm';
 import type { DatabaseHandle, Transaction } from '../db';
 import {
   catalogChannelMappings,
@@ -286,6 +287,13 @@ export class DrizzleCatalogStore implements CatalogStore {
     return fn(this.db);
   }
 
+  /** True when holding the root handle (post-rollback reads are possible). */
+  private isRootHandle(): boolean {
+    return (
+      typeof (this.db as { transaction?: unknown }).transaction === 'function'
+    );
+  }
+
   async findProductById(
     workspaceId: string,
     productId: string
@@ -340,6 +348,57 @@ export class DrizzleCatalogStore implements CatalogStore {
     const current = await this.findProductById(workspaceId, productId);
     if (!current) throw catalogNotFound('Product');
     throw catalogVersionConflict(current.version);
+  }
+
+  async archiveProductCascade(
+    workspaceId: string,
+    productId: string,
+    expectedVersion: number
+  ): Promise<CatalogProductRecord> {
+    // Product + every active variant flip inside one transaction —
+    // no partial archive possible. The product version gate serializes
+    // concurrent archives (loser gets 409 with the current version).
+    return this.inTx(async (tx) => {
+      const now = new Date();
+      const archived = await tx
+        .update(catalogProducts)
+        .set({
+          status: 'archived',
+          version: expectedVersion + 1,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(catalogProducts.id, productId),
+            eq(catalogProducts.workspaceId, workspaceId),
+            eq(catalogProducts.version, expectedVersion)
+          )
+        )
+        .returning();
+      const productRow = archived[0];
+      if (productRow) {
+        await tx
+          .update(catalogVariants)
+          .set({
+            status: 'archived',
+            version: sql`${catalogVariants.version} + 1`,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(catalogVariants.productId, productId),
+              eq(catalogVariants.workspaceId, workspaceId),
+              eq(catalogVariants.status, 'active')
+            )
+          );
+        return toProduct(productRow);
+      }
+      const store = new DrizzleCatalogStore(tx);
+      const current = await store.findProductById(workspaceId, productId);
+      if (!current) throw catalogNotFound('Product');
+      if (current.status === 'archived') return current;
+      throw catalogVersionConflict(current.version);
+    });
   }
 
   // Variants
@@ -459,7 +518,6 @@ export class DrizzleCatalogStore implements CatalogStore {
       name?: string | null;
       barcode?: string | null;
       sellingPriceCents?: number;
-      currency?: string;
       hppCents?: number | null;
       costSource?: string | null;
       listingName?: string | null;
@@ -472,9 +530,6 @@ export class DrizzleCatalogStore implements CatalogStore {
         .update(catalogVariants)
         .set({
           ...patch,
-          ...(patch.currency !== undefined
-            ? { currency: patch.currency.toUpperCase() }
-            : {}),
           version: expectedVersion + 1,
           updatedAt: new Date(),
         })
@@ -598,13 +653,11 @@ export class DrizzleCatalogStore implements CatalogStore {
     variantId: string;
     warehouseId: string;
     delta: number;
-    balanceCheck?: { currentQty: number };
     reason: string;
     actorId: string | null;
     correlationId?: string;
     expectedVersion?: number;
   }): Promise<{ level: InventoryLevelRecord; entry: StockLedgerRecord }> {
-    void input.balanceCheck;
     const run = async (tx: DbOrTx) => {
       const existing = await tx
         .select()
@@ -634,8 +687,18 @@ export class DrizzleCatalogStore implements CatalogStore {
         throw catalogVersionConflict(0);
       }
       const currentQty = current?.qty ?? 0;
+      try {
+        CatalogRules.assertBalanceAllowed({
+          currentQty,
+          delta: input.delta,
+        });
+      } catch (err) {
+        if (err instanceof BusinessRuleViolationError) {
+          throw catalogInsufficientStock();
+        }
+        throw err;
+      }
       const balanceAfter = currentQty + input.delta;
-      if (balanceAfter < 0) throw catalogInsufficientStock();
       const entries = await tx
         .insert(catalogStockLedger)
         .values({
@@ -681,18 +744,32 @@ export class DrizzleCatalogStore implements CatalogStore {
         }
         return { level: toLevel(levelRow), entry: toLedgerEntry(entryRow) };
       }
-      const leveled = await tx
-        .insert(catalogInventoryLevels)
-        .values({
-          workspaceId: input.workspaceId,
-          variantId: input.variantId,
-          warehouseId: input.warehouseId,
-          qty: balanceAfter,
-        })
-        .returning();
-      const levelRow = leveled[0];
-      if (!levelRow) throw new Error('Failed to insert inventory level');
-      return { level: toLevel(levelRow), entry: toLedgerEntry(entryRow) };
+      try {
+        const leveled = await tx
+          .insert(catalogInventoryLevels)
+          .values({
+            workspaceId: input.workspaceId,
+            variantId: input.variantId,
+            warehouseId: input.warehouseId,
+            qty: balanceAfter,
+          })
+          .returning();
+        const levelRow = leveled[0];
+        if (!levelRow) throw new Error('Failed to insert inventory level');
+        return { level: toLevel(levelRow), entry: toLedgerEntry(entryRow) };
+      } catch (err) {
+        if (!isUniqueViolation(err)) throw err;
+        // Lost a first-insert race with a concurrent adjustment. The failed
+        // statement aborted this transaction, so the truthful version is
+        // resolved AFTER rollback — only possible on the root handle.
+        if (!this.isRootHandle()) throw err;
+        const latest = await this.getLevel(
+          input.workspaceId,
+          input.variantId,
+          input.warehouseId
+        );
+        throw catalogVersionConflict(latest?.version ?? 1);
+      }
     };
     return this.inTx(run);
   }
