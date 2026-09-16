@@ -25,6 +25,12 @@ export default function HomePage() {
             Sign in
           </Link>
           <Link
+            href="/pengaturan"
+            className="rounded-lg bg-primary-500 px-6 py-3 min-h-[44px] inline-flex items-center font-semibold text-white hover:bg-primary-600"
+          >
+            Pengaturan
+          </Link>
+          <Link
             href="/profil"
             className="rounded-lg bg-primary-500 px-6 py-3 min-h-[44px] inline-flex items-center font-semibold text-white hover:bg-primary-600"
           >

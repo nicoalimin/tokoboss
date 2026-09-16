@@ -19,6 +19,10 @@ import {
   type WorkspaceRole,
 } from '@/lib/team-client';
 import { getTeamCopy } from '@/lib/team-copy';
+import { getSettingsCopy } from '@/lib/settings-copy';
+import { RoleCards } from '../settings/RoleCards';
+import { PermissionMatrix } from '../settings/PermissionMatrix';
+import { NoAccess } from '../settings/NoAccess';
 import { AuthAlert } from '../auth/AuthAlert';
 
 const inputClass =
@@ -67,6 +71,7 @@ function statusBadge(status: string): string {
  */
 export function TeamPanel() {
   const copy = getTeamCopy('en');
+  const settingsCopy = getSettingsCopy('en');
   const router = useRouter();
   const [workspaceId, setWorkspaceId] = useState('');
   const [members, setMembers] = useState<MemberView[] | null>(null);
@@ -177,9 +182,7 @@ export function TeamPanel() {
       setNotice(copy.inviteCreated);
       setEmail('');
       setScope('');
-      setInvites((prev) =>
-        prev ? [result.invite, ...prev] : [result.invite]
-      );
+      setInvites((prev) => (prev ? [result.invite, ...prev] : [result.invite]));
     } catch (err) {
       if (err instanceof TeamClientError && err.needsReauth) {
         reauth();
@@ -194,9 +197,7 @@ export function TeamPanel() {
   }
 
   function editFor(m: MemberView): { role: WorkspaceRole; scope: string } {
-    return (
-      edits[m.userId] ?? { role: m.role, scope: m.warehouseScope ?? '' }
-    );
+    return edits[m.userId] ?? { role: m.role, scope: m.warehouseScope ?? '' };
   }
 
   async function onSaveMember(m: MemberView) {
@@ -205,10 +206,7 @@ export function TeamPanel() {
     // Last-Admin lock (controls are also disabled): demoting the sole
     // active Admin no-ops here with a clear message; the server 409 stays
     // the authority for stale lists.
-    if (
-      edit.role !== 'admin' &&
-      isLastActiveAdmin(members ?? [], m.userId)
-    ) {
+    if (edit.role !== 'admin' && isLastActiveAdmin(members ?? [], m.userId)) {
       setError(copy.lastAdminError);
       return;
     }
@@ -304,11 +302,29 @@ export function TeamPanel() {
   return (
     <div data-testid="team-panel">
       {error ? <AuthAlert testId="team-error">{error}</AuthAlert> : null}
+      {error === copy.forbiddenError ? (
+        <div className="mt-4" data-testid="team-no-access">
+          <NoAccess />
+        </div>
+      ) : null}
       {notice ? (
         <AuthAlert tone="success" testId="team-notice">
           {notice}
         </AuthAlert>
       ) : null}
+
+      <div
+        data-testid="team-roles-matrix"
+        className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm mb-6"
+      >
+        <RoleCards />
+        <div className="mt-6">
+          <PermissionMatrix />
+        </div>
+        <p className="mt-3 text-xs text-neutral-500">
+          {settingsCopy.matrixNote}
+        </p>
+      </div>
 
       <form
         onSubmit={(e) => {
@@ -371,7 +387,12 @@ export function TeamPanel() {
         </h2>
         <p className="mt-1 text-sm text-neutral-600">{copy.inviteSubtitle}</p>
 
-        <form onSubmit={onInvite} noValidate data-testid="invite-form" className="mt-4 space-y-4">
+        <form
+          onSubmit={onInvite}
+          noValidate
+          data-testid="invite-form"
+          className="mt-4 space-y-4"
+        >
           {formError ? (
             <AuthAlert testId="invite-error">{formError}</AuthAlert>
           ) : null}
@@ -491,9 +512,7 @@ export function TeamPanel() {
         </h2>
         <p className="mt-1 text-sm text-neutral-600">{copy.membersSubtitle}</p>
         {members === null ? (
-          <p className="mt-4 text-sm text-neutral-500">
-            {copy.membersEmpty}
-          </p>
+          <p className="mt-4 text-sm text-neutral-500">{copy.membersEmpty}</p>
         ) : members.length === 0 ? (
           <p className="mt-4 text-sm text-neutral-500">{copy.membersEmpty}</p>
         ) : (
@@ -580,7 +599,10 @@ export function TeamPanel() {
                         onChange={(e) =>
                           setEdits((prev) => ({
                             ...prev,
-                            [m.userId]: { ...editFor(m), scope: e.target.value },
+                            [m.userId]: {
+                              ...editFor(m),
+                              scope: e.target.value,
+                            },
                           }))
                         }
                         className={`${smallInputClass} disabled:bg-neutral-100`}
@@ -662,9 +684,7 @@ export function TeamPanel() {
                   </p>
                   <p className="text-xs text-neutral-500">
                     {invite.role}
-                    {invite.warehouseScope
-                      ? ` · ${invite.warehouseScope}`
-                      : ''}
+                    {invite.warehouseScope ? ` · ${invite.warehouseScope}` : ''}
                     {` · ${copy.statusPending}`}
                   </p>
                 </div>
