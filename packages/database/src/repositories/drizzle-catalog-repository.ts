@@ -8,6 +8,11 @@ import {
   isWarehouseStatus,
 } from '@tokoboss/application';
 import type {
+  BundleLineRecord,
+  NewBundleLineInput,
+} from '@tokoboss/application';
+import { bundleConflict, bundleVersionConflict } from '@tokoboss/application';
+import type {
   CatalogProductRecord,
   CatalogStatus,
   CatalogStore,
@@ -23,6 +28,7 @@ import type {
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import type { DatabaseHandle, Transaction } from '../db';
 import {
+  catalogBundleLines,
   catalogChannelMappings,
   catalogInventoryLevels,
   catalogProducts,
@@ -31,6 +37,7 @@ import {
   catalogWarehouses,
 } from '../schema/index';
 import type {
+  CatalogBundleLineRow,
   CatalogChannelMappingRow,
   CatalogInventoryLevelRow,
   CatalogProductRow,
@@ -138,6 +145,18 @@ function toMapping(row: CatalogChannelMappingRow): ChannelMappingRecord {
     barcodeHint: row.barcodeHint,
     listingName: row.listingName,
     createdAt: row.createdAt,
+  };
+}
+
+function toBundleLine(row: CatalogBundleLineRow): BundleLineRecord {
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    bundleVariantId: row.bundleVariantId,
+    componentVariantId: row.componentVariantId,
+    qty: row.qty,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -934,5 +953,177 @@ export class DrizzleCatalogStore implements CatalogStore {
       )
       .returning({ id: catalogChannelMappings.id });
     if (!rows[0]) throw catalogNotFound('Mapping');
+  }
+
+  // Bundle BOM (UTA-79, Story 13)
+
+  /**
+   * Replace-or-clear helper: compare-and-set on the bundle variant's
+   * version, swap the line set, and bump the variant version — all in one
+   * transaction so concurrent BOM edits never silently overwrite.
+   */
+  private async writeBundleLines(
+    workspaceId: string,
+    bundleVariantId: string,
+    lines: NewBundleLineInput[],
+    expectedVersion: number
+  ): Promise<{ lines: BundleLineRecord[]; bundleVersion: number }> {
+    return this.inTx(async (tx) => {
+      const bumped = await tx
+        .update(catalogVariants)
+        .set({ version: expectedVersion + 1, updatedAt: new Date() })
+        .where(
+          and(
+            eq(catalogVariants.id, bundleVariantId),
+            eq(catalogVariants.workspaceId, workspaceId),
+            eq(catalogVariants.version, expectedVersion)
+          )
+        )
+        .returning({ version: catalogVariants.version });
+      const next = bumped[0];
+      if (!next) {
+        // Resolve the truthful version on `tx` (same transaction — a
+        // lookup on the root handle would deadlock single-connection
+        // drivers like PGlite while the tx is open).
+        const reread = await tx
+          .select()
+          .from(catalogVariants)
+          .where(
+            and(
+              eq(catalogVariants.id, bundleVariantId),
+              eq(catalogVariants.workspaceId, workspaceId)
+            )
+          )
+          .limit(1);
+        const current = reread[0];
+        if (!current) throw catalogNotFound('Variant');
+        throw bundleVersionConflict(toVariant(current).version);
+      }
+      await tx
+        .delete(catalogBundleLines)
+        .where(
+          and(
+            eq(catalogBundleLines.workspaceId, workspaceId),
+            eq(catalogBundleLines.bundleVariantId, bundleVariantId)
+          )
+        );
+      const stored: BundleLineRecord[] = [];
+      for (const line of lines) {
+        const inserted = await tx
+          .insert(catalogBundleLines)
+          .values({
+            workspaceId,
+            bundleVariantId,
+            componentVariantId: line.componentVariantId,
+            qty: line.qty,
+          })
+          .returning();
+        const row = inserted[0];
+        if (!row) throw new Error('Failed to insert bundle line');
+        stored.push(toBundleLine(row));
+      }
+      return { lines: stored, bundleVersion: next.version };
+    });
+  }
+
+  async replaceBundleLines(
+    workspaceId: string,
+    bundleVariantId: string,
+    lines: NewBundleLineInput[],
+    expectedVersion: number
+  ): Promise<{ lines: BundleLineRecord[]; bundleVersion: number }> {
+    try {
+      return await this.writeBundleLines(
+        workspaceId,
+        bundleVariantId,
+        lines,
+        expectedVersion
+      );
+    } catch (err) {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        (err as { code?: unknown }).code === 'BUNDLE_VERSION_CONFLICT'
+      ) {
+        throw err;
+      }
+      if (isUniqueViolation(err)) {
+        throw bundleConflict('A component may appear only once per bundle.');
+      }
+      throw err;
+    }
+  }
+
+  async clearBundleLines(
+    workspaceId: string,
+    bundleVariantId: string,
+    expectedVersion: number
+  ): Promise<{ bundleVersion: number }> {
+    const { bundleVersion } = await this.writeBundleLines(
+      workspaceId,
+      bundleVariantId,
+      [],
+      expectedVersion
+    );
+    return { bundleVersion };
+  }
+
+  async listBundleLines(
+    workspaceId: string,
+    bundleVariantId: string
+  ): Promise<BundleLineRecord[]> {
+    const rows = await this.db
+      .select()
+      .from(catalogBundleLines)
+      .where(
+        and(
+          eq(catalogBundleLines.workspaceId, workspaceId),
+          eq(catalogBundleLines.bundleVariantId, bundleVariantId)
+        )
+      );
+    return rows.map(toBundleLine);
+  }
+
+  async listBundlesByWorkspace(
+    workspaceId: string
+  ): Promise<BundleLineRecord[]> {
+    const rows = await this.db
+      .select()
+      .from(catalogBundleLines)
+      .where(eq(catalogBundleLines.workspaceId, workspaceId));
+    return rows.map(toBundleLine);
+  }
+
+  async listBundlesUsingComponent(
+    workspaceId: string,
+    componentVariantId: string
+  ): Promise<BundleLineRecord[]> {
+    const rows = await this.db
+      .select()
+      .from(catalogBundleLines)
+      .where(
+        and(
+          eq(catalogBundleLines.workspaceId, workspaceId),
+          eq(catalogBundleLines.componentVariantId, componentVariantId)
+        )
+      );
+    return rows.map(toBundleLine);
+  }
+
+  async isBundleVariant(
+    workspaceId: string,
+    variantId: string
+  ): Promise<boolean> {
+    const rows = await this.db
+      .select({ id: catalogBundleLines.id })
+      .from(catalogBundleLines)
+      .where(
+        and(
+          eq(catalogBundleLines.workspaceId, workspaceId),
+          eq(catalogBundleLines.bundleVariantId, variantId)
+        )
+      )
+      .limit(1);
+    return rows.length > 0;
   }
 }

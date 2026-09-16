@@ -5,7 +5,12 @@ import {
   catalogNotFound,
   catalogVersionConflict,
 } from './catalog-errors';
+import { bundleVersionConflict } from '../bundles/bundle-errors';
 import type { CatalogStore } from './catalog-ports';
+import type {
+  BundleLineRecord,
+  NewBundleLineInput,
+} from '../bundles/bundle-types';
 import type {
   CatalogProductRecord,
   CatalogStatus,
@@ -46,6 +51,9 @@ export class InMemoryCatalogStore implements CatalogStore {
   private levels = new Map<string, InventoryLevelRecord>();
   private ledger: StockLedgerRecord[] = [];
   private mappings = new Map<string, ChannelMappingRecord>();
+  // UTA-79: BOM lines keyed by line id; `(bundle, component)` uniqueness
+  // is enforced on write (single-threaded memory semantics = atomic).
+  private bundleLines = new Map<string, BundleLineRecord>();
 
   private skuIndex = new Map<string, string>();
   private warehouseCodeIndex = new Map<string, string>();
@@ -661,5 +669,151 @@ export class InMemoryCatalogStore implements CatalogStore {
     this.mappingKeyIndex.delete(
       `${record.workspaceId}::${record.channel}::${record.shopExtId}::${record.platformSkuId}`
     );
+  }
+
+  // Bundle BOM (UTA-79, Story 13)
+
+  private checkBundleVersion(
+    workspaceId: string,
+    bundleVariantId: string,
+    expectedVersion: number
+  ): CatalogVariantRecord {
+    const bundle = this.variants.get(bundleVariantId);
+    if (!bundle || bundle.workspaceId !== workspaceId) {
+      throw catalogNotFound('Variant');
+    }
+    if (bundle.version !== expectedVersion) {
+      throw bundleVersionConflict(bundle.version);
+    }
+    return bundle;
+  }
+
+  private bumpBundleVersion(
+    bundle: CatalogVariantRecord
+  ): CatalogVariantRecord {
+    const bumped: CatalogVariantRecord = {
+      ...bundle,
+      version: bundle.version + 1,
+      updatedAt: new Date(),
+    };
+    this.variants.set(bundle.id, bumped);
+    return bumped;
+  }
+
+  async replaceBundleLines(
+    workspaceId: string,
+    bundleVariantId: string,
+    lines: NewBundleLineInput[],
+    expectedVersion: number
+  ): Promise<{ lines: BundleLineRecord[]; bundleVersion: number }> {
+    const bundle = this.checkBundleVersion(
+      workspaceId,
+      bundleVariantId,
+      expectedVersion
+    );
+    for (const [id, line] of this.bundleLines) {
+      if (
+        line.workspaceId === workspaceId &&
+        line.bundleVariantId === bundleVariantId
+      ) {
+        this.bundleLines.delete(id);
+      }
+    }
+    const now = new Date();
+    const stored: BundleLineRecord[] = lines.map((l) => ({
+      id: this.nextId('bom'),
+      workspaceId,
+      bundleVariantId,
+      componentVariantId: l.componentVariantId,
+      qty: l.qty,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    for (const line of stored) {
+      this.bundleLines.set(line.id, line);
+    }
+    const bumped = this.bumpBundleVersion(bundle);
+    return { lines: stored.map(clone), bundleVersion: bumped.version };
+  }
+
+  async clearBundleLines(
+    workspaceId: string,
+    bundleVariantId: string,
+    expectedVersion: number
+  ): Promise<{ bundleVersion: number }> {
+    const bundle = this.checkBundleVersion(
+      workspaceId,
+      bundleVariantId,
+      expectedVersion
+    );
+    for (const [id, line] of this.bundleLines) {
+      if (
+        line.workspaceId === workspaceId &&
+        line.bundleVariantId === bundleVariantId
+      ) {
+        this.bundleLines.delete(id);
+      }
+    }
+    const bumped = this.bumpBundleVersion(bundle);
+    return { bundleVersion: bumped.version };
+  }
+
+  async listBundleLines(
+    workspaceId: string,
+    bundleVariantId: string
+  ): Promise<BundleLineRecord[]> {
+    const out: BundleLineRecord[] = [];
+    for (const line of this.bundleLines.values()) {
+      if (
+        line.workspaceId === workspaceId &&
+        line.bundleVariantId === bundleVariantId
+      ) {
+        out.push(clone(line));
+      }
+    }
+    out.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    return out;
+  }
+
+  async listBundlesByWorkspace(
+    workspaceId: string
+  ): Promise<BundleLineRecord[]> {
+    const out: BundleLineRecord[] = [];
+    for (const line of this.bundleLines.values()) {
+      if (line.workspaceId === workspaceId) out.push(clone(line));
+    }
+    out.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    return out;
+  }
+
+  async listBundlesUsingComponent(
+    workspaceId: string,
+    componentVariantId: string
+  ): Promise<BundleLineRecord[]> {
+    const out: BundleLineRecord[] = [];
+    for (const line of this.bundleLines.values()) {
+      if (
+        line.workspaceId === workspaceId &&
+        line.componentVariantId === componentVariantId
+      ) {
+        out.push(clone(line));
+      }
+    }
+    return out;
+  }
+
+  async isBundleVariant(
+    workspaceId: string,
+    variantId: string
+  ): Promise<boolean> {
+    for (const line of this.bundleLines.values()) {
+      if (
+        line.workspaceId === workspaceId &&
+        line.bundleVariantId === variantId
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 }

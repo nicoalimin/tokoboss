@@ -19,6 +19,8 @@ import {
   catalogWarehouseInactive,
 } from './catalog-errors';
 import type { CatalogStore } from './catalog-ports';
+import { activeBundlesUsing } from '../bundles/bundle-use-cases';
+import { bundleNoDirectStock } from '../bundles/bundle-errors';
 import type {
   CatalogProductRecord,
   CatalogStatus,
@@ -436,6 +438,25 @@ export async function archiveProduct(
   );
   if (!product) throw catalogNotFound('Product');
   if (product.status === 'archived') return product;
+  // UTA-79: refuse to orphan active bundles — a variant consumed by an
+  // active BOM blocks the product archive like a SKU-code lock does.
+  const variants = await store.listVariantsByProduct(
+    input.workspaceId,
+    product.id
+  );
+  for (const variant of variants) {
+    if (variant.status !== 'active') continue;
+    const blockers = await activeBundlesUsing(
+      store,
+      input.workspaceId,
+      variant.id
+    );
+    if (blockers.length > 0) {
+      throw catalogConflict(
+        `Variant ${variant.skuCode} is used in an active bundle BOM; remove it first.`
+      );
+    }
+  }
   return store.archiveProductCascade(
     input.workspaceId,
     product.id,
@@ -598,6 +619,18 @@ export async function archiveVariant(
   );
   if (!variant) throw catalogNotFound('Variant');
   if (variant.status === 'archived') return variant;
+  // UTA-79: an active bundle that consumes this variant blocks the
+  // archive — remove the variant from the BOM first.
+  const blockers = await activeBundlesUsing(
+    store,
+    input.workspaceId,
+    variant.id
+  );
+  if (blockers.length > 0) {
+    throw catalogConflict(
+      'Variant is used in an active bundle BOM; remove it first.'
+    );
+  }
   return store.updateVariant(
     input.workspaceId,
     variant.id,
@@ -634,6 +667,11 @@ export async function adjustStock(
   if (!variant) throw catalogNotFound('Variant');
   if (variant.status !== 'active') {
     throw catalogValidation('Variant is archived.');
+  }
+  // UTA-79: bundle variants hold no direct stock — on-hand lives on the
+  // components and bundle availability derives from them.
+  if (await store.isBundleVariant(input.workspaceId, variant.id)) {
+    throw bundleNoDirectStock();
   }
   const warehouseId =
     typeof input.warehouseId === 'string' ? input.warehouseId.trim() : '';
