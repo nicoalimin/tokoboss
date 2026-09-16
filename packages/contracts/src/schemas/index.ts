@@ -5,4 +5,5 @@ export * from './auth';
 export * from './invites';
 export * from './profile';
 export * from './catalog';
+export * from './imports';
 export * from './versioned';
