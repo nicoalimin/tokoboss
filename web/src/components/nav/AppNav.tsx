@@ -3,21 +3,32 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { getProfileCopy } from '@/lib/profile-copy';
+import { canManageTeam } from '@/lib/role-matrix';
+import { useMembership } from '@/lib/use-membership';
 
 /**
- * Bottom-left overflow navigation (UTA-73, Story 25 mockup entry).
+ * Bottom-left overflow navigation (UTA-73 entry, UTA-74 role gate).
  *
  * - Desktop shows the `•••` ellipsis button; mobile shows the `Lainnya`
  *   label next to it (same button, responsive text).
- * - The menu links to Profil (`/profil`), Active sessions (`/sessions`),
- *   Team & Access (`/team`), and Sign in (`/sign-in`). Rendered globally
- *   from the root layout so every screen has the mockup entry point.
- * - No secrets, no session reads: pure navigation links.
+ * - The menu links to Pengaturan (`/pengaturan`), Profil (`/profil`),
+ *   Active sessions (`/sessions`), Team & Access (`/team`), and Sign in
+ *   (`/sign-in`). Rendered globally from the root layout so every screen
+ *   has the mockup entry point.
+ * - Role gate: the Team & Access entry hides once the signed-in role is
+ *   known non-Admin (Manager/Staff keep Pengaturan + Profil + matrix
+ *   visibility; the `/team` deep link itself renders no-access). While the
+ *   membership is loading or the visitor is signed out, all entries show
+ *   so fixture and first-run flows keep working. The server stays the
+ *   security boundary — this is chrome only.
+ * - No secrets, no session reads beyond the opaque membership fetch.
  */
 export function AppNav() {
   const copy = getProfileCopy('en');
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const { membership } = useMembership();
+  const hideTeam = membership !== null && !canManageTeam(membership.role);
 
   useEffect(() => {
     if (!open) return;
@@ -38,9 +49,16 @@ export function AppNav() {
   }, [open]);
 
   const links = [
+    {
+      href: '/pengaturan',
+      label: copy.navSettings,
+      testId: 'nav-link-settings',
+    },
     { href: '/profil', label: copy.navProfile, testId: 'nav-link-profil' },
     { href: '/sessions', label: copy.navSessions, testId: 'nav-link-sessions' },
-    { href: '/team', label: copy.navTeam, testId: 'nav-link-team' },
+    ...(hideTeam
+      ? []
+      : [{ href: '/team', label: copy.navTeam, testId: 'nav-link-team' }]),
     { href: '/sign-in', label: copy.navSignIn, testId: 'nav-link-sign-in' },
   ];
 

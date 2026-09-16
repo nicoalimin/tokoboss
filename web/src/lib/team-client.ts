@@ -42,6 +42,14 @@ export interface InviteView {
   createdAt: string;
 }
 
+export interface MyMembershipView {
+  workspaceId: string;
+  userId: string;
+  role: WorkspaceRole;
+  warehouseScope: string | null;
+  status: 'active' | 'deactivated';
+}
+
 export interface CreateInviteInput {
   email: string;
   role: WorkspaceRole;
@@ -178,7 +186,12 @@ export function validateScopeForRole(
   role: WorkspaceRole,
   warehouseScope: string | null | undefined
 ): boolean {
-  if (role === 'admin' && warehouseScope !== null && warehouseScope !== undefined && warehouseScope !== '') {
+  if (
+    role === 'admin' &&
+    warehouseScope !== null &&
+    warehouseScope !== undefined &&
+    warehouseScope !== ''
+  ) {
     return false;
   }
   return true;
@@ -186,9 +199,8 @@ export function validateScopeForRole(
 
 /** Count active Admins in a member list (drives the last-Admin lock). */
 export function countActiveAdmins(members: MemberView[]): number {
-  return members.filter(
-    (m) => m.role === 'admin' && m.status === 'active'
-  ).length;
+  return members.filter((m) => m.role === 'admin' && m.status === 'active')
+    .length;
 }
 
 /**
@@ -210,7 +222,9 @@ export function isLastActiveAdmin(
 }
 
 /** Normalize the scope input: empty string → null (unscoped). */
-export function normalizeScope(value: string | null | undefined): string | null {
+export function normalizeScope(
+  value: string | null | undefined
+): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.trim();
   return trimmed.length === 0 ? null : trimmed;
@@ -342,6 +356,24 @@ export async function deactivateMember(
     opts.lang ?? 'en'
   );
   return data.member;
+}
+
+/**
+ * Read the caller's own membership in the session workspace (UTA-74).
+ *
+ * Any signed-in member may call this (Manager/Staff included) — it backs
+ * the role-gated shell. 401 maps to re-auth; 403 (no live membership) maps
+ * to the generic access copy. Responses carry opaque ids only.
+ */
+export async function getMyMembership(
+  opts: { fetchFn?: FetchFn; lang?: TeamLang } = {}
+): Promise<MyMembershipView> {
+  const data = await getJson<{ membership: MyMembershipView }>(
+    opts.fetchFn ?? fetch,
+    '/api/auth/membership',
+    opts.lang ?? 'en'
+  );
+  return data.membership;
 }
 
 export async function acceptInvite(

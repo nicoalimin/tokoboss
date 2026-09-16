@@ -52,6 +52,7 @@ export interface ProfileCopy {
   navProfile: string;
   navSessions: string;
   navTeam: string;
+  navSettings: string;
   navSignIn: string;
   backHomeLink: string;
 }
@@ -93,6 +94,7 @@ const en: ProfileCopy = {
   navProfile: 'Profil',
   navSessions: 'Active sessions',
   navTeam: 'Team & Access',
+  navSettings: 'Pengaturan',
   navSignIn: 'Sign in',
   backHomeLink: 'Back to home',
 };
@@ -134,6 +136,7 @@ const id: ProfileCopy = {
   navProfile: 'Profil',
   navSessions: 'Sesi aktif',
   navTeam: 'Tim & Akses',
+  navSettings: 'Pengaturan',
   navSignIn: 'Masuk',
   backHomeLink: 'Kembali ke beranda',
 };
