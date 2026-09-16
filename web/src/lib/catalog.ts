@@ -32,7 +32,9 @@ import {
   type ProductDetailVariant,
   type ProductPicture,
   type ProductWithVariants,
+  type StockBalance,
   type StockLedgerRecord,
+  type StockSettingsRecord,
   type WarehouseRecord,
   type WorkspaceContext,
 } from '@tokoboss/application';
@@ -43,6 +45,8 @@ import type {
   InventoryLevelView,
   LedgerEntryView,
   ProductView,
+  StockBalanceView,
+  StockSettingsView,
   VariantView,
   WarehouseView,
 } from '@tokoboss/contracts';
@@ -334,7 +338,29 @@ export function toLedgerView(e: StockLedgerRecord): LedgerEntryView {
     reason: e.reason,
     actorId: e.actorId,
     correlationId: e.correlationId,
+    idempotencyKey: e.idempotencyKey,
     createdAt: iso(e.createdAt),
+  };
+}
+
+export function toStockSettingsView(s: StockSettingsRecord): StockSettingsView {
+  return {
+    workspaceId: s.workspaceId,
+    allowNegative: s.allowNegative,
+    version: s.version,
+    createdAt: iso(s.createdAt),
+    updatedAt: iso(s.updatedAt),
+  };
+}
+
+export function toStockBalanceView(b: StockBalance): StockBalanceView {
+  return {
+    variantId: b.variantId,
+    workspaceId: b.workspaceId,
+    totalQty: b.totalQty,
+    perWarehouse: [...b.perWarehouse].sort((x, y) =>
+      x.warehouseId.localeCompare(y.warehouseId)
+    ),
   };
 }
 

@@ -1,11 +1,11 @@
-import { getLedger } from '@tokoboss/application';
+import { getStockBalance } from '@tokoboss/application';
 import {
   catalogErrorStatus,
   getCatalogStore,
   requireWorkspaceMember,
   slideForMember,
   storageKind,
-  toLedgerView,
+  toStockBalanceView,
 } from '@/lib/catalog';
 import { authJson, routeContext } from '@/lib/auth-routes';
 
@@ -14,10 +14,11 @@ interface RouteParams {
 }
 
 /**
- * Stock ledger timeline, newest-first (UTA-81, Story 05).
- * GET /api/workspaces/:workspaceId/catalog/variants/:variantId/ledger?limit=&warehouseId=
- * (any active member; workspace-scoped; scoped roles may only filter by
- * their own warehouse).
+ * Consolidated + per-warehouse remaining for one SKU TokoBoss variant
+ * (UTA-81, Story 05 — read API for the multi-warehouse UX).
+ * GET /api/workspaces/:workspaceId/catalog/variants/:variantId/stock
+ * (any active member; workspace-scoped; scoped roles see only their
+ * warehouse line while the consolidated total stays workspace-wide).
  */
 export async function GET(request: Request, { params }: RouteParams) {
   const { requestId, correlationId } = routeContext(request);
@@ -33,29 +34,14 @@ export async function GET(request: Request, { params }: RouteParams) {
     );
   }
 
-  const url = new URL(request.url);
-  const limitParam = url.searchParams.get('limit');
-  const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
-  const warehouseParam = url.searchParams.get('warehouseId');
-  const warehouseId =
-    warehouseParam !== null && warehouseParam.trim().length > 0
-      ? warehouseParam.trim()
-      : undefined;
-
   try {
-    const entries = await getLedger(getCatalogStore(), {
+    const balance = await getStockBalance(getCatalogStore(), {
       ctx: member.value.ctx,
       workspaceId: member.value.ctx.workspaceId,
       variantId,
-      warehouseId,
-      limit: Number.isFinite(limit) ? limit : undefined,
     });
     return authJson(
-      {
-        entries: entries.map(toLedgerView),
-        ...(warehouseId !== undefined ? { warehouseId } : {}),
-        storage: storageKind(),
-      },
+      { balance: toStockBalanceView(balance), storage: storageKind() },
       200,
       requestId,
       correlationId,

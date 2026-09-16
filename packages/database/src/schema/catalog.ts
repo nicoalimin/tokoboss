@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm';
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -26,6 +28,11 @@ import type { ProductPicture } from '@tokoboss/application';
  * - `catalog_inventory_levels`: SoT read model for on-hand qty, derived
  *   ONLY from `catalog_stock_ledger` entries (never edited directly).
  * - `catalog_stock_ledger`: append-only stock source of truth.
+ *   `idempotency_key` (nullable, unique per workspace when present)
+ *   dedupes retried adjustments (UTA-81, Story 05).
+ * - `catalog_stock_settings`: one row per workspace (lazy-created);
+ *   `allow_negative` (default false, Admin-only toggle) gates oversell
+ *   (UTA-81, Story 05).
  * - `catalog_channel_mappings`: `(channel, shop_ext_id, platform_sku_id)`
  *   → SKU TokoBoss. Stub-ready for Story 03–04; no live marketplace calls
  *   touch this table in Story 01.
@@ -158,6 +165,7 @@ export const catalogStockLedger = pgTable(
     reason: text('reason').notNull(),
     actorId: text('actor_id'),
     correlationId: text('correlation_id'),
+    idempotencyKey: text('idempotency_key'),
     createdAt: utcCreatedAt(),
   },
   (t) => [
@@ -170,8 +178,27 @@ export const catalogStockLedger = pgTable(
       t.workspaceId,
       t.variantId
     ),
+    uniqueIndex('catalog_ledger_workspace_idempotency_unique')
+      .on(t.workspaceId, t.idempotencyKey)
+      .where(sql`idempotency_key is not null`),
   ]
 );
+
+/**
+ * Per-workspace stock policy (UTA-81, Story 05).
+ *
+ * Single row per workspace, created lazily on first read/adjustment.
+ * `allowNegative` defaults to false (oversell rejected); an Admin-only
+ * API toggles it. `version` guards concurrent toggles (CAS).
+ */
+export const catalogStockSettings = pgTable('catalog_stock_settings', {
+  workspaceId: uuid('workspace_id')
+    .primaryKey()
+    .references(() => tenants.id, { onDelete: 'cascade' }),
+  allowNegative: boolean('allow_negative').notNull().default(false),
+  version: integer('version').notNull().default(1),
+  ...utcTimestamps(),
+});
 
 export const catalogChannelMappings = pgTable(
   'catalog_channel_mappings',
@@ -214,5 +241,7 @@ export type NewCatalogWarehouseRow = typeof catalogWarehouses.$inferInsert;
 export type CatalogInventoryLevelRow =
   typeof catalogInventoryLevels.$inferSelect;
 export type CatalogStockLedgerRow = typeof catalogStockLedger.$inferSelect;
+export type CatalogStockSettingsRow =
+  typeof catalogStockSettings.$inferSelect;
 export type CatalogChannelMappingRow =
   typeof catalogChannelMappings.$inferSelect;

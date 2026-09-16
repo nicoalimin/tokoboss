@@ -108,7 +108,46 @@ export interface StockLedgerRecord {
   /** Opaque actor user id. Never email/name. */
   actorId: string | null;
   correlationId: string | null;
+  /**
+   * Client-supplied idempotency key (UTA-81, Story 05). Unique per
+   * workspace when present — retried adjustments with the same key
+   * resolve to the original entry instead of double-applying.
+   */
+  idempotencyKey: string | null;
   createdAt: Date;
+}
+
+/**
+ * Per-workspace stock policy (UTA-81, Story 05). One row per workspace,
+ * created lazily with `allowNegative: false`. Only Admin may toggle.
+ */
+export interface StockSettingsRecord {
+  workspaceId: string;
+  allowNegative: boolean;
+  /** Bumped on every toggle; PUT callers must echo it back. */
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Per-warehouse remaining qty for one SKU TokoBoss variant. */
+export interface WarehouseBalance {
+  warehouseId: string;
+  qty: number;
+  /** Level row version (CAS token for the next adjustment). */
+  version: number;
+}
+
+/**
+ * Consolidated + per-warehouse remaining for a SKU TokoBoss variant
+ * (UTA-81 read API for the multi-warehouse UX).
+ */
+export interface StockBalance {
+  variantId: string;
+  workspaceId: string;
+  /** Sum of on-hand qty across all warehouses. */
+  totalQty: number;
+  perWarehouse: WarehouseBalance[];
 }
 
 /**

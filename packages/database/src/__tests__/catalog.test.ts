@@ -5,9 +5,9 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Catalog migration + store integration (UTA-75, Story 01).
+ * Catalog migration + store integration (UTA-75, Story 01; UTA-81, Story 05).
  *
- * Applies the committed chain 0001 → 0011 to an empty PGlite database
+ * Applies the committed chain 0001 → 0012 to an empty PGlite database
  * (no Neon credentials) and proves:
  * 1. `0009_catalog_skus.sql` applies cleanly on top of main's migrations.
  * 2. Product + variants commit atomically; duplicate SKU codes reject
@@ -24,7 +24,11 @@ import {
   createMapping,
   createProduct,
   createWarehouse,
+  getLedger,
+  getStockBalance,
+  getStockSettings,
   searchCatalog,
+  updateStockSettings,
   updateVariant,
   type CatalogStore,
 } from '@tokoboss/application';
@@ -44,6 +48,7 @@ const CHAIN = [
   '0009_catalog_skus.sql',
   '0010_product_imports.sql',
   '0011_bundle_bom.sql',
+  '0012_stock_ledger_hardening.sql',
 ];
 
 async function createMigratedDb() {
@@ -236,6 +241,132 @@ describe('catalog migration + drizzle store', () => {
       expect(archived.status).toBe('archived');
       const level = await store.getLevel(tenant.id, variantId, warehouse.id);
       expect(level?.qty).toBe(13);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('UTA-81: idempotency dedupes retries, policy gates oversell, reads consolidate', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const [tenant] = await db
+        .insert(tenants)
+        .values({ name: 'Acme', slug: 'acme-catalog-uta81' })
+        .returning({ id: tenants.id });
+      if (!tenant) throw new Error('seed tenant failed');
+      const store: CatalogStore = new DrizzleCatalogStore(db);
+      const adminCtx = {
+        workspaceId: tenant.id,
+        userId: 'user_admin_1',
+        role: 'admin' as const,
+        warehouseScope: null,
+        status: 'active' as const,
+        authVersion: 1,
+      };
+      const managerCtx = { ...adminCtx, userId: 'user_mgr_1', role: 'manager' as const };
+      const wh1 = await createWarehouse(store, {
+        ctx: adminCtx,
+        workspaceId: tenant.id,
+        code: 'JKT-01',
+        name: 'Jakarta',
+      });
+      const wh2 = await createWarehouse(store, {
+        ctx: adminCtx,
+        workspaceId: tenant.id,
+        code: 'SBY-01',
+        name: 'Surabaya',
+      });
+      const created = await createProduct(store, {
+        ctx: adminCtx,
+        workspaceId: tenant.id,
+        name: 'Kaos UTA-81',
+        variants: [{ skuCode: 'UTA81-A', sellingPriceCents: 99000 }],
+      });
+      const variantId = created.variants[0]?.id ?? '';
+
+      // Idempotent adjustment: retry resolves to the original entry.
+      const first = await adjustStock(store, {
+        ctx: managerCtx,
+        workspaceId: tenant.id,
+        variantId,
+        warehouseId: wh1.id,
+        delta: 10,
+        reason: 'initial stock',
+        idempotencyKey: 'uta81-retry-1',
+      });
+      const retry = await adjustStock(store, {
+        ctx: managerCtx,
+        workspaceId: tenant.id,
+        variantId,
+        warehouseId: wh1.id,
+        delta: 10,
+        reason: 'initial stock',
+        idempotencyKey: 'uta81-retry-1',
+      });
+      expect(retry.deduplicated).toBe(true);
+      expect(retry.entry.id).toBe(first.entry.id);
+      expect(await store.countMovements(tenant.id, variantId)).toBe(1);
+
+      // Negative stock blocked by default (fresh workspace policy OFF).
+      expect(
+        (await getStockSettings(store, { ctx: adminCtx, workspaceId: tenant.id }))
+          .allowNegative
+      ).toBe(false);
+      await expect(
+        adjustStock(store, {
+          ctx: managerCtx,
+          workspaceId: tenant.id,
+          variantId,
+          warehouseId: wh1.id,
+          delta: -50,
+          reason: 'oversell',
+        })
+      ).rejects.toMatchObject({ code: 'CATALOG_INSUFFICIENT_STOCK' });
+
+      // Admin toggles the policy; oversell then applies.
+      const enabled = await updateStockSettings(store, {
+        ctx: adminCtx,
+        workspaceId: tenant.id,
+        allowNegative: true,
+        expectedVersion: 1,
+      });
+      expect(enabled.allowNegative).toBe(true);
+      const over = await adjustStock(store, {
+        ctx: managerCtx,
+        workspaceId: tenant.id,
+        variantId,
+        warehouseId: wh1.id,
+        delta: -12,
+        reason: 'oversell allowed',
+      });
+      expect(over.level.qty).toBe(-2);
+
+      // Second warehouse + consolidated/per-WH reads + ledger filter.
+      await adjustStock(store, {
+        ctx: managerCtx,
+        workspaceId: tenant.id,
+        variantId,
+        warehouseId: wh2.id,
+        delta: 5,
+        reason: 'sby stock',
+      });
+      const balance = await getStockBalance(store, {
+        ctx: adminCtx,
+        workspaceId: tenant.id,
+        variantId,
+      });
+      expect(balance.totalQty).toBe(3);
+      expect(
+        new Map(balance.perWarehouse.map((p) => [p.warehouseId, p.qty])).get(wh2.id)
+      ).toBe(5);
+      const filtered = await getLedger(store, {
+        ctx: adminCtx,
+        workspaceId: tenant.id,
+        variantId,
+        warehouseId: wh2.id,
+      });
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0]?.reason).toBe('sby stock');
     } finally {
       await client.close();
     }

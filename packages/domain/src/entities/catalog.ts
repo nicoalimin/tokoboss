@@ -58,8 +58,17 @@ export const CatalogRules = {
     }
   },
 
-  /** Balances can never go negative through an adjustment. */
-  assertBalanceAllowed(input: { currentQty: number; delta: number }): void {
+  /**
+   * Balances can never go negative through an adjustment unless the
+   * workspace explicitly opted in (UTA-81: Admin-only `allowNegative`
+   * toggle, default OFF).
+   */
+  assertBalanceAllowed(input: {
+    currentQty: number;
+    delta: number;
+    allowNegative?: boolean;
+  }): void {
+    if (input.allowNegative === true) return;
     if (input.currentQty + input.delta < 0) {
       throw new BusinessRuleViolationError('Insufficient stock for adjustment');
     }

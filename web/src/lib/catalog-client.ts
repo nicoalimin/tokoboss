@@ -96,7 +96,29 @@ export interface LedgerEntryView {
   reason: string;
   actorId: string | null;
   correlationId: string | null;
+  idempotencyKey?: string | null;
   createdAt: string;
+}
+
+export interface WarehouseBalanceView {
+  warehouseId: string;
+  qty: number;
+  version: number;
+}
+
+export interface StockBalanceView {
+  variantId: string;
+  workspaceId: string;
+  totalQty: number;
+  perWarehouse: WarehouseBalanceView[];
+}
+
+export interface StockSettingsView {
+  workspaceId: string;
+  allowNegative: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateProductInput {
@@ -131,6 +153,9 @@ export interface AdjustStockInput {
   warehouseId: string;
   delta: number;
   reason: string;
+  expectedVersion?: number;
+  /** Client-generated retry key; retries resolve without double-apply. */
+  idempotencyKey?: string;
 }
 
 export class CatalogClientError extends Error {
@@ -427,16 +452,24 @@ export async function updateVariant(
 
 /**
  * Warehouse adjustment: warehouse + non-zero delta + reason are all
- * required client-side (the server re-enforces). Any active member may
- * call within warehouse scope; the server stays the boundary.
+ * required client-side (the server re-enforces). Manager/Admin only
+ * (UTA-81); the server stays the boundary.
  */
 export async function adjustStock(
   workspaceId: string,
   variantId: string,
   input: AdjustStockInput,
   opts: ClientOpts = {}
-): Promise<{ level: InventoryLevelView; entry: LedgerEntryView }> {
-  return sendJson<{ level: InventoryLevelView; entry: LedgerEntryView }>(
+): Promise<{
+  level: InventoryLevelView;
+  entry: LedgerEntryView;
+  deduplicated?: boolean;
+}> {
+  return sendJson<{
+    level: InventoryLevelView;
+    entry: LedgerEntryView;
+    deduplicated?: boolean;
+  }>(
     opts.fetchFn ?? fetch,
     `${base(workspaceId)}/variants/${encodeSegment(variantId)}/adjustments`,
     'POST',
@@ -444,6 +477,12 @@ export async function adjustStock(
       warehouseId: input.warehouseId,
       delta: input.delta,
       reason: input.reason,
+      ...(input.expectedVersion !== undefined
+        ? { expectedVersion: input.expectedVersion }
+        : {}),
+      ...(input.idempotencyKey !== undefined
+        ? { idempotencyKey: input.idempotencyKey }
+        : {}),
     },
     opts.lang ?? 'en'
   );
@@ -453,14 +492,48 @@ export async function adjustStock(
 export async function getLedger(
   workspaceId: string,
   variantId: string,
-  opts: ClientOpts = {}
+  opts: ClientOpts & { warehouseId?: string; limit?: number } = {}
 ): Promise<LedgerEntryView[]> {
+  const params = new URLSearchParams();
+  if (opts.warehouseId) params.set('warehouseId', opts.warehouseId);
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+  const query = params.size > 0 ? `?${params.toString()}` : '';
   const data = await getJson<{ entries?: LedgerEntryView[] }>(
     opts.fetchFn ?? fetch,
-    `${base(workspaceId)}/variants/${encodeSegment(variantId)}/ledger`,
+    `${base(workspaceId)}/variants/${encodeSegment(variantId)}/ledger${query}`,
     opts.lang ?? 'en'
   );
   return Array.isArray(data.entries) ? data.entries : [];
+}
+
+/**
+ * Consolidated + per-warehouse remaining for one SKU TokoBoss
+ * (UTA-81 read API for the multi-warehouse UX).
+ */
+export async function getStockBalance(
+  workspaceId: string,
+  variantId: string,
+  opts: ClientOpts = {}
+): Promise<StockBalanceView> {
+  const data = await getJson<{ balance: StockBalanceView }>(
+    opts.fetchFn ?? fetch,
+    `${base(workspaceId)}/variants/${encodeSegment(variantId)}/stock`,
+    opts.lang ?? 'en'
+  );
+  return data.balance;
+}
+
+/** Workspace stock policy (negative-stock toggle, default OFF). */
+export async function getStockSettings(
+  workspaceId: string,
+  opts: ClientOpts = {}
+): Promise<StockSettingsView> {
+  const data = await getJson<{ settings: StockSettingsView }>(
+    opts.fetchFn ?? fetch,
+    `${base(workspaceId)}/stock-settings`,
+    opts.lang ?? 'en'
+  );
+  return data.settings;
 }
 
 /** Warehouses for the adjustment picker (any active member). */

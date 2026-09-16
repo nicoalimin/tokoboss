@@ -29,7 +29,9 @@ import type {
   InventoryLevelRecord,
   NewVariantInput,
   ProductPicture,
+  StockBalance,
   StockLedgerRecord,
+  StockSettingsRecord,
   WarehouseRecord,
   WarehouseStatus,
 } from './catalog-types';
@@ -639,11 +641,31 @@ export async function archiveVariant(
   );
 }
 
-// Stock
+// Stock (UTA-81, Story 05: ledger SoT + reasoned adjustments)
 
 export interface AdjustmentResult {
   level: InventoryLevelRecord;
   entry: StockLedgerRecord;
+  /** True when the idempotency key was already seen (no double-apply). */
+  deduplicated?: boolean;
+}
+
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9\-_:.]{1,128}$/;
+
+function cleanIdempotencyKey(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw catalogValidation(
+      'Idempotency key must be a non-empty string when provided'
+    );
+  }
+  const v = value.trim();
+  if (!IDEMPOTENCY_KEY_PATTERN.test(v)) {
+    throw catalogValidation(
+      'Idempotency key must be 1–128 chars of letters, digits, dash, underscore, colon, or dot'
+    );
+  }
+  return v;
 }
 
 export async function adjustStock(
@@ -657,9 +679,13 @@ export async function adjustStock(
     reason: unknown;
     expectedVersion?: number;
     correlationId?: string;
+    idempotencyKey?: unknown;
   }
 ): Promise<AdjustmentResult> {
   assertSameWorkspace(input.ctx, input.workspaceId);
+  // UTA-81: adjustments are Manager/Admin writes; Staff read
+  // ledger/balances but never mutate stock.
+  assertManagerOrAdmin(input.ctx);
   const variant = await store.findVariantById(
     input.workspaceId,
     input.variantId
@@ -708,6 +734,29 @@ export async function adjustStock(
   if (typeof delta !== 'number' || !Number.isInteger(delta)) {
     throw catalogValidation('Delta must be a non-zero integer');
   }
+  const idempotencyKey = cleanIdempotencyKey(input.idempotencyKey);
+  // Idempotency short-circuit: a retried key resolves to the original
+  // result without touching the ledger (stores re-check atomically).
+  if (idempotencyKey !== undefined) {
+    const seen = await store.findLedgerEntryByIdempotencyKey(
+      input.workspaceId,
+      idempotencyKey
+    );
+    if (seen) {
+      if (
+        seen.entry.variantId !== variant.id ||
+        seen.entry.warehouseId !== warehouse.id ||
+        seen.entry.delta !== delta ||
+        seen.entry.reason !== reason.trim()
+      ) {
+        throw catalogConflict(
+          'Idempotency key was already used for a different adjustment.'
+        );
+      }
+      return { level: seen.level, entry: seen.entry, deduplicated: true };
+    }
+  }
+  const settings = await store.getStockSettings(input.workspaceId);
   try {
     return await store.adjustLevel({
       workspaceId: input.workspaceId,
@@ -717,6 +766,8 @@ export async function adjustStock(
       reason: reason.trim(),
       actorId: input.ctx.userId,
       correlationId: input.correlationId,
+      idempotencyKey,
+      allowNegative: settings.allowNegative,
       expectedVersion: input.expectedVersion,
     });
   } catch (err) {
@@ -726,6 +777,30 @@ export async function adjustStock(
       (err as { code?: unknown }).code === 'CATALOG_INSUFFICIENT_STOCK'
     ) {
       throw catalogInsufficientStock();
+    }
+    // Lost an idempotency race with a concurrent retry: the winner is
+    // the truth — resolve to it (or 409 when the payload differs).
+    if (
+      idempotencyKey !== undefined &&
+      typeof err === 'object' &&
+      err !== null &&
+      (err as { code?: unknown }).code === 'CATALOG_CONFLICT'
+    ) {
+      const seen = await store.findLedgerEntryByIdempotencyKey(
+        input.workspaceId,
+        idempotencyKey
+      );
+      if (seen) {
+        if (
+          seen.entry.variantId !== variant.id ||
+          seen.entry.warehouseId !== warehouse.id ||
+          seen.entry.delta !== delta ||
+          seen.entry.reason !== reason.trim()
+        ) {
+          throw err;
+        }
+        return { level: seen.level, entry: seen.entry, deduplicated: true };
+      }
     }
     throw err;
   }
@@ -737,6 +812,7 @@ export async function getLedger(
     ctx: WorkspaceContext;
     workspaceId: string;
     variantId: string;
+    warehouseId?: string;
     limit?: number;
   }
 ): Promise<StockLedgerRecord[]> {
@@ -746,10 +822,95 @@ export async function getLedger(
     input.variantId
   );
   if (!variant) throw catalogNotFound('Variant');
+  // Warehouse filter is warehouse-scoped like adjustments: scoped roles
+  // may only read their own warehouse.
+  if (input.warehouseId !== undefined) {
+    assertWarehouseAccess(input.ctx, input.warehouseId);
+    const warehouse = await store.findWarehouseById(
+      input.workspaceId,
+      input.warehouseId
+    );
+    if (!warehouse) throw catalogNotFound('Warehouse');
+  }
   return store.listLedgerByVariant(
     input.workspaceId,
     variant.id,
-    Math.min(Math.max(input.limit ?? 50, 1), 100)
+    Math.min(Math.max(input.limit ?? 50, 1), 100),
+    input.warehouseId !== undefined
+      ? { warehouseId: input.warehouseId }
+      : undefined
+  );
+}
+
+/**
+ * Consolidated + per-warehouse remaining for a SKU TokoBoss variant
+ * (UTA-81 read API for the multi-warehouse UX). Any active member;
+ * scoped roles see only their warehouse line (the consolidated total
+ * still reflects every warehouse — stock truth is workspace-wide).
+ */
+export async function getStockBalance(
+  store: CatalogStore,
+  input: { ctx: WorkspaceContext; workspaceId: string; variantId: string }
+): Promise<StockBalance> {
+  assertSameWorkspace(input.ctx, input.workspaceId);
+  const variant = await store.findVariantById(
+    input.workspaceId,
+    input.variantId
+  );
+  if (!variant) throw catalogNotFound('Variant');
+  const levels = await store.listLevelsByVariant(input.workspaceId, variant.id);
+  const visible = levels.filter((l) => {
+    if (input.ctx.role === 'admin') return true;
+    if (input.ctx.warehouseScope === null) return true;
+    return l.warehouseId === input.ctx.warehouseScope;
+  });
+  return {
+    variantId: variant.id,
+    workspaceId: input.workspaceId,
+    totalQty: levels.reduce((sum, l) => sum + l.qty, 0),
+    perWarehouse: visible
+      .map((l) => ({
+        warehouseId: l.warehouseId,
+        qty: l.qty,
+        version: l.version,
+      }))
+      .sort((a, b) => a.warehouseId.localeCompare(b.warehouseId)),
+  };
+}
+
+/** Read the workspace stock policy (any active member). */
+export async function getStockSettings(
+  store: CatalogStore,
+  input: { ctx: WorkspaceContext; workspaceId: string }
+): Promise<StockSettingsRecord> {
+  assertSameWorkspace(input.ctx, input.workspaceId);
+  return store.getStockSettings(input.workspaceId);
+}
+
+/**
+ * Toggle the negative-stock policy (UTA-81). Admin-only: Managers and
+ * Staff get the same generic 403 as non-members.
+ */
+export async function updateStockSettings(
+  store: CatalogStore,
+  input: {
+    ctx: WorkspaceContext;
+    workspaceId: string;
+    allowNegative: unknown;
+    expectedVersion: number;
+  }
+): Promise<StockSettingsRecord> {
+  assertSameWorkspace(input.ctx, input.workspaceId);
+  if (input.ctx.role !== 'admin') {
+    throw catalogForbidden('Only Admin may change stock settings');
+  }
+  if (typeof input.allowNegative !== 'boolean') {
+    throw catalogValidation('allowNegative must be a boolean');
+  }
+  return store.updateStockSettings(
+    input.workspaceId,
+    { allowNegative: input.allowNegative },
+    input.expectedVersion
   );
 }
 

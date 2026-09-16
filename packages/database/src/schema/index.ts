@@ -22,6 +22,7 @@ import {
   catalogInventoryLevels,
   catalogProducts,
   catalogStockLedger,
+  catalogStockSettings,
   catalogVariants,
   catalogWarehouses,
 } from './catalog';
@@ -54,6 +55,7 @@ export const schema = {
   catalogWarehouses,
   catalogInventoryLevels,
   catalogStockLedger,
+  catalogStockSettings,
   catalogChannelMappings,
   productImportBatches,
   productImportRows,
