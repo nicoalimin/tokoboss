@@ -115,6 +115,21 @@ export function ImportReviewPanel() {
     }
   }
 
+  /**
+   * Silent list refresh after row edits: keeps the batch counters honest
+   * without flashing the list loading state.
+   */
+  const refreshBatchesQuiet = useCallback(
+    async (ws: string) => {
+      try {
+        setBatches(await listImports(ws));
+      } catch (err) {
+        handleClientError(err, setError);
+      }
+    },
+    [handleClientError]
+  );
+
   async function onLoad(e?: React.FormEvent) {
     e?.preventDefault();
     const ws = workspaceId.trim();
@@ -233,23 +248,16 @@ export function ImportReviewPanel() {
     setSavingRow(true);
     setError(null);
     try {
-      const updated = await patchImportRow(
-        loadedWorkspace,
-        selected.id,
-        rowId,
-        {
-          productName: editName.trim(),
-          skuCode: editSku.trim(),
-          sellingPriceCents: price,
-          note: editNote.trim() ? editNote.trim() : null,
-        }
-      );
-      setSelected({
-        ...selected,
-        rows: (selected.rows ?? []).map((r) =>
-          r.id === rowId ? updated : r
-        ),
+      await patchImportRow(loadedWorkspace, selected.id, rowId, {
+        productName: editName.trim(),
+        skuCode: editSku.trim(),
+        sellingPriceCents: price,
+        note: editNote.trim() ? editNote.trim() : null,
       });
+      // Re-read the batch detail so rows + counters reflect the server
+      // re-validation (never splice local state over server truth).
+      setSelected(await getImport(loadedWorkspace, selected.id));
+      await refreshBatchesQuiet(loadedWorkspace);
       setEditingRowId(null);
       setNotice(copy.rowSavedNotice);
     } catch (err) {
@@ -264,18 +272,12 @@ export function ImportReviewPanel() {
     setRejectingRowId(rowId);
     setError(null);
     try {
-      const updated = await patchImportRow(
-        loadedWorkspace,
-        selected.id,
-        rowId,
-        { status: 'rejected' }
-      );
-      setSelected({
-        ...selected,
-        rows: (selected.rows ?? []).map((r) =>
-          r.id === rowId ? updated : r
-        ),
+      await patchImportRow(loadedWorkspace, selected.id, rowId, {
+        status: 'rejected',
       });
+      // Re-read the batch detail so rows + counters stay honest.
+      setSelected(await getImport(loadedWorkspace, selected.id));
+      await refreshBatchesQuiet(loadedWorkspace);
       setNotice(copy.rowRejectedNotice);
     } catch (err) {
       handleClientError(err, setError);
@@ -292,7 +294,9 @@ export function ImportReviewPanel() {
     try {
       const result = await confirmImport(loadedWorkspace, selected.id);
       setSummary(result.summary);
-      setSelected(result.batch.rows ? result.batch : await getImport(loadedWorkspace, selected.id));
+      // The confirm response carries the batch without rows — always
+      // re-read the detail so the table shows post-confirm row states.
+      setSelected(await getImport(loadedWorkspace, selected.id));
       setNotice(copy.confirmedNotice);
       await refreshBatches(loadedWorkspace);
     } catch (err) {

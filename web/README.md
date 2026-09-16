@@ -292,6 +292,7 @@ JS storage or logs).
 | Route     | Screen                                                                                                                                                                                                                                                     |
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/produk` | Workspace loader, cross-identifier search (name / SKU TokoBoss / barcode / Store SKU hint / listing name), dense product rows (primary SKU, prices, total stock, status), create (≥1 variant), confirm-gated archive, SKU drawer overlay (list stays open) |
+| `/produk/impor` | Import review (UTA-78, Story 02): workspace loader, CSV/file upload (or pre-parsed rows JSON), batch list with status + counters, reviewable row table (errors, duplicates with `existingPath`, Store SKU as mapping candidate only), row edit/reject, batch reject/reopen, confirm-before-create into the catalog |
 
 Rules reflected in UX: search hits one query across every identifier;
 the drawer keeps SKU TokoBoss visually primary with editable details
@@ -304,6 +305,15 @@ ledger; duplicates surface the conflict copy with the existing-product
 route; Manager/Admin write, Staff reads (+ scoped drawer adjustments);
 401 `INVALID_SESSION` redirects to `/sign-in?expired=1`. Full runbook:
 `src/components/catalog/RUNBOOK.md`.
+
+Import review rules reflected in UX (`/produk/impor`, entered from
+`/produk`): review-before-create only — nothing touches the catalog
+until confirm; row edits re-validate server-side and the batch detail is
+re-read after every mutation so counters stay honest; confirm creates
+via the catalog rules with applied / duplicates (`existingPath`, never
+overwritten) / skipped summary; Store SKU text is a mapping candidate
+only and never the TokoBoss identity; no live marketplace calls. Full
+runbook: `src/components/imports/RUNBOOK.md`.
 
 ### Local preview runbook (memory mode, no `DATABASE_URL`)
 
