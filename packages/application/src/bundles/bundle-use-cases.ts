@@ -100,19 +100,17 @@ function validateLinesInput(raw: unknown): ValidatedLine[] {
   });
 }
 
-function asCycleOrValidation(err: unknown): Error & { code: string } {
+/**
+ * Map a domain `BusinessRuleViolationError` to the bundle error family.
+ * Each rule is invoked in its own `try` block below so the mapping is
+ * explicit — never sniffed from message text.
+ */
+function toBundleError(
+  err: unknown,
+  map: (message: string) => Error & { code: string }
+): Error & { code: string } {
   if (err instanceof BusinessRuleViolationError) {
-    if (
-      err.message.includes('itself') ||
-      err.message.includes('cycle') ||
-      err.message.includes('Cycle')
-    ) {
-      return bundleCycle(err.message);
-    }
-    if (err.message.includes('only once')) {
-      return bundleConflict(err.message);
-    }
-    return bundleValidation(err.message);
+    return map(err.message);
   }
   throw err;
 }
@@ -151,21 +149,33 @@ async function assertComponentsUsable(
     bundleStatus: string;
     lines: ValidatedLine[];
   }
-): Promise<Map<string, CatalogVariantRecord>> {
+): Promise<void> {
   try {
     BundleRules.assertBundleActive(input.bundleStatus);
+  } catch (err) {
+    throw toBundleError(err, bundleValidation);
+  }
+  try {
     BundleRules.assertUniqueComponents(
       input.lines.map((l) => l.componentVariantId)
     );
-    for (const line of input.lines) {
+  } catch (err) {
+    throw toBundleError(err, bundleConflict);
+  }
+  for (const line of input.lines) {
+    try {
       BundleRules.assertLineQtyAllowed(line.qty);
+    } catch (err) {
+      throw toBundleError(err, bundleValidation);
+    }
+    try {
       BundleRules.assertNoSelfReference({
         bundleVariantId: input.bundleVariantId,
         componentVariantId: line.componentVariantId,
       });
+    } catch (err) {
+      throw toBundleError(err, bundleCycle);
     }
-  } catch (err) {
-    throw asCycleOrValidation(err);
   }
 
   const adjacency = await adjacencyWithProposed(
@@ -182,11 +192,10 @@ async function assertComponentsUsable(
         reachesBundle: (from, target) => bomReaches(adjacency, from, target),
       });
     } catch (err) {
-      throw asCycleOrValidation(err);
+      throw toBundleError(err, bundleCycle);
     }
   }
 
-  const components = new Map<string, CatalogVariantRecord>();
   for (const line of input.lines) {
     const component = await store.findVariantById(
       input.workspaceId,
@@ -199,11 +208,9 @@ async function assertComponentsUsable(
         status: component.status,
       });
     } catch (err) {
-      throw asCycleOrValidation(err);
+      throw toBundleError(err, bundleValidation);
     }
-    components.set(component.id, component);
   }
-  return components;
 }
 
 function toNewLines(lines: ValidatedLine[]): NewBundleLineInput[] {
@@ -304,7 +311,7 @@ export async function createBundle(
     bundleStatus: bundle.status,
     lines,
   });
-  const stored = await store.replaceBundleLines(
+  await store.replaceBundleLines(
     input.workspaceId,
     bundle.id,
     toNewLines(lines),
@@ -312,7 +319,6 @@ export async function createBundle(
   );
   const refreshed = await store.findVariantById(input.workspaceId, bundle.id);
   if (!refreshed) throw catalogNotFound('Variant');
-  void stored;
   return loadDetail(store, input.workspaceId, refreshed);
 }
 
@@ -425,6 +431,10 @@ export async function listBundles(
   const out: BundleSummary[] = [];
   for (const bundleId of bundleIds) {
     const bundle = await store.findVariantById(input.workspaceId, bundleId);
+    // Corrupt lines (a component that no longer resolves — components
+    // are never hard-deleted, so this means FK-level drift) are skipped
+    // so one bad row cannot take down the whole list; detail surfaces
+    // them as 404 instead.
     if (!bundle) continue;
     const lines = allLines.filter((l) => l.bundleVariantId === bundleId);
     const detail: BundleLineDetail[] = [];
