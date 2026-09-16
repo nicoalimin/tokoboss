@@ -21,6 +21,11 @@ import {
 } from '../app/api/workspaces/[workspaceId]/catalog/variants/[variantId]/route';
 import { POST as adjustStock } from '../app/api/workspaces/[workspaceId]/catalog/variants/[variantId]/adjustments/route';
 import { GET as getLedger } from '../app/api/workspaces/[workspaceId]/catalog/variants/[variantId]/ledger/route';
+import { GET as getStockBalance } from '../app/api/workspaces/[workspaceId]/catalog/variants/[variantId]/stock/route';
+import {
+  GET as getStockSettings,
+  PUT as updateStockSettings,
+} from '../app/api/workspaces/[workspaceId]/catalog/stock-settings/route';
 import {
   GET as listMappings,
   POST as createMapping,
@@ -201,7 +206,7 @@ describe('catalog routes (memory wiring)', () => {
     expect(dupeBody.details.existingVariantId).toBe(product.variants[0]?.id);
   });
 
-  it('denies staff writes but allows staff reads and scoped adjustments', async () => {
+  it('denies staff writes but allows staff reads; managers adjust stock', async () => {
     const { warehouse } = await seedWarehouse(adminToken);
     const { product } = await seedProduct(adminToken);
     const variantId = product.variants[0]?.id ?? '';
@@ -241,11 +246,22 @@ describe('catalog routes (memory wiring)', () => {
     );
     expect(detail.status).toBe(200);
 
-    const adjusted = await adjustStock(
+    // UTA-81: adjustments are Manager/Admin writes — Staff is denied.
+    const staffAdjust = await adjustStock(
       apiRequest(
         `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/adjustments`,
         { warehouseId: warehouse.id, delta: 10, reason: 'initial stock' },
         bearer(staffToken)
+      ),
+      { params: Promise.resolve({ workspaceId, variantId }) }
+    );
+    expect(staffAdjust.status).toBe(403);
+
+    const adjusted = await adjustStock(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/adjustments`,
+        { warehouseId: warehouse.id, delta: 10, reason: 'initial stock' },
+        bearer(managerToken)
       ),
       { params: Promise.resolve({ workspaceId, variantId }) }
     );
@@ -256,6 +272,28 @@ describe('catalog routes (memory wiring)', () => {
     };
     expect(adjustedBody.level.qty).toBe(10);
     expect(adjustedBody.entry.balanceAfter).toBe(10);
+
+    // Staff can still read the ledger and balances.
+    const ledger = await getLedger(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/ledger`,
+        undefined,
+        bearer(staffToken),
+        'GET'
+      ),
+      { params: Promise.resolve({ workspaceId, variantId }) }
+    );
+    expect(ledger.status).toBe(200);
+    const balance = await getStockBalance(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/stock`,
+        undefined,
+        bearer(staffToken),
+        'GET'
+      ),
+      { params: Promise.resolve({ workspaceId, variantId }) }
+    );
+    expect(balance.status).toBe(200);
   });
 
   it('denies cross-workspace access indistinguishably', async () => {
@@ -573,5 +611,213 @@ describe('catalog routes (memory wiring)', () => {
       { params: Promise.resolve({ workspaceId }) }
     );
     expect(warehouses.status).toBe(200);
+  });
+
+  it('dedupes retried adjustments by idempotency key (UTA-81)', async () => {
+    const { warehouse } = await seedWarehouse(adminToken);
+    const { product } = await seedProduct(adminToken);
+    const variantId = product.variants[0]?.id ?? '';
+    const ctx = { params: Promise.resolve({ workspaceId, variantId }) };
+    const payload = {
+      warehouseId: warehouse.id,
+      delta: 9,
+      reason: 'initial stock',
+      idempotencyKey: 'route-retry-1',
+    };
+
+    const first = await adjustStock(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/adjustments`,
+        payload,
+        bearer(managerToken)
+      ),
+      ctx
+    );
+    expect(first.status).toBe(201);
+
+    const retry = await adjustStock(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/adjustments`,
+        payload,
+        bearer(managerToken)
+      ),
+      ctx
+    );
+    expect(retry.status).toBe(200);
+    const retryBody = (await retry.json()) as {
+      deduplicated: boolean;
+      entry: { id: string };
+      level: { qty: number };
+    };
+    expect(retryBody.deduplicated).toBe(true);
+    expect(retryBody.level.qty).toBe(9);
+    const firstBody = (await first.json()) as { entry: { id: string } };
+    expect(retryBody.entry.id).toBe(firstBody.entry.id);
+
+    // Same key, different payload → 409 (no silent merge).
+    const clash = await adjustStock(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/adjustments`,
+        { ...payload, delta: 10 },
+        bearer(managerToken)
+      ),
+      ctx
+    );
+    expect(clash.status).toBe(409);
+  });
+
+  it('gates negative stock behind the Admin-only toggle (UTA-81)', async () => {
+    const { warehouse } = await seedWarehouse(adminToken);
+    const { product } = await seedProduct(adminToken);
+    const variantId = product.variants[0]?.id ?? '';
+    const adjCtx = { params: Promise.resolve({ workspaceId, variantId }) };
+    const settingsCtx = { params: Promise.resolve({ workspaceId }) };
+
+    // Default OFF — staff and managers can read it.
+    const current = await getStockSettings(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/stock-settings`,
+        undefined,
+        bearer(staffToken),
+        'GET'
+      ),
+      settingsCtx
+    );
+    expect(current.status).toBe(200);
+    const currentBody = (await current.json()) as {
+      settings: { allowNegative: boolean; version: number };
+    };
+    expect(currentBody.settings.allowNegative).toBe(false);
+
+    const overdraw = await adjustStock(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/adjustments`,
+        { warehouseId: warehouse.id, delta: -1, reason: 'oversell' },
+        bearer(managerToken)
+      ),
+      adjCtx
+    );
+    expect(overdraw.status).toBe(422);
+    expect((await overdraw.json()) as { errorCode: string }).toMatchObject({
+      errorCode: 'CATALOG_INSUFFICIENT_STOCK',
+    });
+
+    // Manager toggle attempt → 403.
+    const managerToggle = await updateStockSettings(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/stock-settings`,
+        {
+          allowNegative: true,
+          expectedVersion: currentBody.settings.version,
+        },
+        bearer(managerToken),
+        'PUT'
+      ),
+      settingsCtx
+    );
+    expect(managerToggle.status).toBe(403);
+
+    // Admin enables it; stale versions reject.
+    const enabled = await updateStockSettings(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/stock-settings`,
+        {
+          allowNegative: true,
+          expectedVersion: currentBody.settings.version,
+        },
+        bearer(adminToken),
+        'PUT'
+      ),
+      settingsCtx
+    );
+    expect(enabled.status).toBe(200);
+    const stale = await updateStockSettings(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/stock-settings`,
+        {
+          allowNegative: false,
+          expectedVersion: currentBody.settings.version,
+        },
+        bearer(adminToken),
+        'PUT'
+      ),
+      settingsCtx
+    );
+    expect(stale.status).toBe(409);
+
+    const allowed = await adjustStock(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/adjustments`,
+        { warehouseId: warehouse.id, delta: -4, reason: 'oversell allowed' },
+        bearer(managerToken)
+      ),
+      adjCtx
+    );
+    expect(allowed.status).toBe(201);
+    expect(
+      (await allowed.json()) as { level: { qty: number } }
+    ).toMatchObject({ level: { qty: -4 } });
+  });
+
+  it('reads consolidated + per-warehouse balances and filters the ledger (UTA-81)', async () => {
+    const { warehouse } = await seedWarehouse(adminToken);
+    const other = await seedWarehouse(managerToken, 'SBY-01');
+    const { product } = await seedProduct(adminToken);
+    const variantId = product.variants[0]?.id ?? '';
+    const ctx = { params: Promise.resolve({ workspaceId, variantId }) };
+
+    for (const [id, delta, reason] of [
+      [warehouse.id, 10, 'jkt stock'],
+      [other.warehouse.id, 4, 'sby stock'],
+    ] as const) {
+      const res = await adjustStock(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/adjustments`,
+          { warehouseId: id, delta, reason },
+          bearer(managerToken)
+        ),
+        ctx
+      );
+      expect(res.status).toBe(201);
+    }
+
+    const balance = await getStockBalance(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/stock`,
+        undefined,
+        bearer(staffToken),
+        'GET'
+      ),
+      ctx
+    );
+    expect(balance.status).toBe(200);
+    const balanceBody = (await balance.json()) as {
+      balance: {
+        totalQty: number;
+        perWarehouse: Array<{ warehouseId: string; qty: number }>;
+      };
+    };
+    expect(balanceBody.balance.totalQty).toBe(14);
+    expect(
+      new Map(
+        balanceBody.balance.perWarehouse.map((p) => [p.warehouseId, p.qty])
+      ).get(other.warehouse.id)
+    ).toBe(4);
+
+    const filtered = await getLedger(
+      apiRequest(
+        `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/ledger?warehouseId=${other.warehouse.id}`,
+        undefined,
+        bearer(staffToken),
+        'GET'
+      ),
+      ctx
+    );
+    expect(filtered.status).toBe(200);
+    const filteredBody = (await filtered.json()) as {
+      entries: Array<{ reason: string }>;
+    };
+    expect(filteredBody.entries).toHaveLength(1);
+    expect(filteredBody.entries[0]?.reason).toBe('sby stock');
   });
 });

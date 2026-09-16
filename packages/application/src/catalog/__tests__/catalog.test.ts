@@ -12,9 +12,12 @@ import {
   deleteMapping,
   getLedger,
   getProductDetail,
+  getStockBalance,
+  getStockSettings,
   listProducts,
   searchCatalog,
   updateProduct,
+  updateStockSettings,
   updateVariant,
   updateWarehouse,
 } from '../catalog-use-cases';
@@ -49,6 +52,20 @@ function staff(
     workspaceId,
     userId: 'user_staff_1',
     role: 'staff',
+    warehouseScope,
+    status: 'active',
+    authVersion: 1,
+  };
+}
+
+function scopedManager(
+  workspaceId: string,
+  warehouseScope: string
+): WorkspaceContext {
+  return {
+    workspaceId,
+    userId: 'user_manager_scoped',
+    role: 'manager',
     warehouseScope,
     status: 'active',
     authVersion: 1,
@@ -300,7 +317,7 @@ describe('catalog use-cases (Story 01)', () => {
     const warehouse = await seedWarehouse(store);
 
     const first = await adjustStock(store, {
-      ctx: staff(WS),
+      ctx: manager(WS),
       workspaceId: WS,
       variantId,
       warehouseId: warehouse.id,
@@ -312,7 +329,7 @@ describe('catalog use-cases (Story 01)', () => {
     expect(first.entry.reason).toBe('initial stock');
 
     const second = await adjustStock(store, {
-      ctx: staff(WS),
+      ctx: manager(WS),
       workspaceId: WS,
       variantId,
       warehouseId: warehouse.id,
@@ -325,7 +342,7 @@ describe('catalog use-cases (Story 01)', () => {
     // Missing warehouse / reason / zero delta are rejected.
     await expect(
       adjustStock(store, {
-        ctx: staff(WS),
+        ctx: manager(WS),
         workspaceId: WS,
         variantId,
         warehouseId: '',
@@ -335,7 +352,7 @@ describe('catalog use-cases (Story 01)', () => {
     ).rejects.toMatchObject({ code: 'CATALOG_VALIDATION' });
     await expect(
       adjustStock(store, {
-        ctx: staff(WS),
+        ctx: manager(WS),
         workspaceId: WS,
         variantId,
         warehouseId: warehouse.id,
@@ -345,7 +362,7 @@ describe('catalog use-cases (Story 01)', () => {
     ).rejects.toMatchObject({ code: 'CATALOG_VALIDATION' });
     await expect(
       adjustStock(store, {
-        ctx: staff(WS),
+        ctx: manager(WS),
         workspaceId: WS,
         variantId,
         warehouseId: warehouse.id,
@@ -355,7 +372,7 @@ describe('catalog use-cases (Story 01)', () => {
     ).rejects.toMatchObject({ code: 'CATALOG_VALIDATION' });
     await expect(
       adjustStock(store, {
-        ctx: staff(WS),
+        ctx: manager(WS),
         workspaceId: WS,
         variantId,
         warehouseId: warehouse.id,
@@ -367,7 +384,7 @@ describe('catalog use-cases (Story 01)', () => {
     // Negative balances are rejected; the ledger is newest-first.
     await expect(
       adjustStock(store, {
-        ctx: staff(WS),
+        ctx: manager(WS),
         workspaceId: WS,
         variantId,
         warehouseId: warehouse.id,
@@ -383,7 +400,7 @@ describe('catalog use-cases (Story 01)', () => {
     expect(ledger.map((e) => e.delta)).toEqual([-5, 25]);
   });
 
-  it('rejects adjustments into deactivated warehouses and out-of-scope staff', async () => {
+  it('rejects adjustments into deactivated warehouses and out-of-scope writers', async () => {
     const store = new InMemoryCatalogStore();
     const { variants } = await seedProduct(store);
     const variantId = variants[0]?.id ?? '';
@@ -399,7 +416,7 @@ describe('catalog use-cases (Story 01)', () => {
     expect(
       await codeOf(
         adjustStock(store, {
-          ctx: staff(WS),
+          ctx: manager(WS),
           workspaceId: WS,
           variantId,
           warehouseId: warehouse.id,
@@ -409,7 +426,7 @@ describe('catalog use-cases (Story 01)', () => {
       )
     ).toBe('CATALOG_WAREHOUSE_INACTIVE');
 
-    // Scoped staff cannot touch another warehouse.
+    // Scoped managers cannot touch another warehouse.
     const other = await createWarehouse(store, {
       ctx: admin(WS),
       workspaceId: WS,
@@ -419,7 +436,7 @@ describe('catalog use-cases (Story 01)', () => {
     expect(
       await codeOf(
         adjustStock(store, {
-          ctx: staff(WS, warehouse.id),
+          ctx: scopedManager(WS, warehouse.id),
           workspaceId: WS,
           variantId,
           warehouseId: other.id,
@@ -575,7 +592,7 @@ describe('catalog use-cases (Story 01)', () => {
     expect(renamed.skuCode).toBe('UNLINKED-OK');
   });
 
-  it('denies staff writes but allows staff reads and scoped adjustments', async () => {
+  it('denies staff writes but allows staff reads', async () => {
     const store = new InMemoryCatalogStore();
     await expect(
       createProduct(store, {
@@ -592,5 +609,293 @@ describe('catalog use-cases (Story 01)', () => {
       workspaceId: WS,
     });
     expect(listed).toHaveLength(1);
+    // UTA-81: adjustments are Manager/Admin writes — Staff is denied.
+    const warehouse = await seedWarehouse(store);
+    const variants = await store.listVariantsByWorkspace(WS);
+    await expect(
+      adjustStock(store, {
+        ctx: staff(WS),
+        workspaceId: WS,
+        variantId: variants[0]?.id ?? '',
+        warehouseId: warehouse.id,
+        delta: 1,
+        reason: 'staff attempt',
+      })
+    ).rejects.toMatchObject({ code: 'TENANCY_FORBIDDEN' });
+  });
+});
+
+describe('stock ledger + adjustments (Story 05, UTA-81)', () => {
+  async function seedVariant(
+    store: InMemoryCatalogStore,
+    skuCode = 'STORY05-A'
+  ) {
+    const warehouse = await seedWarehouse(store);
+    const { variants } = await seedProduct(store, admin(WS), skuCode);
+    return { warehouse, variantId: variants[0]?.id ?? '' };
+  }
+
+  it('dedupes retried adjustments by idempotency key (no double-apply)', async () => {
+    const store = new InMemoryCatalogStore();
+    const { warehouse, variantId } = await seedVariant(store);
+    const payload = {
+      ctx: manager(WS),
+      workspaceId: WS,
+      variantId,
+      warehouseId: warehouse.id,
+      delta: 10,
+      reason: 'initial stock',
+      idempotencyKey: 'adj-0001',
+    };
+    const first = await adjustStock(store, payload);
+    expect(first.deduplicated).toBeUndefined();
+    const retry = await adjustStock(store, payload);
+    expect(retry.deduplicated).toBe(true);
+    expect(retry.entry.id).toBe(first.entry.id);
+    expect(retry.level.qty).toBe(10);
+    // Exactly one ledger row — the retry never double-applied.
+    expect(await store.countMovements(WS, variantId)).toBe(1);
+    expect(
+      (await getLedger(store, { ctx: staff(WS), workspaceId: WS, variantId }))
+        .length
+    ).toBe(1);
+
+    // Reusing the key with a different payload is a 409.
+    expect(
+      await codeOf(
+        adjustStock(store, { ...payload, delta: 11 })
+      )
+    ).toBe('CATALOG_CONFLICT');
+    expect(
+      await codeOf(
+        adjustStock(store, { ...payload, reason: 'different reason' })
+      )
+    ).toBe('CATALOG_CONFLICT');
+    // Malformed keys are rejected before touching the ledger.
+    expect(await codeOf(adjustStock(store, { ...payload, idempotencyKey: '  ' }))).toBe(
+      'CATALOG_VALIDATION'
+    );
+    expect(await codeOf(adjustStock(store, { ...payload, idempotencyKey: 'x'.repeat(129) }))).toBe(
+      'CATALOG_VALIDATION'
+    );
+  });
+
+  it('blocks negative stock by default; Admin toggle opts in', async () => {
+    const store = new InMemoryCatalogStore();
+    const { warehouse, variantId } = await seedVariant(store);
+
+    // Default policy: OFF.
+    expect(
+      (await getStockSettings(store, { ctx: staff(WS), workspaceId: WS }))
+        .allowNegative
+    ).toBe(false);
+    await expect(
+      adjustStock(store, {
+        ctx: manager(WS),
+        workspaceId: WS,
+        variantId,
+        warehouseId: warehouse.id,
+        delta: -1,
+        reason: 'oversell',
+      })
+    ).rejects.toMatchObject({ code: 'CATALOG_INSUFFICIENT_STOCK' });
+
+    // Manager/Staff cannot flip the toggle.
+    expect(
+      await codeOf(
+        updateStockSettings(store, {
+          ctx: manager(WS),
+          workspaceId: WS,
+          allowNegative: true,
+          expectedVersion: 1,
+        })
+      )
+    ).toBe('CATALOG_FORBIDDEN');
+
+    // Admin enables it (CAS-guarded).
+    const enabled = await updateStockSettings(store, {
+      ctx: admin(WS),
+      workspaceId: WS,
+      allowNegative: true,
+      expectedVersion: 1,
+    });
+    expect(enabled.allowNegative).toBe(true);
+    expect(enabled.version).toBe(2);
+    expect(
+      await codeOf(
+        updateStockSettings(store, {
+          ctx: admin(WS),
+          workspaceId: WS,
+          allowNegative: false,
+          expectedVersion: 1,
+        })
+      )
+    ).toBe('CATALOG_VERSION_CONFLICT');
+
+    // Oversell now applies and the ledger records the negative balance.
+    const over = await adjustStock(store, {
+      ctx: manager(WS),
+      workspaceId: WS,
+      variantId,
+      warehouseId: warehouse.id,
+      delta: -3,
+      reason: 'oversell allowed',
+    });
+    expect(over.level.qty).toBe(-3);
+    expect(over.entry.balanceAfter).toBe(-3);
+  });
+
+  it('reads consolidated + per-warehouse balances for a SKU', async () => {
+    const store = new InMemoryCatalogStore();
+    const { warehouse: wh1, variantId } = await seedVariant(store);
+    const wh2 = await createWarehouse(store, {
+      ctx: admin(WS),
+      workspaceId: WS,
+      code: 'SBY-01',
+      name: 'Surabaya',
+    });
+    await adjustStock(store, {
+      ctx: manager(WS),
+      workspaceId: WS,
+      variantId,
+      warehouseId: wh1.id,
+      delta: 10,
+      reason: 'initial stock',
+    });
+    await adjustStock(store, {
+      ctx: manager(WS),
+      workspaceId: WS,
+      variantId,
+      warehouseId: wh2.id,
+      delta: 4,
+      reason: 'initial stock',
+    });
+
+    const balance = await getStockBalance(store, {
+      ctx: staff(WS),
+      workspaceId: WS,
+      variantId,
+    });
+    expect(balance.totalQty).toBe(14);
+    expect(balance.perWarehouse).toHaveLength(2);
+    const byWh = new Map(balance.perWarehouse.map((p) => [p.warehouseId, p.qty]));
+    expect(byWh.get(wh1.id)).toBe(10);
+    expect(byWh.get(wh2.id)).toBe(4);
+
+    // Scoped readers see only their warehouse line; the total stays global.
+    const scoped = await getStockBalance(store, {
+      ctx: staff(WS, wh1.id),
+      workspaceId: WS,
+      variantId,
+    });
+    expect(scoped.totalQty).toBe(14);
+    expect(scoped.perWarehouse.map((p) => p.warehouseId)).toEqual([wh1.id]);
+  });
+
+  it('filters the ledger per warehouse', async () => {
+    const store = new InMemoryCatalogStore();
+    const { warehouse: wh1, variantId } = await seedVariant(store);
+    const wh2 = await createWarehouse(store, {
+      ctx: admin(WS),
+      workspaceId: WS,
+      code: 'BDG-01',
+      name: 'Bandung',
+    });
+    await adjustStock(store, {
+      ctx: manager(WS),
+      workspaceId: WS,
+      variantId,
+      warehouseId: wh1.id,
+      delta: 5,
+      reason: 'jkt stock',
+    });
+    await adjustStock(store, {
+      ctx: manager(WS),
+      workspaceId: WS,
+      variantId,
+      warehouseId: wh2.id,
+      delta: 7,
+      reason: 'bdg stock',
+    });
+
+    const all = await getLedger(store, {
+      ctx: staff(WS),
+      workspaceId: WS,
+      variantId,
+    });
+    expect(all).toHaveLength(2);
+    const jkt = await getLedger(store, {
+      ctx: staff(WS),
+      workspaceId: WS,
+      variantId,
+      warehouseId: wh1.id,
+    });
+    expect(jkt).toHaveLength(1);
+    expect(jkt[0]?.reason).toBe('jkt stock');
+
+    // Scoped readers cannot filter by another warehouse.
+    expect(
+      await codeOf(
+        getLedger(store, {
+          ctx: staff(WS, wh1.id),
+          workspaceId: WS,
+          variantId,
+          warehouseId: wh2.id,
+        })
+      )
+    ).toBe('TENANCY_FORBIDDEN');
+    // Unknown warehouse filter is a 404, not an empty list.
+    expect(
+      await codeOf(
+        getLedger(store, {
+          ctx: staff(WS),
+          workspaceId: WS,
+          variantId,
+          warehouseId: 'wh_missing',
+        })
+      )
+    ).toBe('CATALOG_NOT_FOUND');
+  });
+
+  it('keeps CAS on adjustments: stale expectedVersion rejects', async () => {
+    const store = new InMemoryCatalogStore();
+    const { warehouse, variantId } = await seedVariant(store);
+    const first = await adjustStock(store, {
+      ctx: manager(WS),
+      workspaceId: WS,
+      variantId,
+      warehouseId: warehouse.id,
+      delta: 5,
+      reason: 'initial stock',
+    });
+    await adjustStock(store, {
+      ctx: manager(WS),
+      workspaceId: WS,
+      variantId,
+      warehouseId: warehouse.id,
+      delta: 1,
+      reason: 'recount',
+    });
+    expect(
+      await codeOf(
+        adjustStock(store, {
+          ctx: manager(WS),
+          workspaceId: WS,
+          variantId,
+          warehouseId: warehouse.id,
+          delta: 1,
+          reason: 'stale write',
+          expectedVersion: first.level.version,
+        })
+      )
+    ).toBe('CATALOG_VERSION_CONFLICT');
+    // Balances stay consistent with the ledger (CAS losers change nothing).
+    const balance = await getStockBalance(store, {
+      ctx: manager(WS),
+      workspaceId: WS,
+      variantId,
+    });
+    expect(balance.totalQty).toBe(6);
+    expect(await store.countMovements(WS, variantId)).toBe(2);
   });
 });

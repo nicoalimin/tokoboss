@@ -3,7 +3,7 @@ import { AdjustStockBodySchema } from '@tokoboss/contracts';
 import {
   catalogErrorStatus,
   getCatalogStore,
-  requireWorkspaceMember,
+  requireManagerOrAdmin,
   slideForMember,
   storageKind,
   toLedgerView,
@@ -16,21 +16,24 @@ interface RouteParams {
 }
 
 /**
- * Warehouse stock adjustment (UTA-75, Story 01).
+ * Warehouse stock adjustment (UTA-81, Story 05).
  * POST /api/workspaces/:workspaceId/catalog/variants/:variantId/adjustments
- * (any active member within warehouse scope).
+ * (Manager/Admin within warehouse scope; Staff read-only).
  *
  * A quantity change is only valid with warehouse + reason + save: the
  * server appends one ledger entry (the stock SoT) and advances the level
  * read model. There is no draft/pending state server-side. Deactivated
- * warehouses and stale `expectedVersion` values reject instead of
- * silently applying.
+ * warehouses, oversell (unless the Admin-only negative-stock toggle is
+ * ON), and stale `expectedVersion` values reject instead of silently
+ * applying. Retried requests with the same `idempotencyKey` resolve to
+ * the original entry (no double-apply); the response carries
+ * `deduplicated: true` in that case.
  */
 export async function POST(request: Request, { params }: RouteParams) {
   const { requestId, correlationId, log } = routeContext(request);
   const { workspaceId, variantId } = await params;
 
-  const member = await requireWorkspaceMember(request, workspaceId);
+  const member = await requireManagerOrAdmin(request, workspaceId);
   if (!member.ok) {
     return authJson(
       { error: member.denial.error, errorCode: member.denial.errorCode },
@@ -65,6 +68,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       delta: parsed.data.delta,
       reason: parsed.data.reason,
       expectedVersion: parsed.data.expectedVersion,
+      idempotencyKey: parsed.data.idempotencyKey,
       correlationId,
     });
     log.info('catalog stock adjusted', {
@@ -76,9 +80,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       {
         level: toLevelView(result.level),
         entry: toLedgerView(result.entry),
+        ...(result.deduplicated === true ? { deduplicated: true } : {}),
         storage: storageKind(),
       },
-      201,
+      result.deduplicated === true ? 200 : 201,
       requestId,
       correlationId,
       slideForMember(member.value)

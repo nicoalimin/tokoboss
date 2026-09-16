@@ -20,6 +20,7 @@ import type {
   NewVariantInput,
   ProductPicture,
   StockLedgerRecord,
+  StockSettingsRecord,
   WarehouseRecord,
   WarehouseStatus,
 } from './catalog-types';
@@ -58,6 +59,11 @@ export class InMemoryCatalogStore implements CatalogStore {
   private skuIndex = new Map<string, string>();
   private warehouseCodeIndex = new Map<string, string>();
   private mappingKeyIndex = new Map<string, string>();
+  // UTA-81: idempotency keys per workspace → ledger entry id.
+  private idempotencyIndex = new Map<string, string>();
+  private ledgerById = new Map<string, StockLedgerRecord>();
+  // UTA-81: per-workspace stock policy (default allowNegative: false).
+  private stockSettings = new Map<string, StockSettingsRecord>();
 
   private seq = 0;
 
@@ -472,8 +478,36 @@ export class InMemoryCatalogStore implements CatalogStore {
     reason: string;
     actorId: string | null;
     correlationId?: string;
+    idempotencyKey?: string;
+    allowNegative?: boolean;
     expectedVersion?: number;
   }): Promise<{ level: InventoryLevelRecord; entry: StockLedgerRecord }> {
+    // Idempotency first: a retried key resolves to the original result
+    // without double-applying; a key reused with a different payload is
+    // a 409 so misuse never silently merges two adjustments.
+    if (
+      input.idempotencyKey !== undefined &&
+      input.idempotencyKey !== null &&
+      input.idempotencyKey.length > 0
+    ) {
+      const seen = await this.findLedgerEntryByIdempotencyKey(
+        input.workspaceId,
+        input.idempotencyKey
+      );
+      if (seen) {
+        if (
+          seen.entry.variantId !== input.variantId ||
+          seen.entry.warehouseId !== input.warehouseId ||
+          seen.entry.delta !== input.delta ||
+          seen.entry.reason !== input.reason
+        ) {
+          throw catalogConflict(
+            'Idempotency key was already used for a different adjustment.'
+          );
+        }
+        return seen;
+      }
+    }
     const key = `${input.variantId}::${input.warehouseId}`;
     const current = this.levels.get(key);
     if (current) {
@@ -497,7 +531,11 @@ export class InMemoryCatalogStore implements CatalogStore {
     }
     const currentQty = current?.qty ?? 0;
     try {
-      CatalogRules.assertBalanceAllowed({ currentQty, delta: input.delta });
+      CatalogRules.assertBalanceAllowed({
+        currentQty,
+        delta: input.delta,
+        allowNegative: input.allowNegative,
+      });
     } catch (err) {
       if (err instanceof BusinessRuleViolationError) {
         throw catalogInsufficientStock();
@@ -515,9 +553,17 @@ export class InMemoryCatalogStore implements CatalogStore {
       reason: input.reason,
       actorId: input.actorId,
       correlationId: input.correlationId ?? null,
+      idempotencyKey: input.idempotencyKey ?? null,
       createdAt: now,
     };
     this.ledger.push(entry);
+    this.ledgerById.set(entry.id, entry);
+    if (entry.idempotencyKey) {
+      this.idempotencyIndex.set(
+        `${input.workspaceId}::${entry.idempotencyKey}`,
+        entry.id
+      );
+    }
     const level: InventoryLevelRecord = current
       ? {
           ...current,
@@ -536,6 +582,21 @@ export class InMemoryCatalogStore implements CatalogStore {
           updatedAt: now,
         };
     this.levels.set(key, level);
+    return { level: clone(level), entry: clone(entry) };
+  }
+
+  async findLedgerEntryByIdempotencyKey(
+    workspaceId: string,
+    idempotencyKey: string
+  ): Promise<{ level: InventoryLevelRecord; entry: StockLedgerRecord } | null> {
+    const entryId = this.idempotencyIndex.get(
+      `${workspaceId}::${idempotencyKey}`
+    );
+    if (!entryId) return null;
+    const entry = this.ledgerById.get(entryId);
+    if (!entry || entry.workspaceId !== workspaceId) return null;
+    const level = this.levels.get(`${entry.variantId}::${entry.warehouseId}`);
+    if (!level) return null;
     return { level: clone(level), entry: clone(entry) };
   }
 
@@ -565,12 +626,17 @@ export class InMemoryCatalogStore implements CatalogStore {
   async listLedgerByVariant(
     workspaceId: string,
     variantId: string,
-    limit: number
+    limit: number,
+    filters?: { warehouseId?: string }
   ): Promise<StockLedgerRecord[]> {
     return (
       this.ledger
         .filter(
-          (e) => e.workspaceId === workspaceId && e.variantId === variantId
+          (e) =>
+            e.workspaceId === workspaceId &&
+            e.variantId === variantId &&
+            (filters?.warehouseId === undefined ||
+              e.warehouseId === filters.warehouseId)
         )
         // Newest-first; ids are sequential so they break same-millisecond ties.
         .sort((a, b) => {
@@ -591,6 +657,40 @@ export class InMemoryCatalogStore implements CatalogStore {
       if (e.workspaceId === workspaceId && e.variantId === variantId) n += 1;
     }
     return n;
+  }
+
+  async getStockSettings(workspaceId: string): Promise<StockSettingsRecord> {
+    const existing = this.stockSettings.get(workspaceId);
+    if (existing) return clone(existing);
+    const now = new Date();
+    const created: StockSettingsRecord = {
+      workspaceId,
+      allowNegative: false,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.stockSettings.set(workspaceId, created);
+    return clone(created);
+  }
+
+  async updateStockSettings(
+    workspaceId: string,
+    patch: { allowNegative: boolean },
+    expectedVersion: number
+  ): Promise<StockSettingsRecord> {
+    const current = await this.getStockSettings(workspaceId);
+    if (current.version !== expectedVersion) {
+      throw catalogVersionConflict(current.version);
+    }
+    const updated: StockSettingsRecord = {
+      ...current,
+      allowNegative: patch.allowNegative,
+      version: current.version + 1,
+      updatedAt: new Date(),
+    };
+    this.stockSettings.set(workspaceId, updated);
+    return clone(updated);
   }
 
   // Mappings

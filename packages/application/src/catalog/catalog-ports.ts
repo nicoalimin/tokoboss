@@ -7,6 +7,7 @@ import type {
   NewVariantInput,
   ProductPicture,
   StockLedgerRecord,
+  StockSettingsRecord,
   WarehouseRecord,
   WarehouseStatus,
 } from './catalog-types';
@@ -156,10 +157,17 @@ export interface CatalogStore {
   // Stock (ledger SoT + level read model)
 
   /**
-   * Atomic unit of work: validate expected version, compute
-   * `balanceAfter = current + delta`, append the ledger entry, and advance
-   * the level row (created on first adjustment). Throws
-   * `CATALOG_VERSION_CONFLICT` / `CATALOG_INSUFFICIENT_STOCK`.
+   * Atomic unit of work: idempotency check, expected-version check,
+   * compute `balanceAfter = current + delta` (rejecting oversell unless
+   * `allowNegative`), append the ledger entry, and advance the level row
+   * (created on first adjustment). Throws `CATALOG_VERSION_CONFLICT` /
+   * `CATALOG_INSUFFICIENT_STOCK` / `CATALOG_CONFLICT` (idempotency-key
+   * reuse with a different payload).
+   *
+   * When `idempotencyKey` is present and already recorded for the
+   * workspace, the original `{ level, entry }` is returned without
+   * applying the delta again; a key reused with a different
+   * variant/warehouse/delta/reason throws `CATALOG_CONFLICT`.
    */
   adjustLevel(input: {
     workspaceId: string;
@@ -169,8 +177,19 @@ export interface CatalogStore {
     reason: string;
     actorId: string | null;
     correlationId?: string;
+    idempotencyKey?: string;
+    allowNegative?: boolean;
     expectedVersion?: number;
   }): Promise<{ level: InventoryLevelRecord; entry: StockLedgerRecord }>;
+
+  /**
+   * Resolve a previous adjustment by idempotency key (null when unseen).
+   * Scoped to the workspace so keys never leak across tenants.
+   */
+  findLedgerEntryByIdempotencyKey(
+    workspaceId: string,
+    idempotencyKey: string
+  ): Promise<{ level: InventoryLevelRecord; entry: StockLedgerRecord } | null>;
 
   getLevel(
     workspaceId: string,
@@ -186,10 +205,31 @@ export interface CatalogStore {
   listLedgerByVariant(
     workspaceId: string,
     variantId: string,
-    limit: number
+    limit: number,
+    filters?: { warehouseId?: string }
   ): Promise<StockLedgerRecord[]>;
 
   countMovements(workspaceId: string, variantId: string): Promise<number>;
+
+  // Stock policy (UTA-81, Story 05)
+
+  /**
+   * Per-workspace stock policy. Implementations create the default
+   * (`allowNegative: false`) lazily on first read so fresh workspaces
+   * need no backfill.
+   */
+  getStockSettings(workspaceId: string): Promise<StockSettingsRecord>;
+
+  /**
+   * Toggle the negative-stock policy (Admin-only at the use-case layer).
+   * Compare-and-set on `expectedVersion`; stale writes throw
+   * `CATALOG_VERSION_CONFLICT` with `currentVersion`.
+   */
+  updateStockSettings(
+    workspaceId: string,
+    patch: { allowNegative: boolean },
+    expectedVersion: number
+  ): Promise<StockSettingsRecord>;
 
   // Channel mappings (stub-ready)
 

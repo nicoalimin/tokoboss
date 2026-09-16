@@ -160,10 +160,14 @@ export type UpdateVariantBody = z.infer<typeof UpdateVariantBodySchema>;
 // Adjustments + ledger
 
 /**
- * POST /api/.../variants/:variantId/adjustments.
+ * POST /api/.../variants/:variantId/adjustments (Manager/Admin).
  * A quantity change is only valid with warehouse + reason + save:
  * the server persists one ledger entry and advances the read model —
  * there is no draft/pending state server-side.
+ *
+ * `idempotencyKey` (optional, client-generated): retried requests with
+ * the same key resolve to the original entry instead of double-applying.
+ * Reusing a key with a different payload is a 409.
  */
 export const AdjustStockBodySchema = z.object({
   warehouseId: z.string().min(1).max(200),
@@ -175,8 +179,30 @@ export const AdjustStockBodySchema = z.object({
     }),
   reason: z.string().trim().min(1).max(500),
   expectedVersion: z.number().int().nonnegative().optional(),
+  idempotencyKey: z
+    .string()
+    .trim()
+    .min(1)
+    .max(128)
+    .regex(
+      /^[A-Za-z0-9\-_:.]+$/,
+      'Idempotency key has an unsupported format.'
+    )
+    .optional(),
 });
 export type AdjustStockBody = z.infer<typeof AdjustStockBodySchema>;
+
+/**
+ * PUT /api/workspaces/:workspaceId/catalog/stock-settings (Admin only).
+ * Toggles the workspace negative-stock policy (default OFF).
+ */
+export const UpdateStockSettingsBodySchema = z.object({
+  allowNegative: z.boolean(),
+  expectedVersion: z.number().int().positive(),
+});
+export type UpdateStockSettingsBody = z.infer<
+  typeof UpdateStockSettingsBodySchema
+>;
 
 // Channel mappings (stub-ready, no live marketplace calls)
 
@@ -259,6 +285,7 @@ export const LedgerEntryViewSchema = z.object({
   reason: z.string().min(1),
   actorId: z.string().nullable(),
   correlationId: z.string().nullable(),
+  idempotencyKey: z.string().nullable().optional(),
   createdAt: z.string().datetime(),
 });
 export type LedgerEntryView = z.infer<typeof LedgerEntryViewSchema>;
@@ -276,3 +303,32 @@ export const ChannelMappingViewSchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type ChannelMappingView = z.infer<typeof ChannelMappingViewSchema>;
+
+/** GET /api/workspaces/:workspaceId/catalog/stock-settings (any member). */
+export const StockSettingsViewSchema = z.object({
+  workspaceId: z.string().min(1),
+  allowNegative: z.boolean(),
+  version: z.number().int(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type StockSettingsView = z.infer<typeof StockSettingsViewSchema>;
+
+/**
+ * GET /api/.../variants/:variantId/stock (any member).
+ * Consolidated total + per-warehouse remaining for one SKU TokoBoss.
+ */
+export const WarehouseBalanceViewSchema = z.object({
+  warehouseId: z.string().min(1),
+  qty: z.number().int(),
+  version: z.number().int(),
+});
+export type WarehouseBalanceView = z.infer<typeof WarehouseBalanceViewSchema>;
+
+export const StockBalanceViewSchema = z.object({
+  variantId: z.string().min(1),
+  workspaceId: z.string().min(1),
+  totalQty: z.number().int(),
+  perWarehouse: z.array(WarehouseBalanceViewSchema),
+});
+export type StockBalanceView = z.infer<typeof StockBalanceViewSchema>;

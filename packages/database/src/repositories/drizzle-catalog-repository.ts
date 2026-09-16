@@ -22,6 +22,7 @@ import type {
   NewVariantInput,
   ProductPicture,
   StockLedgerRecord,
+  StockSettingsRecord,
   WarehouseRecord,
   WarehouseStatus,
 } from '@tokoboss/application';
@@ -33,6 +34,7 @@ import {
   catalogInventoryLevels,
   catalogProducts,
   catalogStockLedger,
+  catalogStockSettings,
   catalogVariants,
   catalogWarehouses,
 } from '../schema/index';
@@ -42,6 +44,7 @@ import type {
   CatalogInventoryLevelRow,
   CatalogProductRow,
   CatalogStockLedgerRow,
+  CatalogStockSettingsRow,
   CatalogVariantRow,
   CatalogWarehouseRow,
 } from '../schema/index';
@@ -129,7 +132,18 @@ function toLedgerEntry(row: CatalogStockLedgerRow): StockLedgerRecord {
     reason: row.reason,
     actorId: row.actorId,
     correlationId: row.correlationId,
+    idempotencyKey: row.idempotencyKey,
     createdAt: row.createdAt,
+  };
+}
+
+function toStockSettings(row: CatalogStockSettingsRow): StockSettingsRecord {
+  return {
+    workspaceId: row.workspaceId,
+    allowNegative: row.allowNegative,
+    version: row.version,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -675,9 +689,55 @@ export class DrizzleCatalogStore implements CatalogStore {
     reason: string;
     actorId: string | null;
     correlationId?: string;
+    idempotencyKey?: string;
+    allowNegative?: boolean;
     expectedVersion?: number;
   }): Promise<{ level: InventoryLevelRecord; entry: StockLedgerRecord }> {
     const run = async (tx: DbOrTx) => {
+      // Idempotency first (inside the tx so check + insert are atomic):
+      // a retried key resolves to the original result; a key reused
+      // with a different payload is a 409.
+      if (input.idempotencyKey) {
+        const seenRows = await tx
+          .select()
+          .from(catalogStockLedger)
+          .where(
+            and(
+              eq(catalogStockLedger.workspaceId, input.workspaceId),
+              eq(catalogStockLedger.idempotencyKey, input.idempotencyKey)
+            )
+          )
+          .limit(1);
+        const seen = seenRows[0];
+        if (seen) {
+          if (
+            seen.variantId !== input.variantId ||
+            seen.warehouseId !== input.warehouseId ||
+            seen.delta !== input.delta ||
+            seen.reason !== input.reason
+          ) {
+            throw catalogConflict(
+              'Idempotency key was already used for a different adjustment.'
+            );
+          }
+          const levelRows = await tx
+            .select()
+            .from(catalogInventoryLevels)
+            .where(
+              and(
+                eq(catalogInventoryLevels.variantId, seen.variantId),
+                eq(catalogInventoryLevels.warehouseId, seen.warehouseId)
+              )
+            )
+            .limit(1);
+          const levelRow = levelRows[0];
+          if (!levelRow) throw catalogNotFound('Inventory level');
+          return {
+            level: toLevel(levelRow),
+            entry: toLedgerEntry(seen),
+          };
+        }
+      }
       const existing = await tx
         .select()
         .from(catalogInventoryLevels)
@@ -710,6 +770,7 @@ export class DrizzleCatalogStore implements CatalogStore {
         CatalogRules.assertBalanceAllowed({
           currentQty,
           delta: input.delta,
+          allowNegative: input.allowNegative,
         });
       } catch (err) {
         if (err instanceof BusinessRuleViolationError) {
@@ -718,20 +779,46 @@ export class DrizzleCatalogStore implements CatalogStore {
         throw err;
       }
       const balanceAfter = currentQty + input.delta;
-      const entries = await tx
-        .insert(catalogStockLedger)
-        .values({
-          workspaceId: input.workspaceId,
-          variantId: input.variantId,
-          warehouseId: input.warehouseId,
-          delta: input.delta,
-          balanceAfter,
-          reason: input.reason,
-          actorId: input.actorId,
-          correlationId: input.correlationId ?? null,
-        })
-        .returning();
-      const entryRow = entries[0];
+      let entryRow: CatalogStockLedgerRow | undefined;
+      try {
+        const entries = await tx
+          .insert(catalogStockLedger)
+          .values({
+            workspaceId: input.workspaceId,
+            variantId: input.variantId,
+            warehouseId: input.warehouseId,
+            delta: input.delta,
+            balanceAfter,
+            reason: input.reason,
+            actorId: input.actorId,
+            correlationId: input.correlationId ?? null,
+            idempotencyKey: input.idempotencyKey ?? null,
+          })
+          .returning();
+        entryRow = entries[0];
+      } catch (err) {
+        if (!isUniqueViolation(err) || !input.idempotencyKey) throw err;
+        // Lost an idempotency race with a concurrent retry. The failed
+        // statement aborted this transaction, so the winner is resolved
+        // AFTER rollback — only possible on the root handle.
+        if (!this.isRootHandle()) throw err;
+        const winner = await this.findLedgerEntryByIdempotencyKey(
+          input.workspaceId,
+          input.idempotencyKey
+        );
+        if (!winner) throw err;
+        if (
+          winner.entry.variantId !== input.variantId ||
+          winner.entry.warehouseId !== input.warehouseId ||
+          winner.entry.delta !== input.delta ||
+          winner.entry.reason !== input.reason
+        ) {
+          throw catalogConflict(
+            'Idempotency key was already used for a different adjustment.'
+          );
+        }
+        return winner;
+      }
       if (!entryRow) throw new Error('Failed to append stock ledger');
       if (current) {
         const leveled = await tx
@@ -793,6 +880,31 @@ export class DrizzleCatalogStore implements CatalogStore {
     return this.inTx(run);
   }
 
+  async findLedgerEntryByIdempotencyKey(
+    workspaceId: string,
+    idempotencyKey: string
+  ): Promise<{ level: InventoryLevelRecord; entry: StockLedgerRecord } | null> {
+    const rows = await this.db
+      .select()
+      .from(catalogStockLedger)
+      .where(
+        and(
+          eq(catalogStockLedger.workspaceId, workspaceId),
+          eq(catalogStockLedger.idempotencyKey, idempotencyKey)
+        )
+      )
+      .limit(1);
+    const entry = rows[0];
+    if (!entry) return null;
+    const level = await this.getLevel(
+      workspaceId,
+      entry.variantId,
+      entry.warehouseId
+    );
+    if (!level) return null;
+    return { level, entry: toLedgerEntry(entry) };
+  }
+
   async getLevel(
     workspaceId: string,
     variantId: string,
@@ -832,17 +944,20 @@ export class DrizzleCatalogStore implements CatalogStore {
   async listLedgerByVariant(
     workspaceId: string,
     variantId: string,
-    limit: number
+    limit: number,
+    filters?: { warehouseId?: string }
   ): Promise<StockLedgerRecord[]> {
+    const conditions = [
+      eq(catalogStockLedger.workspaceId, workspaceId),
+      eq(catalogStockLedger.variantId, variantId),
+    ];
+    if (filters?.warehouseId !== undefined) {
+      conditions.push(eq(catalogStockLedger.warehouseId, filters.warehouseId));
+    }
     const rows = await this.db
       .select()
       .from(catalogStockLedger)
-      .where(
-        and(
-          eq(catalogStockLedger.workspaceId, workspaceId),
-          eq(catalogStockLedger.variantId, variantId)
-        )
-      )
+      .where(and(...conditions))
       .orderBy(desc(catalogStockLedger.createdAt))
       .limit(Math.max(1, limit));
     return rows.map(toLedgerEntry);
@@ -862,6 +977,64 @@ export class DrizzleCatalogStore implements CatalogStore {
         )
       );
     return rows[0]?.n ?? 0;
+  }
+
+  async getStockSettings(workspaceId: string): Promise<StockSettingsRecord> {
+    const rows = await this.db
+      .select()
+      .from(catalogStockSettings)
+      .where(eq(catalogStockSettings.workspaceId, workspaceId))
+      .limit(1);
+    const existing = rows[0];
+    if (existing) return toStockSettings(existing);
+    // Lazy-create the default (oversell OFF) so fresh workspaces need
+    // no backfill. A lost insert race resolves to the winner's row.
+    try {
+      const inserted = await this.db
+        .insert(catalogStockSettings)
+        .values({ workspaceId })
+        .returning();
+      const row = inserted[0];
+      if (!row) throw new Error('Failed to insert stock settings');
+      return toStockSettings(row);
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+      const reread = await this.db
+        .select()
+        .from(catalogStockSettings)
+        .where(eq(catalogStockSettings.workspaceId, workspaceId))
+        .limit(1);
+      const winner = reread[0];
+      if (!winner) throw err;
+      return toStockSettings(winner);
+    }
+  }
+
+  async updateStockSettings(
+    workspaceId: string,
+    patch: { allowNegative: boolean },
+    expectedVersion: number
+  ): Promise<StockSettingsRecord> {
+    // Ensure the row exists before the CAS update (lazy default).
+    await this.getStockSettings(workspaceId);
+    const updated = await this.db
+      .update(catalogStockSettings)
+      .set({
+        allowNegative: patch.allowNegative,
+        version: expectedVersion + 1,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(catalogStockSettings.workspaceId, workspaceId),
+          eq(catalogStockSettings.version, expectedVersion)
+        )
+      )
+      .returning();
+    const row = updated[0];
+    if (row) return toStockSettings(row);
+    const current = await this.getStockSettings(workspaceId);
+    throw catalogVersionConflict(current.version);
   }
 
   // Mappings
