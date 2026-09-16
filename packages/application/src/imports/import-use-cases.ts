@@ -74,36 +74,23 @@ function toBatchPath(workspaceId: string, batchId: string): string {
   return `/api/workspaces/${workspaceId}/imports/${batchId}`;
 }
 
-/** Resolve generated-SKU placeholders and within-batch collisions. */
-function assignSkus(parsed: ParsedImportRow[]): {
-  skuByIndex: string[];
-  generated: boolean[];
-} {
-  const skuByIndex: string[] = [];
-  const generated: boolean[] = [];
-  const seen = new Map<string, number>();
-  parsed.forEach((row, idx) => {
-    let sku =
-      row.skuCode && row.skuCode !== '__GENERATED__'
-        ? row.skuCode
-        : generateImportSku(
-            row.productName || 'PRODUCT',
-            row.variantName,
-            row.rowNumber
-          );
-    const isGenerated = row.skuCode === '__GENERATED__' || row.skuCode === null;
-    // Within-batch collision: first row keeps the code, later rows get a
-    // deterministic suffix so every row stays individually confirmable.
-    const firstIdx = seen.get(sku);
-    if (firstIdx !== undefined) {
-      sku = `${sku}-R${row.rowNumber}`.slice(0, 64);
-    }
-    seen.set(row.skuCode ?? sku, firstIdx ?? idx);
-    seen.set(sku, firstIdx ?? idx);
-    skuByIndex.push(sku);
-    generated.push(isGenerated);
-  });
-  return { skuByIndex, generated };
+/**
+ * Resolve `__GENERATED__` placeholders into server-generated SKU TokoBoss
+ * slugs. Explicit codes pass through untouched — within-batch collisions
+ * are NOT renamed here; confirm marks the later rows as batch-duplicates
+ * (with a pointer to the winning row) instead of minting near-duplicate
+ * identities.
+ */
+function assignSkus(parsed: ParsedImportRow[]): string[] {
+  return parsed.map((row) =>
+    row.skuCode && row.skuCode !== '__GENERATED__'
+      ? row.skuCode
+      : generateImportSku(
+          row.productName || 'PRODUCT',
+          row.variantName,
+          row.rowNumber
+        )
+  );
 }
 
 export interface CreateImportBatchInput {
@@ -209,7 +196,7 @@ export async function createImportBatch(
     return { batch: existing, rows, duplicate: true, jobId: existing.jobId };
   }
 
-  const { skuByIndex } = assignSkus(parsed);
+  const skuByIndex = assignSkus(parsed);
   const rowsToCreate = parsed.map((row, idx) => {
     const ready =
       row.errors.length === 0 &&

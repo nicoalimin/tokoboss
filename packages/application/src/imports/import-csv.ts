@@ -281,7 +281,10 @@ export function normaliseImportRow(
 
 /** Parse CSV text into normalised candidates (header row required). */
 export function parseImportCsv(content: string): ParsedImportRow[] {
-  const table = parseCsvText(content);
+  // Strip a UTF-8 BOM so exported sheets still match header aliases.
+  const table = parseCsvText(
+    content.charCodeAt(0) === 0xfeff ? content.slice(1) : content
+  );
   if (table.length === 0) return [];
   const [headerRow, ...dataRows] = table;
   const columns = (headerRow ?? []).map(normaliseHeader);

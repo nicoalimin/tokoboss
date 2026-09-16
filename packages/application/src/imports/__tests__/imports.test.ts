@@ -310,4 +310,32 @@ describe('confirmImportBatch (review/confirm)', () => {
     ).rejects.toMatchObject({ code: 'IMPORT_VALIDATION' });
     void store;
   });
+
+  it('strips a UTF-8 BOM and dedupes within-batch SKUs on confirm', async () => {
+    const catalog = new InMemoryCatalogStore();
+    const store = new InMemoryImportStore();
+    const created = await createImportBatch(store, {
+      ctx: MANAGER_CTX,
+      workspaceId: MANAGER_CTX.workspaceId,
+      filename: 'bom.csv',
+      contentType: 'text/csv',
+      content:
+        '\uFEFFproduct_name,sku_tokoboss,price\nKaos,KAOS-DUPE,1000\nKemeja,KAOS-DUPE,2000\n',
+    });
+    expect(created.batch.status).toBe('review');
+    expect(created.rows.map((r) => r.productName)).toEqual(['Kaos', 'Kemeja']);
+
+    const result = await confirmImportBatch(store, catalog, {
+      ctx: MANAGER_CTX,
+      workspaceId: MANAGER_CTX.workspaceId,
+      batchId: created.batch.id,
+    });
+    expect(result.applied).toHaveLength(1);
+    expect(result.duplicates).toHaveLength(1);
+    expect(result.duplicates[0]?.skuCode).toBe('KAOS-DUPE');
+    // Only one variant minted — the dupe never became a near-duplicate SKU.
+    expect(
+      await catalog.listVariantsByWorkspace(MANAGER_CTX.workspaceId)
+    ).toHaveLength(1);
+  });
 });

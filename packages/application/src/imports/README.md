@@ -49,7 +49,9 @@ thousand separators tolerated), `currency` (default `IDR`), `hpp`,
 `shop_id`, `platform_sku_id`, `store_sku`/`seller_sku` (mapping hint).
 
 Limits: 500 rows / 1,000,000 chars per batch. Rows failing validation stay
-`draft` with `errors[]`; only `review` rows confirm.
+`draft` with `errors[]`; only `review` rows confirm. A UTF-8 BOM is stripped;
+two rows claiming the same SKU TokoBoss confirm once — the later row is
+rejected as a batch-duplicate (no near-duplicate identities are minted).
 
 ## xlsx / photo / PDF
 
