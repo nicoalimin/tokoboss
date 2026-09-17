@@ -1,65 +1,92 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+// Import other necessary dependencies
+import { useMembership } from '@/lib/use-membership';
+import { getProfileCopy } from '@/lib/profile-copy';
 import { ProductsPanel } from '@/components/catalog/ProductsPanel';
-import { getCatalogCopy } from '@/lib/catalog-copy';
+import { SkuDrawer } from '@/components/catalog/SkuDrawer';
 
-export const metadata = { title: 'Produk & Stok — TokoBoss' };
+export default function ProductsPage() {
+  const membership = useMembership();
+  const copy = getProfileCopy('en');
+  const [activeTab, setActiveTab] = useState<'products' | 'ledger'>('products');
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
 
-/**
- * Produk & Stok page (UTA-76, Story 01 web; UTA-78 import entry).
- *
- * Information-dense product list + right-side SKU drawer over the UTA-75
- * catalog APIs. Entry via the bottom-left ellipsis / Lainnya menu
- * (`AppNav`, global) and the home page. The drawer overlays the list so
- * list context (query, scroll, selection) is never lost.
- *
- * UTA-78 entry: the review-before-create import UI lives at
- * `/produk/impor` (linked below + from the review panel back-link) so
- * operators move from catalog → import review without AppNav changes.
- */
-export default function ProdukPage() {
-  const copy = getCatalogCopy('en');
   return (
-    <main className="min-h-screen px-4 py-10 sm:px-8">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="text-center mb-6">
-          <p className="text-2xl font-bold text-neutral-900">TokoBoss</p>
-        </div>
-        <section
-          aria-labelledby="produk-title"
-          className="rounded-2xl border border-neutral-200 bg-neutral-50 p-6 shadow-md sm:p-8"
-        >
-          <h1
-            id="produk-title"
-            className="text-2xl font-semibold text-neutral-900 mb-1"
-          >
-            {copy.pageTitle}
-          </h1>
-          <p className="text-sm text-neutral-600 mb-6">{copy.pageSubtitle}</p>
-          <ProductsPanel />
-          <p className="mt-6 flex flex-wrap justify-center gap-4 text-center text-sm">
-            <Link
-              href="/produk/bundles"
-              data-testid="produk-bundles-link"
-              className="text-secondary-700 underline underline-offset-2 hover:text-secondary-800"
-            >
-              Manage bundles / BOM
-            </Link>
-            <Link
-              href="/produk/impor"
-              data-testid="produk-import-link"
-              className="text-secondary-700 underline underline-offset-2 hover:text-secondary-800"
-            >
-              Review product imports
-            </Link>
-            <Link
-              href="/"
-              className="text-secondary-700 underline underline-offset-2 hover:text-secondary-800"
-            >
-              {copy.backHomeLink}
-            </Link>
-          </p>
-        </section>
+    <div className="p-6">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-neutral-900 mb-2">Produk & Stok</h1>
+        <p className="text-neutral-600">Manage your inventory and products</p>
       </div>
-    </main>
+
+      {/* Tab Navigation */}
+      <div className="mb-6 border-b border-neutral-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('products')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'products'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+            }`}
+          >
+            Products
+          </button>
+          <button
+            onClick={() => setActiveTab('ledger')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'ledger'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+            }`}
+          >
+            Stock Ledger
+          </button>
+        </nav>
+      </div>
+
+      {activeTab === 'products' ? (
+        <ProductsPanel />
+      ) : (
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-6 border-b border-neutral-200">
+            <h2 className="text-xl font-semibold text-neutral-900">Stock Ledger</h2>
+            <p className="text-neutral-600">View stock adjustments and history</p>
+          </div>
+
+          <div className="p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-neutral-500">Select a variant to view its ledger</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-4">
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <h3 className="font-medium text-neutral-900">No variant selected</h3>
+                <p className="text-sm text-neutral-600">
+                  Navigate to a product and select it to view its inventory ledger
+                </p>
+              </div>
+            </div>
+
+            {/* Show a ledger panel if a variant is selected */}
+            {selectedVariantId && (
+              <div className="mt-6">
+                <h3 className="text-lg font-medium text-neutral-900">Ledger for {selectedVariantId}</h3>
+                <Link 
+                  href={`/ledger/${selectedVariantId}`}
+                  className="inline-block mt-2 text-primary-600 hover:text-primary-800"
+                >
+                  View detailed ledger history
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
