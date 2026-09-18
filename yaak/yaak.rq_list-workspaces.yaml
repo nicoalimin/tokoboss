@@ -9,10 +9,10 @@ body: {}
 bodyType: null
 description: Lists the active workspaces available to the signed-in user.
 headers:
-- enabled: true
-  name: X-Bootstrap-Password
-  value: ${[bootstrap_password]}
-  id: null
+  - enabled: true
+    name: X-Bootstrap-Password
+    value: ${[bootstrap_password]}
+    id: null
 method: GET
 name: List workspaces
 sortPriority: 1.0

@@ -11,6 +11,7 @@ The implementation adds support for both TUI mode and CLI mode to the TokoBoss a
 ### 1. Terminal User Interface (TUI)
 
 **Directory Structure:**
+
 ```
 packages/tui/
 ├── package.json
@@ -32,8 +33,9 @@ packages/tui/
 ```
 
 **Key Components:**
+
 - `src/index.ts`: Main entry point that handles both TUI and CLI modes
-- `commands/`: Command handlers for login, logout, list, and help 
+- `commands/`: Command handlers for login, logout, list, and help
 - `lib/client.ts`: API client to communicate with backend services
 - `ui/app.tsx`: Core TUI application rendering logic
 - `ui/components/`: Individual UI components (header, navigation, content)
@@ -57,6 +59,7 @@ packages/tui/
 ### Entry Point (`packages/tui/src/index.ts`)
 
 The main TUI entry point:
+
 ```typescript
 #!/usr/bin/env node
 
@@ -74,12 +77,14 @@ if (process.argv.length < 3) {
 ### Command Handlers
 
 Each command is implemented with:
+
 - Input validation
 - API interaction
 - Error handling
 - UI feedback
 
 Example for login command:
+
 ```typescript
 import { login } from '../lib/client';
 
@@ -96,6 +101,7 @@ export const handleLogin = async (username: string, password: string) => {
 ### TUI Application Structure
 
 The core application uses:
+
 - `@inquirer/prompts`: For interactive terminal prompts
 - React components within terminal (via JSX)
 - Event-driven architecture for navigation and data handling
@@ -103,20 +109,23 @@ The core application uses:
 ## Testing
 
 All implementation includes:
-- Unit tests for core TUI logic  
+
+- Unit tests for core TUI logic
 - Integration tests for CLI commands
 - Component tests for UI elements
 - Type safety verification
 
-## Usage Examples 
+## Usage Examples
 
 ### TUI Mode
+
 ```bash
 # Launch the interactive terminal UI
 pnpm tui
 ```
 
 ### CLI Mode
+
 ```bash
 # List available resources
 pnpm tui list
@@ -130,22 +139,23 @@ pnpm tui help
 
 ## Code Organization and Patterns
 
-- **Separation of Concerns**: Commands are separate from UI components  
+- **Separation of Concerns**: Commands are separate from UI components
 - **Reusability**: Leverages existing authentication and data services
-- **Type Safety**: Utilizes TypeScript interfaces matching contract definitions 
+- **Type Safety**: Utilizes TypeScript interfaces matching contract definitions
 - **Error Handling**: Consistent with existing error handling patterns
 - **Documentation**: Follows conventional repository documentation practices
 
 ## Migration Path Considerations
 
 This TUI implementation should be fully compatible with existing database migrations. The new code:
+
 - Makes no direct changes to the schema
 - Uses the existing repository and database layers
 - Integrates through well-defined APIs (like application layer services)
 
 ## Future Improvements
 
-1. **Advanced Navigation**: More complex menu structures 
+1. **Advanced Navigation**: More complex menu structures
 2. **Data Filtering**: Enhanced filtering capabilities for list commands
 3. **History**: Command history for CLI mode
 4. **Themes**: Customizable terminal appearances
@@ -156,12 +166,13 @@ This TUI implementation should be fully compatible with existing database migrat
 
 - Input validation is performed in all command handlers
 - Authentication is handled through existing secure flows
-- No sensitive data is stored in session or cache without encryption 
+- No sensitive data is stored in session or cache without encryption
 
 ## Notes for Reviewers
 
 When reviewing this implementation, verify:
-1. That the TUI components follow the project's UI conventions  
+
+1. That the TUI components follow the project's UI conventions
 2. That CLI commands properly integrate with existing APIs
 3. That error messages are user-friendly and provide actionable feedback
 4. That all required tests pass successfully

@@ -6,11 +6,8 @@ import { handleHelp } from './help';
 
 export const runCLI = async (args: string[]) => {
   const program = new Command();
-  
-  program
-    .name('tui')
-    .description('TUI for TokoBoss')
-    .version('0.0.1');
+
+  program.name('tui').description('TUI for TokoBoss').version('0.0.1');
 
   program
     .command('login')

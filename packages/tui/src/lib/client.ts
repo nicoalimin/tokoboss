@@ -7,7 +7,7 @@ export const login = async (username: string, password: string) => {
     setTimeout(() => {
       resolve({
         token: 'fake-auth-token',
-        user: { username, role: 'admin' }
+        user: { username, role: 'admin' },
       });
     }, 100);
   });
@@ -19,7 +19,7 @@ export const listResources = async (resourceType: string) => {
     setTimeout(() => {
       resolve({
         type: resourceType,
-        items: [`fake-${resourceType}-item-1`, `fake-${resourceType}-item-2`]
+        items: [`fake-${resourceType}-item-1`, `fake-${resourceType}-item-2`],
       });
     }, 100);
   });

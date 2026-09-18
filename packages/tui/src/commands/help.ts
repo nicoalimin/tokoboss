@@ -15,6 +15,6 @@ Commands:
   logout      - End your session
   list        - Display available resources
   help        - Show this help
-    `
+    `,
   };
 };

@@ -241,7 +241,6 @@ export type NewCatalogWarehouseRow = typeof catalogWarehouses.$inferInsert;
 export type CatalogInventoryLevelRow =
   typeof catalogInventoryLevels.$inferSelect;
 export type CatalogStockLedgerRow = typeof catalogStockLedger.$inferSelect;
-export type CatalogStockSettingsRow =
-  typeof catalogStockSettings.$inferSelect;
+export type CatalogStockSettingsRow = typeof catalogStockSettings.$inferSelect;
 export type CatalogChannelMappingRow =
   typeof catalogChannelMappings.$inferSelect;

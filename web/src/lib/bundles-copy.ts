@@ -201,11 +201,11 @@ const id: BundlesCopy = {
   validationError: 'Periksa kolom yang ditandai lalu coba lagi.',
   versionConflictError:
     'Orang lain mengubah bundel ini lebih dulu. Muat ulang detail, lalu coba lagi.',
-  conflictError:
-    'Bundel ini sudah punya BOM. Buka lalu ubah lininya saja.',
+  conflictError: 'Bundel ini sudah punya BOM. Buka lalu ubah lininya saja.',
   cycleError:
     'BOM itu akan membuat siklus: bundel tidak boleh memuat dirinya sendiri, langsung maupun lewat bundel lain.',
-  notFoundError: 'BOM bundel itu sudah hilang. Muat ulang daftar lalu coba lagi.',
+  notFoundError:
+    'BOM bundel itu sudah hilang. Muat ulang daftar lalu coba lagi.',
   noDirectStockError:
     'Varian bundel tidak menyimpan stok langsung — sesuaikan SKU komponennya.',
   genericError: 'Terjadi kesalahan. Coba lagi.',

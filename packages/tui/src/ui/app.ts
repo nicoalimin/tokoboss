@@ -2,7 +2,7 @@ import { select } from '@inquirer/prompts';
 
 export const createApp = async () => {
   console.log('Welcome to TokoBoss TUI!');
-  
+
   while (true) {
     const choice = await select({
       message: 'What would you like to do?',
@@ -10,8 +10,8 @@ export const createApp = async () => {
         { name: 'Login', value: 'login' },
         { name: 'List Resources', value: 'list' },
         { name: 'Logout', value: 'logout' },
-        { name: 'Exit', value: 'exit' }
-      ]
+        { name: 'Exit', value: 'exit' },
+      ],
     });
 
     if (choice === 'exit') {
