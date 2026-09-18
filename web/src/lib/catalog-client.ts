@@ -271,7 +271,7 @@ export function toCatalogClientError(
     });
   }
   if (status === 422 && code === 'WAREHOUSE_INACTIVE') {
-    // Return a generic error to avoid exposing warehouse state details  
+    // Return a generic error to avoid exposing warehouse state details
     return new CatalogClientError({
       status,
       errorCode: code,
