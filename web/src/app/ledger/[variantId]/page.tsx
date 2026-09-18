@@ -11,19 +11,19 @@ const mockLedgerEntries = [
     quantity: 100,
     reason: 'Purchase',
   },
-  { 
-    id: '2', 
-    date: new Date('2023-01-05'), 
-    type: 'OUT', 
-    quantity: 25, 
-    reason: 'Sale' 
+  {
+    id: '2',
+    date: new Date('2023-01-05'),
+    type: 'OUT',
+    quantity: 25,
+    reason: 'Sale',
   },
-  { 
-    id: '3', 
-    date: new Date('2023-01-10'), 
-    type: 'IN', 
-    quantity: 75, 
-    reason: 'Return' 
+  {
+    id: '3',
+    date: new Date('2023-01-10'),
+    type: 'IN',
+    quantity: 75,
+    reason: 'Return',
   },
 ];
 
@@ -45,7 +45,7 @@ export default function Page({ params }: { params: { variantId: string } }) {
         // In a real implementation:
         // const stockData = await getStockBalance(params.variantId);
         // const ledgerData = await getLedgerEntries(params.variantId);
-        
+
         // Mock data for now
         setStockInfo(mockStockInfo);
         setEntries(mockLedgerEntries);
@@ -70,8 +70,12 @@ export default function Page({ params }: { params: { variantId: string } }) {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-neutral-900 mb-2">Stock Ledger</h1>
-        <p className="text-neutral-600">Review stock adjustments for variant {params.variantId}</p>
+        <h1 className="text-3xl font-bold text-neutral-900 mb-2">
+          Stock Ledger
+        </h1>
+        <p className="text-neutral-600">
+          Review stock adjustments for variant {params.variantId}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -79,17 +83,23 @@ export default function Page({ params }: { params: { variantId: string } }) {
         <div className="lg:col-span-1 space-y-6">
           {/* Filters Section */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-neutral-900 mb-4">Filters</h2>
+            <h2 className="text-xl font-semibold text-neutral-900 mb-4">
+              Filters
+            </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Date Range</label>
-                <input 
-                  type="date" 
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Date Range
+                </label>
+                <input
+                  type="date"
                   className="w-full p-2 border border-neutral-300 rounded-md"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Type</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Type
+                </label>
                 <select className="w-full p-2 border border-neutral-300 rounded-md">
                   <option>All</option>
                   <option>IN</option>
@@ -104,33 +114,41 @@ export default function Page({ params }: { params: { variantId: string } }) {
 
           {/* Adjustment Form */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-neutral-900 mb-4">Make Adjustment</h2>
+            <h2 className="text-xl font-semibold text-neutral-900 mb-4">
+              Make Adjustment
+            </h2>
             <form className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Type</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Type
+                </label>
                 <select className="w-full p-2 border border-neutral-300 rounded-md">
                   <option>IN (Increase Stock)</option>
                   <option>OUT (Decrease Stock)</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Quantity</label>
-                <input 
-                  type="number" 
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Quantity
+                </label>
+                <input
+                  type="number"
                   className="w-full p-2 border border-neutral-300 rounded-md"
                   placeholder="Enter quantity"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Reason</label>
-                <input 
-                  type="text" 
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Reason
+                </label>
+                <input
+                  type="text"
                   className="w-full p-2 border border-neutral-300 rounded-md"
                   placeholder="Enter reason"
                 />
               </div>
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="w-full bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600"
               >
                 Submit Adjustment
@@ -143,7 +161,9 @@ export default function Page({ params }: { params: { variantId: string } }) {
         <div className="lg:col-span-2 space-y-6">
           {/* Stock Summary Card */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-neutral-900 mb-4">Stock Summary</h2>
+            <h2 className="text-xl font-semibold text-neutral-900 mb-4">
+              Stock Summary
+            </h2>
             {stockInfo ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-blue-50 p-4 rounded-md">
@@ -152,11 +172,15 @@ export default function Page({ params }: { params: { variantId: string } }) {
                 </div>
                 <div className="bg-yellow-50 p-4 rounded-md">
                   <p className="text-sm text-yellow-700">Reserved Stock</p>
-                  <p className="text-2xl font-bold">{stockInfo.reservedStock}</p>
+                  <p className="text-2xl font-bold">
+                    {stockInfo.reservedStock}
+                  </p>
                 </div>
                 <div className="bg-green-50 p-4 rounded-md">
                   <p className="text-sm text-green-700">Available Stock</p>
-                  <p className="text-2xl font-bold">{stockInfo.availableStock}</p>
+                  <p className="text-2xl font-bold">
+                    {stockInfo.availableStock}
+                  </p>
                 </div>
               </div>
             ) : (
@@ -166,28 +190,44 @@ export default function Page({ params }: { params: { variantId: string } }) {
 
           {/* Ledger History Table */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-neutral-900 mb-4">Stock Ledger History</h2>
+            <h2 className="text-xl font-semibold text-neutral-900 mb-4">
+              Stock Ledger History
+            </h2>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-neutral-200">
                 <thead className="bg-neutral-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Quantity</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Reason</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                      Quantity
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                      Reason
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-200">
                   {entries.map((entry) => (
                     <tr key={entry.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">{entry.date.toLocaleDateString()}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${entry.type === 'IN' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {entry.date.toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                          ${entry.type === 'IN' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+                        >
                           {entry.type}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">{entry.quantity}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {entry.quantity}
+                      </td>
                       <td className="px-6 py-4">{entry.reason}</td>
                     </tr>
                   ))}
