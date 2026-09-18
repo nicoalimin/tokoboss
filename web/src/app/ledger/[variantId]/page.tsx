@@ -1,11 +1,10 @@
-'use client';
+import LedgerClient from './ledger-client'
 
-import LedgerClient from './ledger-client';
-
-export default function LedgerPage({
+export default async function Page({
   params,
 }: {
-  params: { variantId: string };
+  params: Promise<{ variantId: string }>
 }) {
-  return <LedgerClient variantId={params.variantId} />;
+  const { variantId } = await params
+  return <LedgerClient variantId={variantId} />
 }
