@@ -1,0 +1,31 @@
+{
+  "name": "@tokoboss/tui",
+  "version": "0.0.1",
+  "description": "Terminal User Interface for TokoBoss",
+  "main": "./dist/index.js",
+  "bin": {
+    "tui": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && cp -r src/ui/ dist/ui/",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^3.0.0",
+    "chalk": "^5.0.0",
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "tui",
+    "terminal",
+    "cli",
+    "interface"
+  ],
+  "author": "TokoBoss Team",
+  "license": "MIT"
+}
