@@ -16,7 +16,7 @@ invites, and settings work.
   (session invalidation — see `session-policy.ts` in `@tokoboss/auth`).
 - `audit_events` (+ UTA-19 columns `actor_type`, `actor_id`, `category`,
   `correlation_id`): append-only. Categories: `membership | workspace |
-  security`. Payloads carry opaque ids only.
+security`. Payloads carry opaque ids only.
 
 ## Rules for route/use-case authors
 

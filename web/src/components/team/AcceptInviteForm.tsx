@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  TeamClientError,
-  acceptInvite,
-} from '@/lib/team-client';
+import { TeamClientError, acceptInvite } from '@/lib/team-client';
 import { getTeamCopy } from '@/lib/team-copy';
 import { AuthAlert } from '../auth/AuthAlert';
 
@@ -22,7 +19,11 @@ const inputClass =
  * back — success shows opaque ids only. Expired sessions cannot happen here
  * (no cookie needed), but invalid/expired tickets map to dedicated copy.
  */
-export function AcceptInviteForm({ initialToken = '' }: { initialToken?: string }) {
+export function AcceptInviteForm({
+  initialToken = '',
+}: {
+  initialToken?: string;
+}) {
   const copy = getTeamCopy('en');
   const router = useRouter();
   const [token, setToken] = useState(initialToken);
@@ -109,7 +110,10 @@ export function AcceptInviteForm({ initialToken = '' }: { initialToken?: string 
             aria-describedby="accept-password-hint"
             className={inputClass}
           />
-          <p id="accept-password-hint" className="mt-1 text-xs text-neutral-500">
+          <p
+            id="accept-password-hint"
+            className="mt-1 text-xs text-neutral-500"
+          >
             {copy.newPasswordHint}
           </p>
         </div>

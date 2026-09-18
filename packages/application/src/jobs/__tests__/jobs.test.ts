@@ -247,10 +247,7 @@ describe('payload safety', () => {
       assertJobPayloadSafe({ token: 'sk-abcdef1234567890' }, 'input_ref')
     ).toThrow(JobUnsafePayloadError);
     expect(() =>
-      assertJobPayloadSafe(
-        { url: 'postgres://user:pass@host/db' },
-        'input_ref'
-      )
+      assertJobPayloadSafe({ url: 'postgres://user:pass@host/db' }, 'input_ref')
     ).toThrow(JobUnsafePayloadError);
     expect(() =>
       assertJobPayloadSafe({ phone: '+6281234567890' }, 'input_ref')
@@ -259,10 +256,7 @@ describe('payload safety', () => {
       assertJobPayloadSafe({ note: 'see 3174051201900001 attached' }, 'x')
     ).toThrow(JobUnsafePayloadError);
     expect(() =>
-      assertJobPayloadSafe(
-        { raw_payload: { anything: 1 } },
-        'input_ref'
-      )
+      assertJobPayloadSafe({ raw_payload: { anything: 1 } }, 'input_ref')
     ).toThrow(JobUnsafePayloadError);
   });
 

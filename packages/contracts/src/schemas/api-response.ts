@@ -8,11 +8,13 @@ export const ApiResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
   z.object({
     success: z.boolean(),
     data: dataSchema.optional(),
-    error: z.object({
-      code: z.string(),
-      message: z.string(),
-      details: z.record(z.unknown()).optional(),
-    }).optional(),
+    error: z
+      .object({
+        code: z.string(),
+        message: z.string(),
+        details: z.record(z.unknown()).optional(),
+      })
+      .optional(),
     meta: z.object({
       timestamp: z.string().datetime(),
       requestId: z.string().optional(),

@@ -35,10 +35,7 @@ export type JobEventType = (typeof JOB_EVENT_TYPES)[number];
  * with `JOB_NOT_CANCELLABLE`. Terminal states reject with
  * `JOB_INVALID_TRANSITION`.
  */
-export const SAFE_CANCEL_STATUSES: readonly JobStatus[] = [
-  'queued',
-  'waiting',
-];
+export const SAFE_CANCEL_STATUSES: readonly JobStatus[] = ['queued', 'waiting'];
 
 export interface JobRecord {
   id: string;
