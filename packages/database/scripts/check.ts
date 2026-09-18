@@ -89,8 +89,12 @@ async function main(): Promise<void> {
       ok = false;
     }
   });
-  if (new Set(journal.entries.map((e) => e.tag)).size !== journal.entries.length) {
-    console.error('Journal has duplicate tags — each migration tag must be unique.');
+  if (
+    new Set(journal.entries.map((e) => e.tag)).size !== journal.entries.length
+  ) {
+    console.error(
+      'Journal has duplicate tags — each migration tag must be unique.'
+    );
     ok = false;
   }
 

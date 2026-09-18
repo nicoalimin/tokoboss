@@ -23,10 +23,10 @@ pnpm --filter @tokoboss/web dev   # http://localhost:3000/pengaturan
 
 ## Storage modes (memory vs `DATABASE_URL`)
 
-| Mode | How | Membership source |
-| --- | --- | --- |
-| Memory (default, no `DATABASE_URL`) | Process-local stores; responses include `"storage": "memory"`. Fixture: `seedFixtureCredential()` + sign in. | `InMemoryTenancyStore` |
-| Postgres (`DATABASE_URL` set) | Drizzle stores via `createDb()`; same route shapes, `"storage": "postgres"`. | `DrizzleWorkspaceMemberStore` |
+| Mode                                | How                                                                                                          | Membership source             |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------- |
+| Memory (default, no `DATABASE_URL`) | Process-local stores; responses include `"storage": "memory"`. Fixture: `seedFixtureCredential()` + sign in. | `InMemoryTenancyStore`        |
+| Postgres (`DATABASE_URL` set)       | Drizzle stores via `createDb()`; same route shapes, `"storage": "postgres"`.                                 | `DrizzleWorkspaceMemberStore` |
 
 The membership route and all team APIs behave identically across modes;
 only the store changes. Tests run in memory mode:

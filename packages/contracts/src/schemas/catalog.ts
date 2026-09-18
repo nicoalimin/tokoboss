@@ -184,10 +184,7 @@ export const AdjustStockBodySchema = z.object({
     .trim()
     .min(1)
     .max(128)
-    .regex(
-      /^[A-Za-z0-9\-_:.]+$/,
-      'Idempotency key has an unsupported format.'
-    )
+    .regex(/^[A-Za-z0-9\-_:.]+$/, 'Idempotency key has an unsupported format.')
     .optional(),
 });
 export type AdjustStockBody = z.infer<typeof AdjustStockBodySchema>;

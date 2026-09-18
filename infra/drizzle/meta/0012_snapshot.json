@@ -49,9 +49,7 @@
         "tenants_slug_unique": {
           "name": "tenants_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -147,12 +145,8 @@
           "name": "audit_events_tenant_id_tenants_id_fk",
           "tableFrom": "audit_events",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -262,12 +256,8 @@
           "name": "job_events_job_id_jobs_id_fk",
           "tableFrom": "job_events",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -275,12 +265,8 @@
           "name": "job_events_workspace_id_tenants_id_fk",
           "tableFrom": "job_events",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -513,12 +499,8 @@
           "name": "jobs_workspace_id_tenants_id_fk",
           "tableFrom": "jobs",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -737,12 +719,8 @@
           "name": "file_uploads_workspace_id_tenants_id_fk",
           "tableFrom": "file_uploads",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -902,12 +880,8 @@
           "name": "workspace_members_workspace_id_tenants_id_fk",
           "tableFrom": "workspace_members",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1078,12 +1052,8 @@
           "name": "workspace_invites_workspace_id_tenants_id_fk",
           "tableFrom": "workspace_invites",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1093,9 +1063,7 @@
         "workspace_invites_token_hash_unique": {
           "name": "workspace_invites_token_hash_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token_hash"
-          ]
+          "columns": ["token_hash"]
         }
       },
       "policies": {},
@@ -1183,9 +1151,7 @@
         "auth_password_resets_token_hash_unique": {
           "name": "auth_password_resets_token_hash_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token_hash"
-          ]
+          "columns": ["token_hash"]
         }
       },
       "policies": {},
@@ -1319,12 +1285,8 @@
           "name": "auth_sessions_workspace_id_tenants_id_fk",
           "tableFrom": "auth_sessions",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1334,9 +1296,7 @@
         "auth_sessions_token_hash_unique": {
           "name": "auth_sessions_token_hash_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token_hash"
-          ]
+          "columns": ["token_hash"]
         }
       },
       "policies": {},
@@ -1410,16 +1370,12 @@
         "auth_users_email_unique": {
           "name": "auth_users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         },
         "auth_users_user_id_unique": {
           "name": "auth_users_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "user_id"
-          ]
+          "columns": ["user_id"]
         }
       },
       "policies": {},
@@ -1492,12 +1448,8 @@
           "name": "user_profiles_avatar_upload_id_file_uploads_id_fk",
           "tableFrom": "user_profiles",
           "tableTo": "file_uploads",
-          "columnsFrom": [
-            "avatar_upload_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["avatar_upload_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1507,9 +1459,7 @@
         "user_profiles_user_id_unique": {
           "name": "user_profiles_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "user_id"
-          ]
+          "columns": ["user_id"]
         }
       },
       "policies": {},
@@ -1651,12 +1601,8 @@
           "name": "catalog_channel_mappings_workspace_id_tenants_id_fk",
           "tableFrom": "catalog_channel_mappings",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1664,12 +1610,8 @@
           "name": "catalog_channel_mappings_variant_id_catalog_variants_id_fk",
           "tableFrom": "catalog_channel_mappings",
           "tableTo": "catalog_variants",
-          "columnsFrom": [
-            "variant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["variant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1787,12 +1729,8 @@
           "name": "catalog_inventory_levels_workspace_id_tenants_id_fk",
           "tableFrom": "catalog_inventory_levels",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1800,12 +1738,8 @@
           "name": "catalog_inventory_levels_variant_id_catalog_variants_id_fk",
           "tableFrom": "catalog_inventory_levels",
           "tableTo": "catalog_variants",
-          "columnsFrom": [
-            "variant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["variant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1813,12 +1747,8 @@
           "name": "catalog_inventory_levels_warehouse_id_catalog_warehouses_id_fk",
           "tableFrom": "catalog_inventory_levels",
           "tableTo": "catalog_warehouses",
-          "columnsFrom": [
-            "warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1923,12 +1853,8 @@
           "name": "catalog_products_workspace_id_tenants_id_fk",
           "tableFrom": "catalog_products",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2089,12 +2015,8 @@
           "name": "catalog_stock_ledger_workspace_id_tenants_id_fk",
           "tableFrom": "catalog_stock_ledger",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2102,12 +2024,8 @@
           "name": "catalog_stock_ledger_variant_id_catalog_variants_id_fk",
           "tableFrom": "catalog_stock_ledger",
           "tableTo": "catalog_variants",
-          "columnsFrom": [
-            "variant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["variant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2115,12 +2033,8 @@
           "name": "catalog_stock_ledger_warehouse_id_catalog_warehouses_id_fk",
           "tableFrom": "catalog_stock_ledger",
           "tableTo": "catalog_warehouses",
-          "columnsFrom": [
-            "warehouse_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["warehouse_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2176,12 +2090,8 @@
           "name": "catalog_stock_settings_workspace_id_tenants_id_fk",
           "tableFrom": "catalog_stock_settings",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2363,12 +2273,8 @@
           "name": "catalog_variants_workspace_id_tenants_id_fk",
           "tableFrom": "catalog_variants",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2376,12 +2282,8 @@
           "name": "catalog_variants_product_id_catalog_products_id_fk",
           "tableFrom": "catalog_variants",
           "tableTo": "catalog_products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2493,12 +2395,8 @@
           "name": "catalog_warehouses_workspace_id_tenants_id_fk",
           "tableFrom": "catalog_warehouses",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2629,12 +2527,8 @@
           "name": "catalog_bundle_lines_workspace_id_tenants_id_fk",
           "tableFrom": "catalog_bundle_lines",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2642,12 +2536,8 @@
           "name": "catalog_bundle_lines_bundle_variant_id_catalog_variants_id_fk",
           "tableFrom": "catalog_bundle_lines",
           "tableTo": "catalog_variants",
-          "columnsFrom": [
-            "bundle_variant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["bundle_variant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2655,12 +2545,8 @@
           "name": "catalog_bundle_lines_component_variant_id_catalog_variants_id_fk",
           "tableFrom": "catalog_bundle_lines",
           "tableTo": "catalog_variants",
-          "columnsFrom": [
-            "component_variant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["component_variant_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2824,12 +2710,8 @@
           "name": "product_import_batches_workspace_id_tenants_id_fk",
           "tableFrom": "product_import_batches",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2837,12 +2719,8 @@
           "name": "product_import_batches_job_id_jobs_id_fk",
           "tableFrom": "product_import_batches",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3074,12 +2952,8 @@
           "name": "product_import_rows_workspace_id_tenants_id_fk",
           "tableFrom": "product_import_rows",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3087,12 +2961,8 @@
           "name": "product_import_rows_batch_id_product_import_batches_id_fk",
           "tableFrom": "product_import_rows",
           "tableTo": "product_import_batches",
-          "columnsFrom": [
-            "batch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["batch_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3181,12 +3051,8 @@
           "name": "products_store_id_stores_id_fk",
           "tableFrom": "products",
           "tableTo": "stores",
-          "columnsFrom": [
-            "store_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["store_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3240,12 +3106,8 @@
           "name": "stock_moves_product_id_products_id_fk",
           "tableFrom": "stock_moves",
           "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }

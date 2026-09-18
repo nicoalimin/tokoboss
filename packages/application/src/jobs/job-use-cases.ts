@@ -6,11 +6,7 @@ import type {
   JobTxRunner,
 } from './job-ports';
 import { JobNotFoundError, JobTransitionError } from './job-ports';
-import type {
-  JobEventRecord,
-  JobRecord,
-  NewJobInput,
-} from './job-types';
+import type { JobEventRecord, JobRecord, NewJobInput } from './job-types';
 import { SAFE_CANCEL_STATUSES } from './job-types';
 
 export const HELLO_JOB_TYPE = 'hello';
@@ -64,7 +60,12 @@ export async function createJob(
     );
     if (existing) return { job: existing, duplicate: true };
     try {
-      const job = await store.create({ ...input, workspaceId, type, idempotencyKey });
+      const job = await store.create({
+        ...input,
+        workspaceId,
+        type,
+        idempotencyKey,
+      });
       await store.appendEvent(job.id, workspaceId, 'queued', 0, {
         type: job.type,
       });
@@ -104,7 +105,11 @@ export async function claimStartJob(
 ): Promise<{ job: JobRecord; duplicate: boolean }> {
   const job = await store.findById(input.jobId, input.workspaceId);
   if (!job) throw new JobNotFoundError(input.jobId);
-  if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+  if (
+    job.status === 'completed' ||
+    job.status === 'failed' ||
+    job.status === 'cancelled'
+  ) {
     throw new JobTransitionError(
       'JOB_INVALID_TRANSITION',
       `Cannot start job ${job.id} from terminal status ${job.status}`
@@ -129,9 +134,15 @@ export async function claimStartJob(
     errorMessage: null,
     workflowRunId: input.workflowRunId,
   });
-  await store.appendEvent(job.id, job.workspaceId, 'started', updated.attemptCount, {
-    workflowRunId: input.workflowRunId,
-  });
+  await store.appendEvent(
+    job.id,
+    job.workspaceId,
+    'started',
+    updated.attemptCount,
+    {
+      workflowRunId: input.workflowRunId,
+    }
+  );
   return { job: updated, duplicate: false };
 }
 
@@ -155,16 +166,23 @@ export async function reportJobProgress(
   }
   const total = input.total ?? job.progressTotal;
   const current = Math.max(0, Math.min(input.current, total));
-  if (input.note !== undefined) assertJobPayloadSafe({ note: input.note }, 'progress');
+  if (input.note !== undefined)
+    assertJobPayloadSafe({ note: input.note }, 'progress');
   const updated = await store.update(job.id, job.workspaceId, {
     progressCurrent: current,
     progressTotal: total,
   });
-  await store.appendEvent(job.id, job.workspaceId, 'progress', job.attemptCount, {
-    current,
-    total,
-    ...(input.note ? { note: input.note } : {}),
-  });
+  await store.appendEvent(
+    job.id,
+    job.workspaceId,
+    'progress',
+    job.attemptCount,
+    {
+      current,
+      total,
+      ...(input.note ? { note: input.note } : {}),
+    }
+  );
   return updated;
 }
 
@@ -196,9 +214,15 @@ export async function completeJob(
     errorCode: null,
     errorMessage: null,
   });
-  await store.appendEvent(job.id, job.workspaceId, 'completed', job.attemptCount, {
-    attempt: job.attemptCount,
-  });
+  await store.appendEvent(
+    job.id,
+    job.workspaceId,
+    'completed',
+    job.attemptCount,
+    {
+      attempt: job.attemptCount,
+    }
+  );
   return updated;
 }
 
@@ -237,10 +261,16 @@ export async function failJob(
       errorCode: input.errorCode,
       errorMessage: input.errorMessage ?? null,
     });
-    await store.appendEvent(job.id, job.workspaceId, 'failed', job.attemptCount, {
-      errorCode: input.errorCode,
-      terminal: true,
-    });
+    await store.appendEvent(
+      job.id,
+      job.workspaceId,
+      'failed',
+      job.attemptCount,
+      {
+        errorCode: input.errorCode,
+        terminal: true,
+      }
+    );
     return updated;
   }
   const nextRetryAt = computeNextRetryAt(job.attemptCount);
@@ -288,9 +318,15 @@ export async function cancelJob(
     completedAt: new Date(),
     nextRetryAt: null,
   });
-  await store.appendEvent(job.id, job.workspaceId, 'cancelled', job.attemptCount, {
-    ...(input.reason ? { reason: input.reason } : {}),
-  });
+  await store.appendEvent(
+    job.id,
+    job.workspaceId,
+    'cancelled',
+    job.attemptCount,
+    {
+      ...(input.reason ? { reason: input.reason } : {}),
+    }
+  );
   return updated;
 }
 

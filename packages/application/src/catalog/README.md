@@ -6,15 +6,15 @@ for Story 03–04).
 
 ## Data model (`0009_catalog_skus` + `0012_stock_ledger_hardening`)
 
-| Table                      | Key / constraint                                                                                                                               |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `catalog_products`         | workspace-scoped product (name, unit, pictures metadata, `active`/`archived`, `version`)                                                       |
-| `catalog_variants`         | one SKU TokoBoss per row; `UNIQUE (workspace_id, sku_code)`; manual HPP (`hpp_cents`) + cost-source label; optional barcode; listing-name hint |
-| `catalog_warehouses`       | workspace-scoped master data (`code` unique per workspace, `active`/`deactivated`, `version`)                                                  |
-| `catalog_inventory_levels` | SoT read model, `UNIQUE (variant_id, warehouse_id)` — derived ONLY from the ledger                                                             |
+| Table                      | Key / constraint                                                                                                                                                  |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `catalog_products`         | workspace-scoped product (name, unit, pictures metadata, `active`/`archived`, `version`)                                                                          |
+| `catalog_variants`         | one SKU TokoBoss per row; `UNIQUE (workspace_id, sku_code)`; manual HPP (`hpp_cents`) + cost-source label; optional barcode; listing-name hint                    |
+| `catalog_warehouses`       | workspace-scoped master data (`code` unique per workspace, `active`/`deactivated`, `version`)                                                                     |
+| `catalog_inventory_levels` | SoT read model, `UNIQUE (variant_id, warehouse_id)` — derived ONLY from the ledger                                                                                |
 | `catalog_stock_ledger`     | append-only source of truth (`delta`, `balance_after`, `reason`, actor, correlation, `idempotency_key` — `UNIQUE (workspace_id, idempotency_key)` where not null) |
-| `catalog_stock_settings`   | one row per workspace (lazy-created, default `allow_negative = false`); Admin-only toggle, CAS-guarded `version`                               |
-| `catalog_channel_mappings` | `UNIQUE (workspace_id, channel, shop_ext_id, platform_sku_id)` → variant; hints only                                                           |
+| `catalog_stock_settings`   | one row per workspace (lazy-created, default `allow_negative = false`); Admin-only toggle, CAS-guarded `version`                                                  |
+| `catalog_channel_mappings` | `UNIQUE (workspace_id, channel, shop_ext_id, platform_sku_id)` → variant; hints only                                                                              |
 
 Removal is archive-only (`status = 'archived'`, idempotent, cascaded
 atomically to active variants). `DELETE` on products/variants answers
@@ -44,7 +44,7 @@ CATALOG_WAREHOUSE_INACTIVE`).
   a different variant/warehouse/delta/reason is `409 CATALOG_CONFLICT`.
 - Optimistic concurrency: `expectedVersion` on every PATCH/adjustment/
   settings-toggle; stale writes reject with `409
-  CATALOG_VERSION_CONFLICT` (+ `currentVersion`) instead of silently
+CATALOG_VERSION_CONFLICT` (+ `currentVersion`) instead of silently
   overwriting.
 - RBAC: reads any active member; creates/updates/archives/mappings/
   warehouses/adjustments Manager/Admin; stock-settings toggle Admin only.

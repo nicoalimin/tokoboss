@@ -92,7 +92,10 @@ export async function requestUploadToken(
   const purpose = input.purpose as FileUploadPurpose;
   if (
     input.retentionUntil !== undefined &&
-    !(input.retentionUntil instanceof Date && !Number.isNaN(input.retentionUntil.getTime()))
+    !(
+      input.retentionUntil instanceof Date &&
+      !Number.isNaN(input.retentionUntil.getTime())
+    )
   ) {
     throw new UploadValidationError('retentionUntil must be a valid date');
   }
@@ -103,7 +106,10 @@ export async function requestUploadToken(
 
   // Idempotent token request: same (workspace, key) resolves to the same
   // pending record instead of minting a second pathname.
-  const existing = await store.findByIdempotencyKey(workspaceId, idempotencyKey);
+  const existing = await store.findByIdempotencyKey(
+    workspaceId,
+    idempotencyKey
+  );
   if (existing) {
     const token = await storage.issueUploadToken({
       workspaceId,
@@ -147,7 +153,10 @@ export async function requestUploadToken(
     });
   } catch (err) {
     if (err instanceof Error && err.name === 'UploadConflictError') {
-      const winner = await store.findByIdempotencyKey(workspaceId, idempotencyKey);
+      const winner = await store.findByIdempotencyKey(
+        workspaceId,
+        idempotencyKey
+      );
       if (winner) {
         const token = await storage.issueUploadToken({
           workspaceId,
@@ -229,7 +238,10 @@ export async function completeUpload(
   if (input.uploadId) {
     record = await store.findById(input.uploadId, workspaceId);
   } else if (input.idempotencyKey) {
-    record = await store.findByIdempotencyKey(workspaceId, input.idempotencyKey);
+    record = await store.findByIdempotencyKey(
+      workspaceId,
+      input.idempotencyKey
+    );
   }
   if (!record) {
     // Pathname fallback keeps retried client callbacks idempotent even when
@@ -247,8 +259,13 @@ export async function completeUpload(
   if (record.pathname !== input.pathname.trim()) {
     throw new UploadValidationError('pathname does not match the issued token');
   }
-  if (input.contentType !== undefined && input.contentType !== record.contentType) {
-    throw new UploadValidationError('contentType does not match the issued token');
+  if (
+    input.contentType !== undefined &&
+    input.contentType !== record.contentType
+  ) {
+    throw new UploadValidationError(
+      'contentType does not match the issued token'
+    );
   }
   const maxBytes = PURPOSE_MAX_BYTES[record.purpose];
   if (!Number.isFinite(input.byteSize) || input.byteSize <= 0) {
@@ -341,7 +358,9 @@ export async function deleteUpload(
   if (!upload) throw new UploadForbiddenError();
   if (upload.status === 'deleted') return upload;
   await storage.deleteObject(upload.pathname);
-  const updated = await store.update(upload.id, workspaceId, { status: 'deleted' });
+  const updated = await store.update(upload.id, workspaceId, {
+    status: 'deleted',
+  });
   if (audit) {
     await audit.append({
       workspaceId,
@@ -357,7 +376,9 @@ export async function deleteUpload(
 }
 
 /** Re-exported guard for Route Handlers validating query-supplied enums. */
-export function assertKnownPurpose(purpose: unknown): asserts purpose is FileUploadPurpose {
+export function assertKnownPurpose(
+  purpose: unknown
+): asserts purpose is FileUploadPurpose {
   if (!isFileUploadPurpose(purpose)) {
     throw new UploadValidationError(
       `purpose must be one of the operational purposes (got ${JSON.stringify(purpose)})`
@@ -366,7 +387,10 @@ export function assertKnownPurpose(purpose: unknown): asserts purpose is FileUpl
 }
 
 /** MIME allowlist check exposed for completion-time re-validation. */
-export function assertMimeAllowed(purpose: FileUploadPurpose, contentType: string): void {
+export function assertMimeAllowed(
+  purpose: FileUploadPurpose,
+  contentType: string
+): void {
   if (!PURPOSE_MIME_ALLOWLIST[purpose].includes(contentType)) {
     throw new UploadValidationError(
       `contentType ${JSON.stringify(contentType)} not allowed for purpose ${JSON.stringify(purpose)}`

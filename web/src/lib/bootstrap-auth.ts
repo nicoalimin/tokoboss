@@ -7,7 +7,5 @@ export function hasValidBootstrapPassword(request: Request): boolean {
   if (!configured || !supplied) return false;
   const expected = Buffer.from(configured);
   const actual = Buffer.from(supplied);
-  return (
-    expected.length === actual.length && timingSafeEqual(expected, actual)
-  );
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
 }

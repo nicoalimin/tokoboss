@@ -263,7 +263,11 @@ describe('catalog migration + drizzle store', () => {
         status: 'active' as const,
         authVersion: 1,
       };
-      const managerCtx = { ...adminCtx, userId: 'user_mgr_1', role: 'manager' as const };
+      const managerCtx = {
+        ...adminCtx,
+        userId: 'user_mgr_1',
+        role: 'manager' as const,
+      };
       const wh1 = await createWarehouse(store, {
         ctx: adminCtx,
         workspaceId: tenant.id,
@@ -309,8 +313,12 @@ describe('catalog migration + drizzle store', () => {
 
       // Negative stock blocked by default (fresh workspace policy OFF).
       expect(
-        (await getStockSettings(store, { ctx: adminCtx, workspaceId: tenant.id }))
-          .allowNegative
+        (
+          await getStockSettings(store, {
+            ctx: adminCtx,
+            workspaceId: tenant.id,
+          })
+        ).allowNegative
       ).toBe(false);
       await expect(
         adjustStock(store, {
@@ -357,7 +365,9 @@ describe('catalog migration + drizzle store', () => {
       });
       expect(balance.totalQty).toBe(3);
       expect(
-        new Map(balance.perWarehouse.map((p) => [p.warehouseId, p.qty])).get(wh2.id)
+        new Map(balance.perWarehouse.map((p) => [p.warehouseId, p.qty])).get(
+          wh2.id
+        )
       ).toBe(5);
       const filtered = await getLedger(store, {
         ctx: adminCtx,
