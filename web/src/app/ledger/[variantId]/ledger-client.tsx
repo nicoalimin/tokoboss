@@ -53,11 +53,7 @@ interface StockSettings {
 }
 
 // This component would be used by the page to display UI elements
-export default function LedgerClient({
-  variantId,
-}: {
-  variantId: string;
-}) {
+export default function LedgerClient({ variantId }: { variantId: string }) {
   const router = useRouter();
   const { membership, loading: membershipLoading } = useMembership();
   const [error, setError] = useState<string | null>(null);
@@ -112,7 +108,7 @@ export default function LedgerClient({
     setError(null);
 
     try {
-      // Get warehouse-specific version for expectedVersion 
+      // Get warehouse-specific version for expectedVersion
       let expectedVersion: number | undefined = undefined;
       if (stockBalance && adjustmentForm.warehouseId) {
         const warehouseLevel = stockBalance.perWarehouse.find(
