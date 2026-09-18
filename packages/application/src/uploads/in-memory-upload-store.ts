@@ -85,7 +85,10 @@ export class InMemoryUploadStore implements FileUploadStore {
     return clone(record);
   }
 
-  async findById(id: string, workspaceId: string): Promise<FileUploadRecord | null> {
+  async findById(
+    id: string,
+    workspaceId: string
+  ): Promise<FileUploadRecord | null> {
     const record = this.uploads.get(id);
     if (!record || record.workspaceId !== workspaceId) return null;
     return clone(record);

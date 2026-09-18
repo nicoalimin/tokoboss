@@ -1,15 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Page() {
   const router = useRouter();
   
-  // Redirect to the main page or a default variant 
+  // Redirect to a default variant ID
   useEffect(() => {
-    // In a real implementation, this would redirect to a specific variant
-    // For now, we'll just navigate to a placeholder URL
+    // Navigate to a specific variant (using a placeholder ID)
     router.push('/ledger/variant_abc123');
   }, [router]);
   

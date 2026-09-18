@@ -27,7 +27,9 @@ function jsonResponse(body: unknown, status: number): Response {
   });
 }
 
-function stubFetch(impl: (url: string, init?: RequestInit) => Promise<Response>) {
+function stubFetch(
+  impl: (url: string, init?: RequestInit) => Promise<Response>
+) {
   return vi.fn(impl) as unknown as typeof fetch & {
     mock: { calls: Array<[string, RequestInit?]> };
   };
@@ -246,7 +248,9 @@ describe('imports-client (UTA-78 UI)', () => {
       return jsonResponse(
         {
           summary: {
-            applied: [{ rowId: 'row_1', productId: 'prod_1', variantId: 'var_1' }],
+            applied: [
+              { rowId: 'row_1', productId: 'prod_1', variantId: 'var_1' },
+            ],
             duplicates: [
               {
                 rowId: 'row_2',

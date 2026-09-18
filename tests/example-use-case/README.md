@@ -41,6 +41,7 @@ pnpm test:example
 ## Expected output
 
 The test should:
+
 - ✅ Create a test item with price and quantity
 - ✅ Execute the use case with in-memory repository
 - ✅ Calculate total value correctly

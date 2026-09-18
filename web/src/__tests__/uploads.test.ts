@@ -29,10 +29,16 @@ describe('private fixture upload/read (web wiring)', () => {
       role: 'staff',
       idempotencyKey: 'web-fix-1',
     });
-    expect(issued.pathname).toBe(`workspaces/${WS}/fixture/web-fix-1/hello.txt`);
+    expect(issued.pathname).toBe(
+      `workspaces/${WS}/fixture/web-fix-1/hello.txt`
+    );
 
     // Fixture "client upload": bytes go to the blob store, never Postgres.
-    blob.putFixture(issued.pathname, Buffer.from('hello, fixture'), 'text/plain');
+    blob.putFixture(
+      issued.pathname,
+      Buffer.from('hello, fixture'),
+      'text/plain'
+    );
 
     const completed = await completeUpload(store, {
       workspaceId: WS,
@@ -46,9 +52,9 @@ describe('private fixture upload/read (web wiring)', () => {
       workspaceId: WS,
       uploadId: issued.upload.id,
     });
-    expect(
-      blob.readFixture(issued.pathname)?.toString()
-    ).toBe('hello, fixture');
+    expect(blob.readFixture(issued.pathname)?.toString()).toBe(
+      'hello, fixture'
+    );
     expect(read.downloadUrl.length).toBeGreaterThan(0);
 
     // Response-safe: no RW token, no DATABASE_URL, no raw bytes.
@@ -59,7 +65,9 @@ describe('private fixture upload/read (web wiring)', () => {
     expect(wire).not.toContain('BLOB_READ_WRITE_TOKEN');
     expect(wire).not.toContain('DATABASE_URL');
     expect(wire).not.toContain('hello, fixture');
-    expect(process.env['BLOB_READ_WRITE_TOKEN'] ?? '').not.toContain('NEXT_PUBLIC');
+    expect(process.env['BLOB_READ_WRITE_TOKEN'] ?? '').not.toContain(
+      'NEXT_PUBLIC'
+    );
   });
 
   it('denies cross-workspace download (404-shape at the route)', async () => {

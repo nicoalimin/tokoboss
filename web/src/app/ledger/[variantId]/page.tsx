@@ -1,20 +1,36 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
-import { id } from '@tokoboss/contracts';
 
 // Mock data for demonstration - in reality this would come from API calls
 const mockLedgerEntries = [
-  { id: '1', date: '2023-01-01', type: 'IN', quantity: 100, reason: 'Purchase' },
-  { id: '2', date: '2023-01-05', type: 'OUT', quantity: 25, reason: 'Sale' },
-  { id: '3', date: '2023-01-10', type: 'IN', quantity: 75, reason: 'Return' },
+  {
+    id: '1',
+    date: new Date('2023-01-01'),
+    type: 'IN',
+    quantity: 100,
+    reason: 'Purchase',
+  },
+  { 
+    id: '2', 
+    date: new Date('2023-01-05'), 
+    type: 'OUT', 
+    quantity: 25, 
+    reason: 'Sale' 
+  },
+  { 
+    id: '3', 
+    date: new Date('2023-01-10'), 
+    type: 'IN', 
+    quantity: 75, 
+    reason: 'Return' 
+  },
 ];
 
 const mockStockInfo = {
   currentStock: 150,
   reservedStock: 25,
-  availableStock: 125
+  availableStock: 125,
 };
 
 export default function Page({ params }: { params: { variantId: string } }) {
@@ -164,7 +180,7 @@ export default function Page({ params }: { params: { variantId: string } }) {
                 <tbody className="bg-white divide-y divide-neutral-200">
                   {entries.map((entry) => (
                     <tr key={entry.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">{format(new Date(entry.date), 'yyyy-MM-dd')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">{entry.date.toLocaleDateString()}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                           ${entry.type === 'IN' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
