@@ -262,6 +262,22 @@ export function toCatalogClientError(
       message: copy.bundleStockError,
     });
   }
+  if (status === 422 && code === 'INSUFFICIENT_STOCK') {
+    // Return a generic error to avoid exposing stock levels or quantity details
+    return new CatalogClientError({
+      status,
+      errorCode: code,
+      message: copy.validationError,
+    });
+  }
+  if (status === 422 && code === 'WAREHOUSE_INACTIVE') {
+    // Return a generic error to avoid exposing warehouse state details  
+    return new CatalogClientError({
+      status,
+      errorCode: code,
+      message: copy.validationError,
+    });
+  }
   if (status === 400 || status === 422) {
     return new CatalogClientError({
       status,
