@@ -53,9 +53,15 @@ export const jobs = pgTable(
     progressTotal: integer('progress_total').notNull().default(100),
     attemptCount: integer('attempt_count').notNull().default(0),
     maxAttempts: integer('max_attempts').notNull().default(3),
-    scheduledAt: timestamp('scheduled_at', { withTimezone: true, mode: 'date' }),
+    scheduledAt: timestamp('scheduled_at', {
+      withTimezone: true,
+      mode: 'date',
+    }),
     startedAt: timestamp('started_at', { withTimezone: true, mode: 'date' }),
-    completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+    completedAt: timestamp('completed_at', {
+      withTimezone: true,
+      mode: 'date',
+    }),
     nextRetryAt: timestamp('next_retry_at', {
       withTimezone: true,
       mode: 'date',
