@@ -17,7 +17,7 @@ export const colors = {
     800: '#B34F72',
     900: '#994466',
   },
-  
+
   // Secondary pastel colors
   secondary: {
     50: '#F0F9FF',
@@ -93,7 +93,7 @@ export const colors = {
   foreground: '#171717',
   surface: '#FAFAFA',
   border: '#E5E5E5',
-  
+
   // Text colors
   text: {
     primary: '#171717',

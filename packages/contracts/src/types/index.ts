@@ -17,7 +17,8 @@ export type RequireProps<T, K extends keyof T> = T & Required<Pick<T, K>>;
 /**
  * Make specific properties optional
  */
-export type OptionalProps<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+export type OptionalProps<T, K extends keyof T> = Omit<T, K> &
+  Partial<Pick<T, K>>;
 
 /**
  * Branded types for type safety

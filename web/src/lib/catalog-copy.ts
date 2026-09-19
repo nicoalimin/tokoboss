@@ -215,10 +215,13 @@ const en: CatalogCopy = {
     'That change is locked by earlier stock or mappings. The drawer shows what can still be edited.',
   bundleStockError:
     'Bundle shells hold no direct stock — adjust the component SKUs instead.',
+  insufficientStockError:
+    'Insufficient stock for this warehouse. Check the available quantity and try again.',
   bundleSectionTitle: 'Bundle BOM',
   bundleSectionSubtitle:
     'Derived from the bundle API. This variant is a bundle shell or a component.',
-  bundleSectionEmpty: 'No BOM for this variant yet. Managers create it under Bundles.',
+  bundleSectionEmpty:
+    'No BOM for this variant yet. Managers create it under Bundles.',
   bundleOpenLink: 'Open in Bundles',
   genericError: 'Something went wrong. Try again.',
   forbiddenError: 'You do not have access to this workspace.',
@@ -328,10 +331,13 @@ const id: CatalogCopy = {
     'Perubahan itu terkunci oleh stok atau pemetaan sebelumnya. Drawer menunjukkan yang masih bisa diubah.',
   bundleStockError:
     'Varian bundel tidak menyimpan stok langsung — sesuaikan SKU komponennya.',
+  insufficientStockError:
+    'Stok tidak mencukupi untuk gudang ini. Periksa jumlah yang tersedia dan coba lagi.',
   bundleSectionTitle: 'BOM Bundel',
   bundleSectionSubtitle:
     'Diturunkan dari API bundel. Varian ini adalah bundel atau komponen.',
-  bundleSectionEmpty: 'Belum ada BOM untuk varian ini. Manager membuatnya di Bundel.',
+  bundleSectionEmpty:
+    'Belum ada BOM untuk varian ini. Manager membuatnya di Bundel.',
   bundleOpenLink: 'Buka di Bundel',
   genericError: 'Terjadi kesalahan. Coba lagi.',
   forbiddenError: 'Anda tidak punya akses ke workspace ini.',

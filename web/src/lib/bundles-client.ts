@@ -96,9 +96,7 @@ export function toBundleClientError(
 ): BundleClientError {
   const copy = getBundlesCopy(lang);
   const code =
-    typeof body['errorCode'] === 'string'
-      ? body['errorCode']
-      : 'BUNDLE_FAILED';
+    typeof body['errorCode'] === 'string' ? body['errorCode'] : 'BUNDLE_FAILED';
   if (status === 401) {
     return new BundleClientError({
       status,
