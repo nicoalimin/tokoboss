@@ -109,7 +109,7 @@ export default function LedgerClient({
     if (!membership?.workspaceId) return;
 
     setIsSubmitting(true);
-    setError(null);
+    setAdjustmentError(null);
 
     try {
       // Get warehouse-specific version for expectedVersion 
@@ -146,11 +146,26 @@ export default function LedgerClient({
       });
     } catch (err) {
       if (err instanceof CatalogClientError) {
-        setError(err.message);
+        // Specific error mapping for adjustment errors
+        switch (err.errorCode) {
+          case 'CATALOG_INSUFFICIENT_STOCK':
+            setAdjustmentError('Insufficient stock available for this warehouse.');
+            break;
+          case 'CATALOG_WAREHOUSE_INACTIVE':
+            setAdjustmentError('Warehouse is inactive. Please select an active warehouse.');
+            break;
+          case 'CATALOG_VERSION_CONFLICT':
+            setAdjustmentError(
+              'Someone else changed this row first. Close and reopen the drawer, then try again.'
+            );
+            break;
+          default:
+            setAdjustmentError(err.message);
+        }
       } else if (err instanceof Error) {
-        setError(err.message);
+        setAdjustmentError(err.message);
       } else {
-        setError('An unexpected error occurred');
+        setAdjustmentError('An unexpected error occurred');
       }
     } finally {
       setIsSubmitting(false);
@@ -330,6 +345,12 @@ export default function LedgerClient({
               </h2>
 
               <form onSubmit={handleAdjustmentSubmit} className="space-y-4">
+                {adjustmentError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
+                    {adjustmentError}
+                  </div>
+                )}
+                
                 <div>
                   <label
                     htmlFor="warehouse"

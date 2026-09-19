@@ -248,12 +248,27 @@ export function toCatalogClientError(
       message: copy.versionConflictError,
     });
   }
-  if (status === 422 && code === 'CATALOG_SKU_LOCKED') {
-    return new CatalogClientError({
-      status,
-      errorCode: code,
-      message: copy.lockError,
-    });
+
+  // Handle specific 422 errors that need specific messages
+  switch (code) {
+    case 'CATALOG_INSUFFICIENT_STOCK':
+      return new CatalogClientError({
+        status,
+        errorCode: code,
+        message: 'Insufficient stock available for this warehouse.',
+      });
+    case 'CATALOG_WAREHOUSE_INACTIVE':
+      return new CatalogClientError({
+        status,
+        errorCode: code,
+        message: 'Warehouse is inactive. Please select an active warehouse.',
+      });
+    case 'CATALOG_SKU_LOCKED':
+      return new CatalogClientError({
+        status,
+        errorCode: code,
+        message: copy.lockError,
+      });
   }
   if (status === 422 && code === 'BUNDLE_NO_DIRECT_STOCK') {
     return new CatalogClientError({
