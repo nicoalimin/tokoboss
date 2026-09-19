@@ -53,11 +53,7 @@ interface StockSettings {
 }
 
 // This component would be used by the page to display UI elements
-export default function LedgerClient({
-  variantId,
-}: {
-  variantId: string;
-}) {
+export default function LedgerClient({ variantId }: { variantId: string }) {
   const router = useRouter();
   const { membership, loading: membershipLoading } = useMembership();
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +70,7 @@ export default function LedgerClient({
     delta: 0,
     reason: '',
   });
+  const [adjustmentError, setAdjustmentError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -112,7 +109,7 @@ export default function LedgerClient({
     setAdjustmentError(null);
 
     try {
-      // Get warehouse-specific version for expectedVersion 
+      // Get warehouse-specific version for expectedVersion
       let expectedVersion: number | undefined = undefined;
       if (stockBalance && adjustmentForm.warehouseId) {
         const warehouseLevel = stockBalance.perWarehouse.find(
@@ -149,10 +146,14 @@ export default function LedgerClient({
         // Specific error mapping for adjustment errors
         switch (err.errorCode) {
           case 'CATALOG_INSUFFICIENT_STOCK':
-            setAdjustmentError('Insufficient stock available for this warehouse.');
+            setAdjustmentError(
+              'Insufficient stock available for this warehouse.'
+            );
             break;
           case 'CATALOG_WAREHOUSE_INACTIVE':
-            setAdjustmentError('Warehouse is inactive. Please select an active warehouse.');
+            setAdjustmentError(
+              'Warehouse is inactive. Please select an active warehouse.'
+            );
             break;
           case 'CATALOG_VERSION_CONFLICT':
             setAdjustmentError(
@@ -350,7 +351,7 @@ export default function LedgerClient({
                     {adjustmentError}
                   </div>
                 )}
-                
+
                 <div>
                   <label
                     htmlFor="warehouse"
