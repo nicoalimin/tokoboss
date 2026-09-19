@@ -10,8 +10,7 @@ export interface UseCase<TRequest, TResponse> {
  * Result wrapper for use case responses
  */
 export type Result<T, E = Error> =
-  | { success: true; value: T }
-  | { success: false; error: E };
+  { success: true; value: T } | { success: false; error: E };
 
 export const Success = <T>(value: T): Result<T, never> => ({
   success: true,

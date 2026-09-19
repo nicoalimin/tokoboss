@@ -30,10 +30,9 @@ function toEntity(row: typeof tenants.$inferSelect): TenantEntity {
  * Accepts either a root `Database` or a `Transaction` handle so callers can
  * compose multi-table writes atomically via `withTransaction`.
  */
-export class DrizzleTenantRepository implements Repository<
-  TenantEntity,
-  string
->, WorkspaceStore {
+export class DrizzleTenantRepository
+  implements Repository<TenantEntity, string>, WorkspaceStore
+{
   constructor(private readonly db: DbOrTx) {}
 
   /** Rebind this repository to a transaction handle. */
@@ -51,7 +50,9 @@ export class DrizzleTenantRepository implements Repository<
     return row ? toEntity(row) : null;
   }
 
-  async listWorkspaces(): Promise<Array<{ id: string; name: string; slug: string }>> {
+  async listWorkspaces(): Promise<
+    Array<{ id: string; name: string; slug: string }>
+  > {
     return (await this.db.select().from(tenants)).map(toEntity);
   }
 

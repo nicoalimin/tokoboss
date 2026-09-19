@@ -15,7 +15,12 @@ import {
   createJob,
   readJobTimeline,
 } from '@tokoboss/application';
-import { getJobExecutor, getJobStore, getJobTxRunner, storageKind } from '@/lib/jobs';
+import {
+  getJobExecutor,
+  getJobStore,
+  getJobTxRunner,
+  storageKind,
+} from '@/lib/jobs';
 import { HelloStepError } from '@/workflows/hello';
 
 const WORKSPACE_HEADER = 'x-workspace-id';
@@ -81,10 +86,12 @@ export async function POST(request: Request) {
       correlationId
     );
   }
-  if (body.inputRef !== undefined &&
+  if (
+    body.inputRef !== undefined &&
     (typeof body.inputRef !== 'object' ||
       body.inputRef === null ||
-      Array.isArray(body.inputRef))) {
+      Array.isArray(body.inputRef))
+  ) {
     return json(
       { error: 'inputRef must be an object', errorCode: 'JOB_VALIDATION' },
       400,
@@ -181,7 +188,8 @@ export async function POST(request: Request) {
       return json(
         {
           error: err.message,
-          errorCode: err instanceof JobTransitionError ? err.code : 'JOB_NOT_FOUND',
+          errorCode:
+            err instanceof JobTransitionError ? err.code : 'JOB_NOT_FOUND',
         },
         409,
         requestId,

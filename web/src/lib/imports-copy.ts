@@ -176,7 +176,8 @@ const en: ImportsCopy = {
     'Confirm creates catalog products + SKU TokoBoss rows. Rejected and invalid rows are skipped. Duplicates are never overwritten.',
   confirmButton: 'Confirm ready rows',
   confirming: 'Confirming…',
-  confirmedNotice: 'Confirm finished — see applied, duplicates, and skipped below.',
+  confirmedNotice:
+    'Confirm finished — see applied, duplicates, and skipped below.',
   confirmDuplicatesTitle: 'Duplicates (kept honest — existing catalog kept)',
   confirmSkippedTitle: 'Skipped',
   rejectBatchButton: 'Reject batch',
@@ -191,7 +192,8 @@ const en: ImportsCopy = {
     'Reject this whole batch? Rows stay readable but nothing can be confirmed.',
   identityFreezeNote:
     'Store SKU text is a mapping candidate only. The SKU TokoBoss identity is the only catalog identity.',
-  noLiveChannelNote: 'No live marketplace calls — candidates are read from this batch only.',
+  noLiveChannelNote:
+    'No live marketplace calls — candidates are read from this batch only.',
   readOnlyNote:
     'You can read batches and rows. Upload, edits, and confirm need Manager or Admin.',
   noAccessTitle: 'No access to these imports',
@@ -235,7 +237,8 @@ const id: ImportsCopy = {
     'Array JSON berisi 1–500 objek baris dengan kosakata kolom yang sama. Server tidak pernah mem-parsing format biner.',
   uploadButton: 'Unggah untuk ditinjau',
   uploading: 'Mengunggah…',
-  uploadedNotice: 'Batch terunggah — periksa baris di bawah sebelum konfirmasi.',
+  uploadedNotice:
+    'Batch terunggah — periksa baris di bawah sebelum konfirmasi.',
   uploadDuplicateNotice:
     'Unggahan itu sudah pernah diterima — batch yang sudah ada dibuka agar tidak ganda.',
   batchesTitle: 'Batch',

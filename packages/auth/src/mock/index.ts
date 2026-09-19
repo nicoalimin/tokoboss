@@ -8,7 +8,10 @@ import type { AuthProvider, AuthorizationService } from '../ports';
 export class MockAuthProvider implements AuthProvider {
   private readonly sessions = new Map<string, Session>();
 
-  async authenticate(_credentials: { email: string; password: string }): Promise<Session> {
+  async authenticate(_credentials: {
+    email: string;
+    password: string;
+  }): Promise<Session> {
     // Mock implementation - always succeeds
     const session: Session = {
       userId: 'mock-user-123',
@@ -46,7 +49,11 @@ export class MockAuthProvider implements AuthProvider {
 }
 
 export class MockAuthorizationService implements AuthorizationService {
-  async hasPermission(_userId: string, _resource: string, _action: string): Promise<boolean> {
+  async hasPermission(
+    _userId: string,
+    _resource: string,
+    _action: string
+  ): Promise<boolean> {
     return true; // Mock always allows
   }
 

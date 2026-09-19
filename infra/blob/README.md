@@ -8,15 +8,15 @@ retention, status) — never Blob contents, never secrets.
 
 ## Pieces
 
-| Piece | Path |
-| --- | --- |
-| Storage port (`ObjectStoragePort`, purposes, `DEFAULT_BLOB_ACCESS = 'private'`) | `packages/domain/src/ports/storage.ts` |
-| Vercel Blob private adapter stub + memory fixture adapter | `packages/integrations/src/blob/vercel-blob-adapter.ts` |
-| Upload use cases (token / complete / download / delete + audit) | `packages/application/src/uploads/` |
-| `file_uploads` schema | `packages/database/src/schema/file-uploads.ts` |
-| Migration | `infra/drizzle/0004_file_uploads.sql` |
-| Route Handlers | `web/src/app/api/uploads/token/route.ts`, `complete/route.ts`, `[id]/route.ts` (GET + DELETE) |
-| Wiring (postgres ↔ memory, vercel-blob ↔ memory-blob) | `web/src/lib/uploads.ts` |
+| Piece                                                                           | Path                                                                                          |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Storage port (`ObjectStoragePort`, purposes, `DEFAULT_BLOB_ACCESS = 'private'`) | `packages/domain/src/ports/storage.ts`                                                        |
+| Vercel Blob private adapter stub + memory fixture adapter                       | `packages/integrations/src/blob/vercel-blob-adapter.ts`                                       |
+| Upload use cases (token / complete / download / delete + audit)                 | `packages/application/src/uploads/`                                                           |
+| `file_uploads` schema                                                           | `packages/database/src/schema/file-uploads.ts`                                                |
+| Migration                                                                       | `infra/drizzle/0004_file_uploads.sql`                                                         |
+| Route Handlers                                                                  | `web/src/app/api/uploads/token/route.ts`, `complete/route.ts`, `[id]/route.ts` (GET + DELETE) |
+| Wiring (postgres ↔ memory, vercel-blob ↔ memory-blob)                           | `web/src/lib/uploads.ts`                                                                      |
 
 ## Auth stub (Workstream 0)
 
