@@ -23,10 +23,11 @@ This directory contains configuration and documentation for deploying TokoBoss t
 ### Initial Setup
 
 1. **Link the Vercel project** (run from repository root):
+
    ```bash
    vercel link
    ```
-   
+
    Select:
    - Scope: Your Vercel team
    - Link to existing project: Yes (if project exists) or No (to create new)
@@ -46,7 +47,7 @@ This directory contains configuration and documentation for deploying TokoBoss t
    ```bash
    # Deploy to preview
    vercel
-   
+
    # Deploy to production
    vercel --prod
    ```
@@ -55,12 +56,12 @@ This directory contains configuration and documentation for deploying TokoBoss t
 
 According to RFC 01, TokoBoss uses four distinct environments:
 
-| Environment | Vercel Environment | Git Branch | Purpose |
-|-------------|-------------------|------------|---------|
-| **Production** | `production` | `main` | Live production serving real users |
-| **Staging** | `preview` (custom) | `develop` or release branches | Pre-production testing with production-like data |
-| **Preview** | `preview` | Feature branches (PRs) | Isolated PR preview deployments |
-| **Local** | N/A | Any branch | Developer machines |
+| Environment    | Vercel Environment | Git Branch                    | Purpose                                          |
+| -------------- | ------------------ | ----------------------------- | ------------------------------------------------ |
+| **Production** | `production`       | `main`                        | Live production serving real users               |
+| **Staging**    | `preview` (custom) | `develop` or release branches | Pre-production testing with production-like data |
+| **Preview**    | `preview`          | Feature branches (PRs)        | Isolated PR preview deployments                  |
+| **Local**      | N/A                | Any branch                    | Developer machines                               |
 
 ### Key Principles
 
@@ -74,6 +75,7 @@ According to RFC 01, TokoBoss uses four distinct environments:
 ### For Monorepo with Multiple Apps
 
 This repository contains:
+
 - `/web` - Next.js web application (deployed to Vercel)
 - `/mobile` - React Native mobile app (not deployed to Vercel)
 - `/packages/*` - Shared packages
@@ -94,6 +96,7 @@ This creates `.vercel/project.json` which should be gitignored (already in `.git
 In Vercel Dashboard → Project Settings:
 
 **General**:
+
 - Root Directory: `web`
 - Framework Preset: Next.js
 - Build Command: `pnpm build`
@@ -101,28 +104,30 @@ In Vercel Dashboard → Project Settings:
 - Output Directory: Leave empty (uses `.next` default)
 
 **Git**:
+
 - Production Branch: `main`
 - Preview Branches: All branches (Vercel auto-creates preview for each PR)
 
 **Build & Development Settings**:
+
 - Node.js Version: 22.x (see `engines` in root `package.json`)
 
 ## Environment Variables
 
 ### Variable Ownership Matrix
 
-| Variable | Production | Staging | Preview | Local | Notes |
-|----------|-----------|---------|---------|-------|-------|
-| `NODE_ENV` | `production` | `production` | `production` | `development` | Set by Vercel |
-| `VERCEL_ENV` | `production` | `preview` | `preview` | undefined | Set by Vercel |
-| `APP_ENV` | `production` | `staging` | `preview` | `local` | Manual override |
-| `NEXT_PUBLIC_APP_URL` | `https://tokoboss.com` | `https://staging.tokoboss.com` | `https://<unique>.vercel.app` | `http://localhost:3000` | Public URL |
-| `NEXT_PUBLIC_APP_ENV` | `production` | `staging` | `preview` | `local` | Displayed to users |
-| Database credentials | Production DB | Staging DB | ⚠️ Mock/dev DB | Local dev DB | **Preview must NOT use production** |
-| Blob storage tokens | Production | Staging | ⚠️ Separate preview | Local dev | **Preview must NOT use production** |
-| API keys (marketplace) | Production | Staging | ⚠️ Sandbox/test | Development | **Preview must NOT use production** |
-| Payment/billing secrets | Production | Staging | ❌ Not set | Not set | **Preview must NOT have these** |
-| Signing keys | Production | Staging | ❌ Not set | Development | **Preview must NOT have production keys** |
+| Variable                | Production             | Staging                        | Preview                       | Local                   | Notes                                     |
+| ----------------------- | ---------------------- | ------------------------------ | ----------------------------- | ----------------------- | ----------------------------------------- |
+| `NODE_ENV`              | `production`           | `production`                   | `production`                  | `development`           | Set by Vercel                             |
+| `VERCEL_ENV`            | `production`           | `preview`                      | `preview`                     | undefined               | Set by Vercel                             |
+| `APP_ENV`               | `production`           | `staging`                      | `preview`                     | `local`                 | Manual override                           |
+| `NEXT_PUBLIC_APP_URL`   | `https://tokoboss.com` | `https://staging.tokoboss.com` | `https://<unique>.vercel.app` | `http://localhost:3000` | Public URL                                |
+| `NEXT_PUBLIC_APP_ENV`   | `production`           | `staging`                      | `preview`                     | `local`                 | Displayed to users                        |
+| Database credentials    | Production DB          | Staging DB                     | ⚠️ Mock/dev DB                | Local dev DB            | **Preview must NOT use production**       |
+| Blob storage tokens     | Production             | Staging                        | ⚠️ Separate preview           | Local dev               | **Preview must NOT use production**       |
+| API keys (marketplace)  | Production             | Staging                        | ⚠️ Sandbox/test               | Development             | **Preview must NOT use production**       |
+| Payment/billing secrets | Production             | Staging                        | ❌ Not set                    | Not set                 | **Preview must NOT have these**           |
+| Signing keys            | Production             | Staging                        | ❌ Not set                    | Development             | **Preview must NOT have production keys** |
 
 ⚠️ = Must be isolated from production
 ❌ = Should not be set at all
@@ -157,12 +162,14 @@ vercel env add SOME_SHARED_CONFIG production preview development
 ### Public vs Server-Only Variables
 
 **Public (Client-Side) Variables**:
+
 - Must be prefixed with `NEXT_PUBLIC_`
 - Embedded in client bundle
 - Never contain secrets
 - Examples: `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_ENV`
 
 **Server-Only Variables**:
+
 - No prefix
 - Only available in server code
 - Can contain secrets
@@ -175,6 +182,7 @@ vercel env add SOME_SHARED_CONFIG production preview development
 For initial deployment (before UTA-10), only these variables are needed:
 
 **Production**:
+
 ```bash
 NEXT_PUBLIC_APP_URL=https://tokoboss.com
 NEXT_PUBLIC_APP_ENV=production
@@ -182,6 +190,7 @@ APP_ENV=production
 ```
 
 **Staging**:
+
 ```bash
 NEXT_PUBLIC_APP_URL=https://staging.tokoboss.com
 NEXT_PUBLIC_APP_ENV=staging
@@ -189,12 +198,14 @@ APP_ENV=staging
 ```
 
 **Preview**:
+
 ```bash
 NEXT_PUBLIC_APP_ENV=preview
 APP_ENV=preview
 ```
 
 **Local** (`.env.local`):
+
 ```bash
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_APP_ENV=local
@@ -206,15 +217,18 @@ APP_ENV=local
 When database and storage are added, these will be required:
 
 **Production**:
+
 - `DATABASE_URL` - Neon production database
 - `DATABASE_POOL_URL` - Neon production connection pool
 - `BLOB_READ_WRITE_TOKEN` - Vercel Blob production
 
 **Staging**:
+
 - `DATABASE_URL` - Neon staging database
 - `BLOB_READ_WRITE_TOKEN` - Vercel Blob staging
 
 **Preview**:
+
 - `DATABASE_URL` - Neon preview/dev database (separate from production!)
 - `BLOB_READ_WRITE_TOKEN` - Vercel Blob preview (separate from production!)
 
@@ -262,11 +276,13 @@ In Vercel Dashboard → Environment Variables:
 Staging uses the Vercel "Preview" environment but with different credentials:
 
 **Option A: Branch-based (Recommended)**:
+
 - Create a `staging` or `develop` branch
 - Deploy: `vercel --branch=staging`
 - Set environment variables specifically for staging deployments
 
 **Option B: Custom Vercel Environment** (Enterprise):
+
 - Create custom "Staging" environment in Vercel
 - Set separate credentials for staging
 - Configure deployment rules
@@ -319,6 +335,7 @@ If a production deployment has issues:
    - Click "..." → "Promote to Production"
 
 2. **Via Git**:
+
    ```bash
    # Revert the problematic commit
    git revert <commit-sha>

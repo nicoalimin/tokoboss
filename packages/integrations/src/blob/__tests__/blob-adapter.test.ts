@@ -91,16 +91,20 @@ describe('memory blob fixture adapter', () => {
     expect(adapter.access).toBe('private');
     const bytes = Buffer.from('hello fixture');
     adapter.putFixture('workspaces/ws/fixture/k/f.txt', bytes, 'text/plain');
-    expect(adapter.readFixture('workspaces/ws/fixture/k/f.txt')?.toString()).toBe(
-      'hello fixture'
-    );
+    expect(
+      adapter.readFixture('workspaces/ws/fixture/k/f.txt')?.toString()
+    ).toBe('hello fixture');
     await adapter.deleteObject('workspaces/ws/fixture/k/f.txt');
     expect(adapter.readFixture('workspaces/ws/fixture/k/f.txt')).toBeNull();
   });
 
   it('isolates pathnames (no cross-key reads)', () => {
     const adapter = new MemoryBlobAdapter();
-    adapter.putFixture('workspaces/a/fixture/k/f.txt', Buffer.from('A'), 'text/plain');
+    adapter.putFixture(
+      'workspaces/a/fixture/k/f.txt',
+      Buffer.from('A'),
+      'text/plain'
+    );
     expect(adapter.readFixture('workspaces/b/fixture/k/f.txt')).toBeNull();
   });
 });

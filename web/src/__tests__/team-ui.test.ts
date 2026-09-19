@@ -108,7 +108,8 @@ describe('team-client (UTA-71 UI)', () => {
           { member: { userId: 'u9', status: 'deactivated' } },
           200
         );
-      if (url.endsWith('/invites/i9')) return jsonResponse({ revoked: true }, 200);
+      if (url.endsWith('/invites/i9'))
+        return jsonResponse({ revoked: true }, 200);
       return jsonResponse({}, 404);
     });
     const updated = await updateMember(
@@ -151,7 +152,10 @@ describe('team-client (UTA-71 UI)', () => {
     expect(
       toTeamClientError(
         409,
-        { error: 'Cannot remove or deactivate the last active Admin', errorCode: 'TENANCY_LAST_ADMIN' },
+        {
+          error: 'Cannot remove or deactivate the last active Admin',
+          errorCode: 'TENANCY_LAST_ADMIN',
+        },
         'en'
       ).message
     ).toBe(getTeamCopy('en').lastAdminError);
@@ -169,7 +173,10 @@ describe('team-client (UTA-71 UI)', () => {
   it('maps forbidden to generic access copy and 401 to re-auth', async () => {
     const forbidden = toTeamClientError(
       403,
-      { error: 'Cross-workspace access denied', errorCode: 'TENANCY_FORBIDDEN' },
+      {
+        error: 'Cross-workspace access denied',
+        errorCode: 'TENANCY_FORBIDDEN',
+      },
       'en'
     );
     expect(forbidden.message).toBe(getTeamCopy('en').forbiddenError);
@@ -186,7 +193,10 @@ describe('team-client (UTA-71 UI)', () => {
   it('thrown errors never echo emails, tokens, or passwords', async () => {
     const email = 'clerk@toko.id';
     const fetchFn = stubFetch(async () =>
-      jsonResponse({ error: 'Invite is invalid.', errorCode: 'INVITE_INVALID' }, 404)
+      jsonResponse(
+        { error: 'Invite is invalid.', errorCode: 'INVITE_INVALID' },
+        404
+      )
     );
     const err = await createInvite(
       'ws_1',
@@ -255,11 +265,7 @@ describe('team-client (UTA-71 UI)', () => {
 
     // The lock message is the dedicated last-Admin copy (never a raw 409).
     expect(
-      toTeamClientError(
-        409,
-        { errorCode: 'TENANCY_LAST_ADMIN' },
-        'en'
-      ).message
+      toTeamClientError(409, { errorCode: 'TENANCY_LAST_ADMIN' }, 'en').message
     ).toBe(getTeamCopy('en').lastAdminError);
   });
 

@@ -21,7 +21,7 @@
 - **Entry points**: `Manage bundles / BOM` link on `/produk` (preserves
   the workspace via `?workspaceId=`), same link at the bottom of
   `/produk`, and the SKU drawer `Bundle BOM` section with `Open in
-  Bundles` deep-link (`?workspaceId=&bundleVariantId=`). Drawer also
+Bundles` deep-link (`?workspaceId=&bundleVariantId=`). Drawer also
   lists the variant's BOM lines when present, empty note otherwise.
   Drawer stock adjustments on a bundle shell now show the honest
   bundle-stock sentence (catalog client maps `BUNDLE_NO_DIRECT_STOCK`).
@@ -37,8 +37,8 @@ pnpm --filter @tokoboss/web dev   # http://localhost:3000/produk/bundles
 
 ## Storage modes (memory vs `DATABASE_URL`)
 
-| Mode                                | How                                                                                                          | Bundle source            |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| Mode                                | How                                                                                                          | Bundle source          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------- |
 | Memory (default, no `DATABASE_URL`) | Process-local stores; responses include `"storage": "memory"`. Fixture: `seedFixtureCredential()` + sign in. | `InMemoryCatalogStore` |
 | Postgres (`DATABASE_URL` set)       | Drizzle stores via `createDb()`; same route shapes, `"storage": "postgres"`.                                 | `DrizzleCatalogStore`  |
 

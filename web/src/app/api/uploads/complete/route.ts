@@ -76,8 +76,7 @@ export async function POST(request: Request) {
       getUploadStore(),
       {
         workspaceId,
-        uploadId:
-          typeof body.uploadId === 'string' ? body.uploadId : undefined,
+        uploadId: typeof body.uploadId === 'string' ? body.uploadId : undefined,
         idempotencyKey:
           typeof body.idempotencyKey === 'string'
             ? body.idempotencyKey
@@ -85,8 +84,7 @@ export async function POST(request: Request) {
         pathname: typeof body.pathname === 'string' ? body.pathname : '',
         url: typeof body.url === 'string' ? body.url : undefined,
         byteSize: body.byteSize as number,
-        checksum:
-          typeof body.checksum === 'string' ? body.checksum : undefined,
+        checksum: typeof body.checksum === 'string' ? body.checksum : undefined,
         contentType:
           typeof body.contentType === 'string' ? body.contentType : undefined,
       },

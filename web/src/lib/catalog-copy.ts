@@ -113,6 +113,7 @@ export interface CatalogCopy {
   forbiddenError: string;
   expiredNotice: string;
   backHomeLink: string;
+  insufficientStockError: string;
 }
 
 const en: CatalogCopy = {
@@ -218,12 +219,14 @@ const en: CatalogCopy = {
   bundleSectionTitle: 'Bundle BOM',
   bundleSectionSubtitle:
     'Derived from the bundle API. This variant is a bundle shell or a component.',
-  bundleSectionEmpty: 'No BOM for this variant yet. Managers create it under Bundles.',
+  bundleSectionEmpty:
+    'No BOM for this variant yet. Managers create it under Bundles.',
   bundleOpenLink: 'Open in Bundles',
   genericError: 'Something went wrong. Try again.',
   forbiddenError: 'You do not have access to this workspace.',
   expiredNotice: 'Your session ended. Sign in again to continue.',
   backHomeLink: 'Back to home',
+  insufficientStockError: 'Insufficient stock available for this warehouse.',
 };
 
 const id: CatalogCopy = {
@@ -331,12 +334,14 @@ const id: CatalogCopy = {
   bundleSectionTitle: 'BOM Bundel',
   bundleSectionSubtitle:
     'Diturunkan dari API bundel. Varian ini adalah bundel atau komponen.',
-  bundleSectionEmpty: 'Belum ada BOM untuk varian ini. Manager membuatnya di Bundel.',
+  bundleSectionEmpty:
+    'Belum ada BOM untuk varian ini. Manager membuatnya di Bundel.',
   bundleOpenLink: 'Buka di Bundel',
   genericError: 'Terjadi kesalahan. Coba lagi.',
   forbiddenError: 'Anda tidak punya akses ke workspace ini.',
   expiredNotice: 'Sesi Anda berakhir. Masuk kembali untuk lanjut.',
   backHomeLink: 'Kembali ke beranda',
+  insufficientStockError: 'Stok tidak mencukupi untuk gudang ini.',
 };
 
 const COPIES: Record<CatalogLang, CatalogCopy> = { en, id };
