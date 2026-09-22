@@ -5,27 +5,32 @@ This document provides additional context for UTA-8 implementation.
 ## What was implemented
 
 ### 1. Domain Layer (Pure Business Logic)
+
 - **Entities**: `BaseEntity` with identity and timestamps
 - **Value Objects**: `Money`, `Quantity` (immutable, self-validating)
 - **Ports**: `Repository`, `EventPublisher` interfaces
 - **Errors**: Domain-specific error types
 
 ### 2. Application Layer (Use Cases)
+
 - **Use Cases**: `BaseUseCase` interface, `CalculateTotalValueUseCase` example
 - **Result Types**: Success/Failure result wrapper
 - **DTOs**: Pagination DTOs
 
 ### 3. Contracts (API Schemas)
+
 - **Zod Schemas**: Money, Quantity, Pagination, API Response
 - **Error Codes**: Stable error code enum
 - **Types**: TypeScript utility types
 
 ### 4. Infrastructure Adapters
+
 - **Database**: In-memory repository implementation
 - **Integrations**: Mock marketplace, payment, shipping adapters
 - **Auth**: Mock auth provider and authorization service
 
 ### 5. Design Tokens
+
 - **Colors**: Pastel palette (primary, secondary, success, warning, error, neutral)
 - **Spacing**: 4px-based scale with border radius
 - **Typography**: Font families, sizes, weights, line heights
@@ -33,10 +38,12 @@ This document provides additional context for UTA-8 implementation.
 - **Touch Targets**: Mobile-first touch target sizes
 
 ### 6. Config
+
 - **Environment**: Type-safe environment variable utilities
 - **Constants**: Application-wide constants
 
 ### 7. Testing & Validation
+
 - **Boundary Test**: Enforces domain layer purity (no framework imports)
 - **Example Use Case Test**: Demonstrates Clean Architecture with in-memory port
 

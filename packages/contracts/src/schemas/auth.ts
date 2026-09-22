@@ -26,9 +26,7 @@ export const AuthBootstrapUserBodySchema = z.object({
   password: z.string().min(8),
   workspaceName: z.string().trim().min(1).max(120).optional(),
 });
-export type AuthBootstrapUserBody = z.infer<
-  typeof AuthBootstrapUserBodySchema
->;
+export type AuthBootstrapUserBody = z.infer<typeof AuthBootstrapUserBodySchema>;
 
 /** Client-safe session projection (no hashes, no tokens). */
 export const AuthSessionViewSchema = z.object({

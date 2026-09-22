@@ -35,9 +35,10 @@ export interface CalculateTotalValueResponse {
  * Example use case: Calculate total value of an item
  * Demonstrates Clean Architecture with ports and adapters
  */
-export class CalculateTotalValueUseCase
-  implements UseCase<CalculateTotalValueRequest, Result<CalculateTotalValueResponse, Error>>
-{
+export class CalculateTotalValueUseCase implements UseCase<
+  CalculateTotalValueRequest,
+  Result<CalculateTotalValueResponse, Error>
+> {
   constructor(private readonly itemRepository: Repository<Item, string>) {}
 
   async execute(
@@ -63,7 +64,9 @@ export class CalculateTotalValueUseCase
         totalValue,
       });
     } catch (error) {
-      return Failure(error instanceof Error ? error : new Error('Unknown error'));
+      return Failure(
+        error instanceof Error ? error : new Error('Unknown error')
+      );
     }
   }
 }

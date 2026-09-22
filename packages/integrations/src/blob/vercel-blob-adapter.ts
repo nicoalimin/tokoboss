@@ -38,9 +38,7 @@ export class VercelBlobAdapter implements ObjectStoragePort {
   readonly kind = 'vercel-blob';
   readonly access = 'private' as const;
 
-  constructor(
-    private readonly opts: { tokenTtlSecs?: number } = {}
-  ) {}
+  constructor(private readonly opts: { tokenTtlSecs?: number } = {}) {}
 
   private ttlSecs(): number {
     return this.opts.tokenTtlSecs ?? TOKEN_TTL_SECS;
@@ -62,7 +60,13 @@ export class VercelBlobAdapter implements ObjectStoragePort {
     const nonce = shortId();
     const binding = createHash('sha256')
       .update(
-        [input.workspaceId, input.pathname, input.contentType, String(input.byteSize), nonce].join('|')
+        [
+          input.workspaceId,
+          input.pathname,
+          input.contentType,
+          String(input.byteSize),
+          nonce,
+        ].join('|')
       )
       .digest('hex')
       .slice(0, 32);
