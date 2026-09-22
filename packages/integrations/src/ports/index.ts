@@ -14,7 +14,11 @@ export interface PaymentAdapter {
 }
 
 export interface ShippingAdapter {
-  getRates(origin: string, destination: string, weight: number): Promise<unknown[]>;
+  getRates(
+    origin: string,
+    destination: string,
+    weight: number
+  ): Promise<unknown[]>;
   createShipment(shipmentRequest: unknown): Promise<unknown>;
   trackShipment(trackingNumber: string): Promise<unknown>;
 }

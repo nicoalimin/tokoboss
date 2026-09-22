@@ -121,9 +121,7 @@ export function toImportsClientError(
 ): ImportsClientError {
   const copy = getImportsCopy(lang);
   const code =
-    typeof body['errorCode'] === 'string'
-      ? body['errorCode']
-      : 'IMPORT_FAILED';
+    typeof body['errorCode'] === 'string' ? body['errorCode'] : 'IMPORT_FAILED';
   if (status === 401) {
     return new ImportsClientError({
       status,
@@ -170,7 +168,8 @@ async function getJson<T>(
   lang: ImportsLang
 ): Promise<T> {
   const res = await fetchFn(path, { credentials: 'same-origin' });
-  if (!res.ok) throw toImportsClientError(res.status, await readBody(res), lang);
+  if (!res.ok)
+    throw toImportsClientError(res.status, await readBody(res), lang);
   return (await res.json()) as T;
 }
 
@@ -187,7 +186,8 @@ async function sendJson<T>(
     credentials: 'same-origin',
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw toImportsClientError(res.status, await readBody(res), lang);
+  if (!res.ok)
+    throw toImportsClientError(res.status, await readBody(res), lang);
   return (await res.json()) as T;
 }
 
@@ -324,10 +324,12 @@ export async function confirmImport(
 }
 
 /** Parse a rows-JSON textarea into pre-parsed row objects (client-side). */
-export function parseRowsJson(text: string): {
-  ok: true;
-  rows: Array<Record<string, unknown>>;
-} | { ok: false } {
+export function parseRowsJson(text: string):
+  | {
+      ok: true;
+      rows: Array<Record<string, unknown>>;
+    }
+  | { ok: false } {
   try {
     const data: unknown = JSON.parse(text);
     if (!Array.isArray(data) || data.length < 1 || data.length > 500) {
