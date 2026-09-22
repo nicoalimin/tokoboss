@@ -85,6 +85,13 @@
       "when": 1789541269961,
       "tag": "0012_stock_ledger_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790160000000,
+      "tag": "0013_warehouse_transfers",
+      "breakpoints": true
     }
   ]
 }
