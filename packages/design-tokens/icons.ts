@@ -42,4 +42,4 @@ export const iconNames = [
 ] as const;
 
 export type IconSize = keyof typeof iconSizes;
-export type IconName = typeof iconNames[number];
+export type IconName = (typeof iconNames)[number];

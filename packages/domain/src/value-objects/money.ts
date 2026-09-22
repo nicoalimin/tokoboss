@@ -39,20 +39,32 @@ export class Money {
 
   add(other: Money): Money {
     this.assertSameCurrency(other);
-    return Money.fromCents(this._amountInCents + other._amountInCents, this._currency);
+    return Money.fromCents(
+      this._amountInCents + other._amountInCents,
+      this._currency
+    );
   }
 
   subtract(other: Money): Money {
     this.assertSameCurrency(other);
-    return Money.fromCents(this._amountInCents - other._amountInCents, this._currency);
+    return Money.fromCents(
+      this._amountInCents - other._amountInCents,
+      this._currency
+    );
   }
 
   multiply(factor: number): Money {
-    return Money.fromCents(Math.round(this._amountInCents * factor), this._currency);
+    return Money.fromCents(
+      Math.round(this._amountInCents * factor),
+      this._currency
+    );
   }
 
   equals(other: Money): boolean {
-    return this._amountInCents === other._amountInCents && this._currency === other._currency;
+    return (
+      this._amountInCents === other._amountInCents &&
+      this._currency === other._currency
+    );
   }
 
   isGreaterThan(other: Money): boolean {
@@ -67,7 +79,9 @@ export class Money {
 
   private assertSameCurrency(other: Money): void {
     if (this._currency !== other._currency) {
-      throw new Error(`Currency mismatch: ${this._currency} vs ${other._currency}`);
+      throw new Error(
+        `Currency mismatch: ${this._currency} vs ${other._currency}`
+      );
     }
   }
 

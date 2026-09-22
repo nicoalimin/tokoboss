@@ -66,11 +66,7 @@ export interface JobStore {
     workspaceId: string,
     idempotencyKey: string
   ): Promise<JobRecord | null>;
-  update(
-    id: string,
-    workspaceId: string,
-    patch: JobPatch
-  ): Promise<JobRecord>;
+  update(id: string, workspaceId: string, patch: JobPatch): Promise<JobRecord>;
   appendEvent(
     jobId: string,
     workspaceId: string,

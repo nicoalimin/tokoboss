@@ -754,9 +754,9 @@ describe('catalog routes (memory wiring)', () => {
       adjCtx
     );
     expect(allowed.status).toBe(201);
-    expect(
-      (await allowed.json()) as { level: { qty: number } }
-    ).toMatchObject({ level: { qty: -4 } });
+    expect((await allowed.json()) as { level: { qty: number } }).toMatchObject({
+      level: { qty: -4 },
+    });
   });
 
   it('reads consolidated + per-warehouse balances and filters the ledger (UTA-81)', async () => {
