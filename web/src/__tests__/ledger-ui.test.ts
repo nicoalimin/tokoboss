@@ -9,8 +9,8 @@ import {
 } from '../lib/catalog-client';
 
 /**
- * Web Stock Ledger UI (UTA-82): ledger list/filter + adjustments UI
- * matching the mockup and wired to UTA-81 APIs.
+ * Web Stock Ledger UI (UTA-82): ledger list/filter + adjustments client
+ * wired to UTA-81 APIs — Vitest stubFetch pattern (no DOM), peer to produk-ui.
  */
 
 function jsonResponse(body: unknown, status: number): Response {
@@ -73,16 +73,8 @@ describe('ledger-client (UTA-82 UI)', () => {
               workspaceId: WS,
               totalQty: 25,
               perWarehouse: [
-                {
-                  warehouseId: 'wh_1',
-                  qty: 15,
-                  version: 1,
-                },
-                {
-                  warehouseId: 'wh_2',
-                  qty: 10,
-                  version: 1,
-                },
+                { warehouseId: 'wh_1', qty: 15, version: 1 },
+                { warehouseId: 'wh_2', qty: 10, version: 1 },
               ],
             },
           },
@@ -148,8 +140,16 @@ describe('ledger-client (UTA-82 UI)', () => {
   });
 
   it('adjusts stock with warehouse + delta + reason + idempotency key + expectedVersion', async () => {
-    const fetchFn = stubFetch(async (url: string) => {
+    const fetchFn = stubFetch(async (url: string, init?: RequestInit) => {
       if (String(url).endsWith('/adjustments')) {
+        expect(init?.method).toBe('POST');
+        expect(init?.credentials).toBe('same-origin');
+        const body = JSON.parse(String(init?.body));
+        expect(body.warehouseId).toBe('wh_1');
+        expect(body.delta).toBe(-5);
+        expect(body.reason).toBe('damaged stock');
+        expect(body.idempotencyKey).toBe('key_123');
+        expect(body.expectedVersion).toBe(1);
         return jsonResponse(
           {
             level: {
@@ -219,8 +219,10 @@ describe('ledger-client (UTA-82 UI)', () => {
     expect(err).toBeInstanceOf(CatalogClientError);
     const clientErr = err as CatalogClientError;
     expect(clientErr.errorCode).toBe('CATALOG_INSUFFICIENT_STOCK');
-    // The message should not contain secret information
-    expect(clientErr.message).not.toContain('insufficient');
+    expect(clientErr.message).toBe(
+      'Insufficient stock available for this warehouse.'
+    );
+    expect(JSON.stringify(err)).not.toMatch(/Bearer|tb_session|passwordHash/);
   });
 
   it('maps CATALOG_WAREHOUSE_INACTIVE to user-friendly message', async () => {
@@ -248,8 +250,10 @@ describe('ledger-client (UTA-82 UI)', () => {
     expect(err).toBeInstanceOf(CatalogClientError);
     const clientErr = err as CatalogClientError;
     expect(clientErr.errorCode).toBe('CATALOG_WAREHOUSE_INACTIVE');
-    // The message should not contain secret information
-    expect(clientErr.message).not.toContain('inactive');
+    expect(clientErr.message).toBe(
+      'Warehouse is inactive. Please select an active warehouse.'
+    );
+    expect(JSON.stringify(err)).not.toMatch(/Bearer|tb_session|passwordHash/);
   });
 
   it('maps CATALOG_VERSION_CONFLICT to user-friendly message', async () => {
@@ -277,8 +281,10 @@ describe('ledger-client (UTA-82 UI)', () => {
     expect(err).toBeInstanceOf(CatalogClientError);
     const clientErr = err as CatalogClientError;
     expect(clientErr.errorCode).toBe('CATALOG_VERSION_CONFLICT');
-    // The message should not contain secret information
-    expect(clientErr.message).not.toContain('conflict');
+    expect(clientErr.message).toBe(
+      'Someone else changed this row first. Close and reopen the drawer, then try again.'
+    );
+    expect(JSON.stringify(err)).not.toMatch(/Bearer|tb_session|passwordHash/);
   });
 
   it('uses same-origin credentials for all endpoints', async () => {
