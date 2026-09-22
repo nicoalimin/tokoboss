@@ -59,17 +59,20 @@ export async function POST(request: Request) {
     }
   }
 
-  const result = await reconcileStrandedJobs(
-    getJobStore(),
-    getJobExecutor(),
-    { workspaceId }
-  );
+  const result = await reconcileStrandedJobs(getJobStore(), getJobExecutor(), {
+    workspaceId,
+  });
   log.info('jobs reconciled', {
     route: '/api/jobs/reconcile',
     examined: result.examined,
     dispatched: result.dispatched.length,
   });
-  return json({ ...result, storage: storageKind() }, 200, requestId, correlationId);
+  return json(
+    { ...result, storage: storageKind() },
+    200,
+    requestId,
+    correlationId
+  );
 }
 
 function json(

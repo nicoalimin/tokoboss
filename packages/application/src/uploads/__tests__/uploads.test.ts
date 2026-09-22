@@ -62,7 +62,8 @@ async function issueFixture(
     contentType: overrides.contentType ?? 'text/plain',
     byteSize: overrides.byteSize ?? 11,
     role: overrides.role ?? 'staff',
-    idempotencyKey: overrides.idempotencyKey ?? `fix-${Math.random().toString(36).slice(2)}`,
+    idempotencyKey:
+      overrides.idempotencyKey ?? `fix-${Math.random().toString(36).slice(2)}`,
   });
 }
 
@@ -92,9 +93,9 @@ describe('token issuance validation (before any token)', () => {
         byteSize: 2 * 1024 * 1024,
       })
     ).rejects.toThrow(/exceeds/);
-    await expect(
-      issueFixture(store, blob, { byteSize: 0 })
-    ).rejects.toThrow(UploadValidationError);
+    await expect(issueFixture(store, blob, { byteSize: 0 })).rejects.toThrow(
+      UploadValidationError
+    );
   });
 
   it('rejects missing workspace, filename, and path traversal', async () => {
@@ -102,9 +103,9 @@ describe('token issuance validation (before any token)', () => {
     await expect(
       issueFixture(store, blob, { workspaceId: '  ' })
     ).rejects.toThrow(UploadValidationError);
-    await expect(
-      issueFixture(store, blob, { filename: '  ' })
-    ).rejects.toThrow(UploadValidationError);
+    await expect(issueFixture(store, blob, { filename: '  ' })).rejects.toThrow(
+      UploadValidationError
+    );
     await expect(
       issueFixture(store, blob, { filename: '../evil.txt' })
     ).rejects.toThrow(/bare name/);
@@ -134,8 +135,12 @@ describe('token issuance validation (before any token)', () => {
 
   it('duplicate token requests resolve to the same pending record', async () => {
     const { store, blob } = await newHarness();
-    const first = await issueFixture(store, blob, { idempotencyKey: 'dup-tok' });
-    const second = await issueFixture(store, blob, { idempotencyKey: 'dup-tok' });
+    const first = await issueFixture(store, blob, {
+      idempotencyKey: 'dup-tok',
+    });
+    const second = await issueFixture(store, blob, {
+      idempotencyKey: 'dup-tok',
+    });
     expect(first.duplicate).toBe(false);
     expect(second.duplicate).toBe(true);
     expect(second.upload.id).toBe(first.upload.id);
@@ -319,7 +324,11 @@ describe('metadata-only + secret safety', () => {
     const { upload, pathname } = await issueFixture(store, blob, {
       idempotencyKey: 'del-audit',
     });
-    await completeUpload(store, { workspaceId: WS_A, uploadId: upload.id, pathname, byteSize: 11 }, store.audit);
+    await completeUpload(
+      store,
+      { workspaceId: WS_A, uploadId: upload.id, pathname, byteSize: 11 },
+      store.audit
+    );
     const deleted = await deleteUpload(
       store,
       blob,
@@ -327,9 +336,9 @@ describe('metadata-only + secret safety', () => {
       store.audit
     );
     expect(deleted.status).toBe('deleted');
-    expect(
-      store.auditEvents.map((e) => e.action)
-    ).toContain('file_upload.deleted');
+    expect(store.auditEvents.map((e) => e.action)).toContain(
+      'file_upload.deleted'
+    );
     // Deleted uploads are no longer readable.
     await expect(
       authorizeDownload(store, blob, { workspaceId: WS_A, uploadId: upload.id })

@@ -45,7 +45,12 @@ function toInputs(lines: LineDraft[]): BundleComponentInput[] | null {
   for (const line of lines) {
     const id = line.componentVariantId.trim();
     const qty = Number.parseInt(line.qty.trim(), 10);
-    if (!id || !/^\d+$/.test(line.qty.trim()) || !Number.isSafeInteger(qty) || qty <= 0) {
+    if (
+      !id ||
+      !/^\d+$/.test(line.qty.trim()) ||
+      !Number.isSafeInteger(qty) ||
+      qty <= 0
+    ) {
       return null;
     }
     out.push({ componentVariantId: id, qty });
@@ -212,7 +217,8 @@ export function BundlesPanel({
 
   // Deep-linked bundle selection loads once the list is in.
   useEffect(() => {
-    if (!loadedWorkspace || !initialBundleVariantId.trim() || selectedId) return;
+    if (!loadedWorkspace || !initialBundleVariantId.trim() || selectedId)
+      return;
     const target = initialBundleVariantId.trim();
     setSelectedId(target);
     void loadDetail(loadedWorkspace, target);
@@ -256,10 +262,11 @@ export function BundlesPanel({
     }
     setCreating(true);
     try {
-      const created = await createBundle(
-        loadedWorkspace,
-        { bundleVariantId, components, expectedVersion }
-      );
+      const created = await createBundle(loadedWorkspace, {
+        bundleVariantId,
+        components,
+        expectedVersion,
+      });
       setBundles((prev) =>
         prev.some((b) => b.bundleVariantId === created.bundleVariantId)
           ? prev.map((b) =>
@@ -295,10 +302,14 @@ export function BundlesPanel({
     }
     setSaving(true);
     try {
-      const updated = await updateBundle(loadedWorkspace, detail.bundleVariantId, {
-        components,
-        expectedVersion: detail.version,
-      });
+      const updated = await updateBundle(
+        loadedWorkspace,
+        detail.bundleVariantId,
+        {
+          components,
+          expectedVersion: detail.version,
+        }
+      );
       setDetail(updated);
       setEditLines(
         updated.components.map((c: BundleComponentWire) => ({
@@ -388,9 +399,7 @@ export function BundlesPanel({
                 onChange={(e) =>
                   setLines(
                     lines.map((l, j) =>
-                      j === i
-                        ? { ...l, componentVariantId: e.target.value }
-                        : l
+                      j === i ? { ...l, componentVariantId: e.target.value } : l
                     )
                   )
                 }
@@ -421,9 +430,7 @@ export function BundlesPanel({
                 type="button"
                 data-testid={`${prefix}-remove-${i}`}
                 disabled={lines.length <= 1}
-                onClick={() =>
-                  setLines(lines.filter((_, j) => j !== i))
-                }
+                onClick={() => setLines(lines.filter((_, j) => j !== i))}
                 className={secondaryButtonClass}
               >
                 {copy.removeLineButton}
@@ -728,9 +735,7 @@ export function BundlesPanel({
               <h2 className="text-lg font-semibold text-neutral-900">
                 {copy.createTitle}
               </h2>
-              <p className="text-sm text-neutral-600">
-                {copy.createSubtitle}
-              </p>
+              <p className="text-sm text-neutral-600">{copy.createSubtitle}</p>
               {createError ? (
                 <p
                   role="alert"
@@ -742,10 +747,7 @@ export function BundlesPanel({
               ) : null}
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label
-                    htmlFor="bundle-create-id"
-                    className={labelClass}
-                  >
+                  <label htmlFor="bundle-create-id" className={labelClass}>
                     {copy.bundleVariantIdLabel}
                   </label>
                   <input
@@ -761,10 +763,7 @@ export function BundlesPanel({
                   </p>
                 </div>
                 <div>
-                  <label
-                    htmlFor="bundle-create-version"
-                    className={labelClass}
-                  >
+                  <label htmlFor="bundle-create-version" className={labelClass}>
                     {copy.expectedVersionLabel}
                   </label>
                   <input

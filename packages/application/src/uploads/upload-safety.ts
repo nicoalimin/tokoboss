@@ -129,7 +129,11 @@ export function validateTokenRequest(input: TokenRequestValidation): void {
       `filename exceeds ${MAX_FILENAME_LEN} chars`
     );
   }
-  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+  if (
+    filename.includes('..') ||
+    filename.includes('/') ||
+    filename.includes('\\')
+  ) {
     throw new UploadValidationError('filename must be a bare name (no paths)');
   }
 }

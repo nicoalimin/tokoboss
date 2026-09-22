@@ -110,7 +110,9 @@ describe('committed migration artefacts', () => {
       expect(entry.idx).toBe(position);
       expect(sqlFiles).toContain(`${entry.tag}.sql`);
       // Tag sequence prefix must match idx+1 (drizzle-kit convention).
-      expect(entry.tag.startsWith(`${String(entry.idx + 1).padStart(4, '0')}_`)).toBe(true);
+      expect(
+        entry.tag.startsWith(`${String(entry.idx + 1).padStart(4, '0')}_`)
+      ).toBe(true);
     });
 
     const seqs = sqlFiles.map((f) => f.slice(0, 4));
