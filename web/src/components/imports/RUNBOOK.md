@@ -12,7 +12,7 @@
   binary formats). Idempotent retries surface the duplicate notice and
   open the existing batch.
 - **Review rows**: product, SKU TokoBoss (primary, mono), Store SKU shown
-  everywhere as a *mapping candidate only* (hint text under every cell),
+  everywhere as a _mapping candidate only_ (hint text under every cell),
   price (IDR), status, errors, `duplicateOf.existingPath` (opaque route +
   source), applied marker. Row edit (name/SKU/price/note, re-validated) +
   reject. Batch reject/reopen with confirm gates.

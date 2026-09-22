@@ -115,9 +115,7 @@ describe('bundles-client (UTA-80 UI)', () => {
 
   it('replaces lines with expectedVersion and archives idempotently', async () => {
     const patchFetch = stubFetch(async (url: string, init?: RequestInit) => {
-      expect(url).toBe(
-        `/api/workspaces/${WS}/catalog/bundles/var_bundle_1`
-      );
+      expect(url).toBe(`/api/workspaces/${WS}/catalog/bundles/var_bundle_1`);
       expect(init?.method).toBe('PATCH');
       const body = JSON.parse(String(init?.body));
       expect(body.expectedVersion).toBe(2);
@@ -199,10 +197,7 @@ describe('bundles-client (UTA-80 UI)', () => {
 
   it('thrown errors never echo SKUs, quantities, or ids', async () => {
     const fetchFn = stubFetch(async () =>
-      jsonResponse(
-        { error: 'Cycle detected.', errorCode: 'BUNDLE_CYCLE' },
-        422
-      )
+      jsonResponse({ error: 'Cycle detected.', errorCode: 'BUNDLE_CYCLE' }, 422)
     );
     const err = await createBundle(
       WS,

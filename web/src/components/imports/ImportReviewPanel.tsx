@@ -322,7 +322,9 @@ export function ImportReviewPanel() {
       );
       setSelected(detail);
       setNotice(
-        action === 'reject' ? copy.batchRejectedNotice : copy.batchReopenedNotice
+        action === 'reject'
+          ? copy.batchRejectedNotice
+          : copy.batchReopenedNotice
       );
       await refreshBatches(loadedWorkspace);
     } catch (err) {
@@ -474,9 +476,7 @@ export function ImportReviewPanel() {
                         type="file"
                         accept=".csv,text/csv,text/plain"
                         className="block text-sm text-neutral-700"
-                        onChange={(e) =>
-                          void onPickFile(e.target.files?.[0])
-                        }
+                        onChange={(e) => void onPickFile(e.target.files?.[0])}
                       />
                       <p className="mt-1 text-xs text-neutral-500">
                         {copy.fileHint}
@@ -540,8 +540,8 @@ export function ImportReviewPanel() {
                           {b.sourceFilename}
                         </p>
                         <p className="mt-1 text-xs text-neutral-500">
-                          {copy.batchStatusLabel}: {b.status} ·{' '}
-                          {b.readyRows}/{b.totalRows} {copy.batchCountersHint} ·{' '}
+                          {copy.batchStatusLabel}: {b.status} · {b.readyRows}/
+                          {b.totalRows} {copy.batchCountersHint} ·{' '}
                           {b.appliedRows} · {b.rejectedRows}
                         </p>
                       </div>
@@ -570,7 +570,8 @@ export function ImportReviewPanel() {
                 id="review-rows-title"
                 className="text-lg font-semibold text-neutral-900"
               >
-                {copy.rowTableTitle} — {selected.sourceFilename} ({selected.status})
+                {copy.rowTableTitle} — {selected.sourceFilename} (
+                {selected.status})
               </h2>
               <p className="mt-1 text-xs text-neutral-500">
                 {copy.identityFreezeNote} {copy.noLiveChannelNote}
@@ -607,7 +608,9 @@ export function ImportReviewPanel() {
                           data-row-id={row.id}
                           className="border-b border-neutral-100 align-top"
                         >
-                          <td className="px-2 py-3 font-mono">{row.rowNumber}</td>
+                          <td className="px-2 py-3 font-mono">
+                            {row.rowNumber}
+                          </td>
                           <td className="px-2 py-3">
                             {editingRowId === row.id ? (
                               <input
@@ -678,9 +681,7 @@ export function ImportReviewPanel() {
                               className="font-mono text-xs text-neutral-600"
                               title={copy.rowStoreSkuHint}
                             >
-                              {row.sellerSkuHint ??
-                                row.platformSkuId ??
-                                '—'}
+                              {row.sellerSkuHint ?? row.platformSkuId ?? '—'}
                             </p>
                             <p className="text-[11px] text-neutral-400">
                               {copy.rowStoreSkuHint}
@@ -726,7 +727,9 @@ export function ImportReviewPanel() {
                                     onClick={() => void onSaveRow(row.id)}
                                     className={secondaryButtonClass}
                                   >
-                                    {savingRow ? copy.rowSaving : copy.rowSaveButton}
+                                    {savingRow
+                                      ? copy.rowSaving
+                                      : copy.rowSaveButton}
                                   </button>
                                   <button
                                     type="button"
@@ -803,7 +806,9 @@ export function ImportReviewPanel() {
                         onClick={() => void onBatchAction('reopen')}
                         className={secondaryButtonClass}
                       >
-                        {batchBusy ? copy.reopeningBatch : copy.reopenBatchButton}
+                        {batchBusy
+                          ? copy.reopeningBatch
+                          : copy.reopenBatchButton}
                       </button>
                     ) : (
                       <button
@@ -813,7 +818,9 @@ export function ImportReviewPanel() {
                         onClick={() => void onBatchAction('reject')}
                         className={secondaryButtonClass}
                       >
-                        {batchBusy ? copy.rejectingBatch : copy.rejectBatchButton}
+                        {batchBusy
+                          ? copy.rejectingBatch
+                          : copy.rejectBatchButton}
                       </button>
                     )}
                   </div>
@@ -831,7 +838,8 @@ export function ImportReviewPanel() {
                   {summary.duplicates.length > 0 ? (
                     <div className="rounded-lg border border-neutral-300 bg-white px-4 py-3">
                       <p className="text-sm font-semibold">
-                        {copy.confirmDuplicatesTitle} ({summary.duplicates.length})
+                        {copy.confirmDuplicatesTitle} (
+                        {summary.duplicates.length})
                       </p>
                       <ul className="mt-2 grid gap-1">
                         {summary.duplicates.map((d) => (

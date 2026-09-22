@@ -289,9 +289,9 @@ ID); browser calls in `src/lib/catalog-client.ts` (`credentials:
 "same-origin"` so the HttpOnly session cookie rides along — no tokens in
 JS storage or logs).
 
-| Route     | Screen                                                                                                                                                                                                                                                     |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/produk` | Workspace loader, cross-identifier search (name / SKU TokoBoss / barcode / Store SKU hint / listing name), dense product rows (primary SKU, prices, total stock, status), create (≥1 variant), confirm-gated archive, SKU drawer overlay (list stays open) |
+| Route           | Screen                                                                                                                                                                                                                                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/produk`       | Workspace loader, cross-identifier search (name / SKU TokoBoss / barcode / Store SKU hint / listing name), dense product rows (primary SKU, prices, total stock, status), create (≥1 variant), confirm-gated archive, SKU drawer overlay (list stays open)                                                         |
 | `/produk/impor` | Import review (UTA-78, Story 02): workspace loader, CSV/file upload (or pre-parsed rows JSON), batch list with status + counters, reviewable row table (errors, duplicates with `existingPath`, Store SKU as mapping candidate only), row edit/reject, batch reject/reopen, confirm-before-create into the catalog |
 
 Rules reflected in UX: search hits one query across every identifier;

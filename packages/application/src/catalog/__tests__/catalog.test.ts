@@ -661,23 +661,23 @@ describe('stock ledger + adjustments (Story 05, UTA-81)', () => {
     ).toBe(1);
 
     // Reusing the key with a different payload is a 409.
-    expect(
-      await codeOf(
-        adjustStock(store, { ...payload, delta: 11 })
-      )
-    ).toBe('CATALOG_CONFLICT');
+    expect(await codeOf(adjustStock(store, { ...payload, delta: 11 }))).toBe(
+      'CATALOG_CONFLICT'
+    );
     expect(
       await codeOf(
         adjustStock(store, { ...payload, reason: 'different reason' })
       )
     ).toBe('CATALOG_CONFLICT');
     // Malformed keys are rejected before touching the ledger.
-    expect(await codeOf(adjustStock(store, { ...payload, idempotencyKey: '  ' }))).toBe(
-      'CATALOG_VALIDATION'
-    );
-    expect(await codeOf(adjustStock(store, { ...payload, idempotencyKey: 'x'.repeat(129) }))).toBe(
-      'CATALOG_VALIDATION'
-    );
+    expect(
+      await codeOf(adjustStock(store, { ...payload, idempotencyKey: '  ' }))
+    ).toBe('CATALOG_VALIDATION');
+    expect(
+      await codeOf(
+        adjustStock(store, { ...payload, idempotencyKey: 'x'.repeat(129) })
+      )
+    ).toBe('CATALOG_VALIDATION');
   });
 
   it('blocks negative stock by default; Admin toggle opts in', async () => {
@@ -778,7 +778,9 @@ describe('stock ledger + adjustments (Story 05, UTA-81)', () => {
     });
     expect(balance.totalQty).toBe(14);
     expect(balance.perWarehouse).toHaveLength(2);
-    const byWh = new Map(balance.perWarehouse.map((p) => [p.warehouseId, p.qty]));
+    const byWh = new Map(
+      balance.perWarehouse.map((p) => [p.warehouseId, p.qty])
+    );
     expect(byWh.get(wh1.id)).toBe(10);
     expect(byWh.get(wh2.id)).toBe(4);
 
