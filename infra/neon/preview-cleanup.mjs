@@ -144,7 +144,9 @@ async function main() {
         teamId: env.vercelTeamId,
         gitBranch,
       });
-      console.log(`[preview-cleanup] Removed ${deleted} branch-scoped DATABASE_URL var(s).`);
+      console.log(
+        `[preview-cleanup] Removed ${deleted} branch-scoped DATABASE_URL var(s).`
+      );
     } catch (error) {
       console.error(`preview-cleanup failed: vercel step: ${error.message}`);
       process.exit(1);
@@ -153,7 +155,9 @@ async function main() {
 
   // Hook point for UTA-15 (Vercel Blob private store): delete any preview
   // Blob prefixes here once the store exists. No-op today by design.
-  console.log('[preview-cleanup] Blob cleanup: no-op (private store lands in UTA-15).');
+  console.log(
+    '[preview-cleanup] Blob cleanup: no-op (private store lands in UTA-15).'
+  );
   console.log(`[preview-cleanup] Done for PR #${prNumber}.`);
 }
 
