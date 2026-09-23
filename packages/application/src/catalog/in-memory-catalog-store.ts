@@ -89,6 +89,18 @@ export class InMemoryCatalogStore implements CatalogStore {
     return `${prefix}_${this.seq.toString().padStart(4, '0')}`;
   }
 
+  // UTA-94 transfer helper: next transfer ID
+  private nextTransferId(): string {
+    this.transferIdCounter += 1;
+    return `trf_${this.transferIdCounter.toString().padStart(4, '0')}`;
+  }
+
+  // UTA-94 transfer helper: next transfer item ID
+  private nextTransferItemId(): string {
+    this.transferItemIdCounter += 1;
+    return `itm_${this.transferItemIdCounter.toString().padStart(4, '0')}`;
+  }
+
   private variantPath(workspaceId: string, v: CatalogVariantRecord): string {
     return `/api/workspaces/${workspaceId}/catalog/products/${v.productId}/variants/${v.id}`;
   }
