@@ -8,6 +8,8 @@ import type {
   ProductPicture,
   StockLedgerRecord,
   StockSettingsRecord,
+  TransferRecord,
+  TransferWithItems,
   WarehouseRecord,
   WarehouseStatus,
 } from './catalog-types';
@@ -301,4 +303,83 @@ export interface CatalogStore {
 
   /** True when the variant holds ≥1 BOM lines (i.e. it is a bundle). */
   isBundleVariant(workspaceId: string, variantId: string): Promise<boolean>;
+
+  // Warehouse Transfers (UTA-94, Story 06)
+
+  /** Create a transfer draft (no stock movements yet). */
+  createTransferDraft(input: {
+    workspaceId: string;
+    referenceNum: string;
+    sourceWarehouseId: string;
+    destWarehouseId: string;
+    notes?: string;
+    expectedReceiveDate?: Date;
+  }): Promise<TransferRecord>;
+
+  /** Add items to a transfer draft (no stock movements yet). */
+  addTransferItems(input: {
+    workspaceId: string;
+    transferId: string;
+    items: Array<{
+      variantId: string;
+      requestedQty: number;
+    }>;
+  }): Promise<TransferItemRecord[]>;
+
+  /** Find a transfer by ID. */
+  findTransferById(
+    workspaceId: string,
+    transferId: string
+  ): Promise<TransferRecord | null>;
+
+  /** Find a transfer with all its items. */
+  findTransferWithItems(
+    workspaceId: string,
+    transferId: string
+  ): Promise<TransferWithItems | null>;
+
+  /** List all transfers in workspace. */
+  listTransfers(workspaceId: string): Promise<TransferRecord[]>;
+
+  /** List all transfers with items in workspace. */
+  listTransfersWithItems(workspaceId: string): Promise<TransferWithItems[]>;
+
+  /** Send a transfer (reserve stock from source warehouse). */
+  sendTransfer(input: {
+    workspaceId: string;
+    transferId: string;
+    items: Array<{
+      itemId: string;
+      requestedQty: number;
+    }>;
+    idempotencyKey?: string;
+    allowNegative?: boolean;
+    expectedVersion: number;
+  }): Promise<TransferWithItems>;
+
+  /** Receive a transfer (credit stock to destination warehouse). */
+  receiveTransfer(input: {
+    workspaceId: string;
+    transferId: string;
+    items: Array<{
+      itemId: string;
+      receivedQty: number;
+      damagedQty: number;
+    }>;
+    idempotencyKey?: string;
+    expectedVersion: number;
+  }): Promise<TransferWithItems>;
+
+  /** Cancel a transfer (release stock back to source warehouse). */
+  cancelTransfer(input: {
+    workspaceId: string;
+    transferId: string;
+    items: Array<{
+      itemId: string;
+      cancellationReason?: string;
+    }>;
+    idempotencyKey?: string;
+    allowNegative?: boolean;
+    expectedVersion: number;
+  }): Promise<TransferWithItems>;
 }

@@ -179,3 +179,57 @@ export interface NewVariantInput {
   costSource?: string | null;
   listingName?: string | null;
 }
+
+/** Transfer status (UTA-94, Story 06). */
+export const TRANSFER_STATUSES = [
+  'draft',
+  'sent',
+  'received',
+  'cancelled',
+] as const;
+export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
+
+export function isTransferStatus(value: unknown): value is TransferStatus {
+  return (
+    typeof value === 'string' &&
+    (TRANSFER_STATUSES as readonly string[]).includes(value)
+  );
+}
+
+/** Transfer master data (workspace-scoped). */
+export interface TransferRecord {
+  id: string;
+  workspaceId: string;
+  referenceNum: string;
+  status: TransferStatus;
+  sourceWarehouseId: string;
+  destWarehouseId: string;
+  notes: string | null;
+  expectedReceiveDate: Date | null;
+  /** Bumped on every update; PATCH callers must echo it back. */
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Transfer items (line items). */
+export interface TransferItemRecord {
+  id: string;
+  transferId: string;
+  workspaceId: string;
+  variantId: string;
+  requestedQty: number;
+  sentQty: number;
+  receivedQty: number;
+  damagedQty: number;
+  cancellationReason: string | null;
+  /** Bumped on every update. */
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Transfer with items. */
+export type TransferWithItems = TransferRecord & {
+  items: TransferItemRecord[];
+};
