@@ -65,6 +65,8 @@ export class InMemoryCatalogStore implements CatalogStore {
   private transferItems = new Map<string, TransferItemRecord>();
   // Idempotency keys for transfers (send/receive/cancel)
   private transferIdempotencyIndex = new Map<string, string>();
+  // Index for looking up items by transfer ID
+  private transferItemsIndex = new Map<string, string[]>();
 
   private skuIndex = new Map<string, string>();
   private warehouseCodeIndex = new Map<string, string>();
