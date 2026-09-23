@@ -102,13 +102,20 @@ describe('staging-parent guard', () => {
 
 describe('preview env + url guards', () => {
   it('requires APP_ENV=preview', () => {
-    assert.throws(() => assertPreviewEnv('production'), /never touch Production/);
-    assert.throws(() => assertPreviewEnv('staging'), /expected APP_ENV=preview/);
+    assert.throws(
+      () => assertPreviewEnv('production'),
+      /never touch Production/
+    );
+    assert.throws(
+      () => assertPreviewEnv('staging'),
+      /expected APP_ENV=preview/
+    );
     assert.doesNotThrow(() => assertPreviewEnv('preview'));
   });
   it('refuses production-looking urls', () => {
     assert.throws(
-      () => assertNoProductionUrl('postgresql://u:p@ep-prod-123.aws.neon.tech/db'),
+      () =>
+        assertNoProductionUrl('postgresql://u:p@ep-prod-123.aws.neon.tech/db'),
       /looks like a Production/
     );
     assert.doesNotThrow(() =>
@@ -120,7 +127,9 @@ describe('preview env + url guards', () => {
 describe('redaction + correlation', () => {
   it('redacts connection strings to hostnames', () => {
     assert.equal(
-      redactUrl('postgresql://user:secret@ep-cool-123.aws.neon.tech/neondb?sslmode=require'),
+      redactUrl(
+        'postgresql://user:secret@ep-cool-123.aws.neon.tech/neondb?sslmode=require'
+      ),
       'ep-cool-123.aws.neon.tech'
     );
     assert.equal(redactUrl('not a url'), '(unparseable-url)');
@@ -154,21 +163,33 @@ describe('ttl', () => {
     const now = Date.parse('2026-09-14T00:00:00Z');
     const old = new Date(now - 73 * 3_600_000).toISOString();
     const fresh = new Date(now - 1 * 3_600_000).toISOString();
-    assert.equal(isStranded({ createdAt: old, nowMs: now, ttlHours: 72 }), true);
-    assert.equal(isStranded({ createdAt: fresh, nowMs: now, ttlHours: 72 }), false);
+    assert.equal(
+      isStranded({ createdAt: old, nowMs: now, ttlHours: 72 }),
+      true
+    );
+    assert.equal(
+      isStranded({ createdAt: fresh, nowMs: now, ttlHours: 72 }),
+      false
+    );
     assert.equal(isStranded({ createdAt: 'garbage', nowMs: now }), false);
   });
 });
 
 describe('vercel payload', () => {
   it('scopes DATABASE_URL to preview target + git branch', () => {
-    const payload = vercelEnvCreatePayload({ value: 'SECRET', gitBranch: 'feat/x' });
+    const payload = vercelEnvCreatePayload({
+      value: 'SECRET',
+      gitBranch: 'feat/x',
+    });
     assert.deepEqual(payload.target, ['preview']);
     assert.equal(payload.gitBranch, 'feat/x');
     assert.equal(payload.key, 'DATABASE_URL');
   });
   it('requires a git branch', () => {
-    assert.throws(() => vercelEnvCreatePayload({ value: 'x', gitBranch: '' }), /git branch/);
+    assert.throws(
+      () => vercelEnvCreatePayload({ value: 'x', gitBranch: '' }),
+      /git branch/
+    );
   });
 });
 
@@ -177,11 +198,21 @@ describe('vercel payload', () => {
 function stubFetch(routes) {
   const calls = [];
   const impl = async (url, init = {}) => {
-    calls.push({ url: String(url), method: init.method ?? 'GET', body: init.body });
+    calls.push({
+      url: String(url),
+      method: init.method ?? 'GET',
+      body: init.body,
+    });
     const key = `${init.method ?? 'GET'} ${String(url).split('?')[0]}`;
     const handler = routes[key];
     if (!handler) {
-      return { ok: false, status: 404, statusText: 'Not Found', text: async () => 'no route', json: async () => ({}) };
+      return {
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        text: async () => 'no route',
+        json: async () => ({}),
+      };
     }
     return handler({ url: String(url), init, calls });
   };
@@ -201,30 +232,61 @@ describe('neon api helpers (stubbed)', () => {
     const { impl, calls } = stubFetch({
       'GET https://console.neon.tech/api/v2/projects/p1/branches': () =>
         okJson({ branches: [{ id: 'br-staging', name: 'staging' }] }),
-      'POST https://console.neon.tech/api/v2/projects/p1/branches': ({ calls: c }) => {
+      'POST https://console.neon.tech/api/v2/projects/p1/branches': ({
+        calls: c,
+      }) => {
         const body = JSON.parse(c.at(-1).body);
         assert.equal(body.branch.name, 'preview/pr-5');
         assert.equal(body.branch.parent_id, 'br-staging');
-        return okJson({ branch: { id: 'br-new', name: 'preview/pr-5', current_state: 'creating' } });
+        return okJson({
+          branch: {
+            id: 'br-new',
+            name: 'preview/pr-5',
+            current_state: 'creating',
+          },
+        });
       },
       'GET https://console.neon.tech/api/v2/projects/p1/branches/br-new': () =>
-        okJson({ branch: { id: 'br-new', name: 'preview/pr-5', current_state: 'ready' } }),
+        okJson({
+          branch: {
+            id: 'br-new',
+            name: 'preview/pr-5',
+            current_state: 'ready',
+          },
+        }),
       'GET https://console.neon.tech/api/v2/projects/p1/connection_uri': () =>
-        okJson({ uri: 'postgresql://u:p@ep-new.aws.neon.tech/neondb?sslmode=require' }),
+        okJson({
+          uri: 'postgresql://u:p@ep-new.aws.neon.tech/neondb?sslmode=require',
+        }),
     });
 
-    const branches = await listNeonBranches({ apiKey: 'k', projectId: 'p1', fetchImpl: impl });
+    const branches = await listNeonBranches({
+      apiKey: 'k',
+      projectId: 'p1',
+      fetchImpl: impl,
+    });
     assert.equal(findBranchByName(branches, 'preview/pr-5'), null);
     const created = await createNeonBranch({
-      apiKey: 'k', projectId: 'p1', name: 'preview/pr-5', parentId: 'br-staging', fetchImpl: impl,
+      apiKey: 'k',
+      projectId: 'p1',
+      name: 'preview/pr-5',
+      parentId: 'br-staging',
+      fetchImpl: impl,
     });
     assert.equal(created.id, 'br-new');
     const ready = await waitForBranchReady({
-      apiKey: 'k', projectId: 'p1', branchId: 'br-new', fetchImpl: impl, sleep: async () => {},
+      apiKey: 'k',
+      projectId: 'p1',
+      branchId: 'br-new',
+      fetchImpl: impl,
+      sleep: async () => {},
     });
     assert.equal(ready.current_state, 'ready');
     const uri = await getBranchConnectionUri({
-      apiKey: 'k', projectId: 'p1', branchId: 'br-new', fetchImpl: impl,
+      apiKey: 'k',
+      projectId: 'p1',
+      branchId: 'br-new',
+      fetchImpl: impl,
     });
     assert.match(uri, /ep-new/);
     assert.ok(calls.length >= 4);
@@ -233,7 +295,10 @@ describe('neon api helpers (stubbed)', () => {
   it('delete is idempotent on 404', async () => {
     const { impl } = stubFetch({});
     const deleted = await deleteNeonBranch({
-      apiKey: 'k', projectId: 'p1', branchId: 'br-missing', fetchImpl: impl,
+      apiKey: 'k',
+      projectId: 'p1',
+      branchId: 'br-missing',
+      fetchImpl: impl,
     });
     assert.equal(deleted, false);
   });
@@ -246,8 +311,13 @@ describe('neon api helpers (stubbed)', () => {
     await assert.rejects(
       () =>
         waitForBranchReady({
-          apiKey: 'k', projectId: 'p1', branchId: 'br-x', fetchImpl: impl,
-          timeoutMs: 10, intervalMs: 1, sleep: async () => {},
+          apiKey: 'k',
+          projectId: 'p1',
+          branchId: 'br-x',
+          fetchImpl: impl,
+          timeoutMs: 10,
+          intervalMs: 1,
+          sleep: async () => {},
         }),
       /Timed out.*retry/i
     );
@@ -258,12 +328,21 @@ describe('vercel api helpers (stubbed)', () => {
   it('upsert removes stale branch env then creates', async () => {
     const { impl, calls } = stubFetch({
       'GET https://api.vercel.com/v9/projects/prj/env': () =>
-        okJson({ envs: [{ id: 'env-old', key: 'DATABASE_URL', gitBranch: 'feat/x' }] }),
-      'DELETE https://api.vercel.com/v9/projects/prj/env/env-old': () => okJson({}),
-      'POST https://api.vercel.com/v10/projects/prj/env': () => okJson({ created: { id: 'env-new' } }),
+        okJson({
+          envs: [{ id: 'env-old', key: 'DATABASE_URL', gitBranch: 'feat/x' }],
+        }),
+      'DELETE https://api.vercel.com/v9/projects/prj/env/env-old': () =>
+        okJson({}),
+      'POST https://api.vercel.com/v10/projects/prj/env': () =>
+        okJson({ created: { id: 'env-new' } }),
     });
     const id = await upsertVercelBranchEnv({
-      token: 't', projectId: 'prj', teamId: null, gitBranch: 'feat/x', value: 'SECRET', fetchImpl: impl,
+      token: 't',
+      projectId: 'prj',
+      teamId: null,
+      gitBranch: 'feat/x',
+      value: 'SECRET',
+      fetchImpl: impl,
     });
     assert.equal(id, 'env-new');
     assert.ok(calls.some((c) => c.method === 'DELETE'));
@@ -279,10 +358,15 @@ describe('vercel api helpers (stubbed)', () => {
             { id: 'env-c', key: 'OTHER', gitBranch: 'feat/x' },
           ],
         }),
-      'DELETE https://api.vercel.com/v9/projects/prj/env/env-a': () => okJson({}),
+      'DELETE https://api.vercel.com/v9/projects/prj/env/env-a': () =>
+        okJson({}),
     });
     const deleted = await deleteVercelBranchEnv({
-      token: 't', projectId: 'prj', teamId: null, gitBranch: 'feat/x', fetchImpl: impl,
+      token: 't',
+      projectId: 'prj',
+      teamId: null,
+      gitBranch: 'feat/x',
+      fetchImpl: impl,
     });
     assert.equal(deleted, 1);
     assert.ok(!calls.some((c) => c.url.includes('env-b')));
