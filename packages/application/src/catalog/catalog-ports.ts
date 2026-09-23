@@ -8,6 +8,7 @@ import type {
   ProductPicture,
   StockLedgerRecord,
   StockSettingsRecord,
+  TransferItemRecord,
   TransferRecord,
   TransferWithItems,
   WarehouseRecord,
