@@ -75,6 +75,9 @@ export class InMemoryCatalogStore implements CatalogStore {
   // UTA-81: per-workspace stock policy (default allowNegative: false).
   private stockSettings = new Map<string, StockSettingsRecord>();
 
+  private transferIdCounter = 0;
+  private transferItemIdCounter = 0;
+
   private seq = 0;
 
   private nextId(prefix: string): string {
