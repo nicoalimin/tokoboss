@@ -21,6 +21,10 @@ import type {
   ProductPicture,
   StockLedgerRecord,
   StockSettingsRecord,
+  TransferItemRecord,
+  TransferRecord,
+  TransferStatus,
+  TransferWithItems,
   WarehouseRecord,
   WarehouseStatus,
 } from './catalog-types';
