@@ -73,4 +73,163 @@ export const CatalogRules = {
       throw new BusinessRuleViolationError('Insufficient stock for adjustment');
     }
   },
+
+  /**
+   * Same-warehouse transfers are blocked.
+   */
+  assertSourceAndDestDifferent(
+    sourceWarehouseId: string,
+    destWarehouseId: string
+  ): void {
+    if (sourceWarehouseId === destWarehouseId) {
+      throw new BusinessRuleViolationError(
+        'Source and destination warehouses must be different'
+      );
+    }
+  },
+
+  /**
+   * Oversell is blocked unless negative stock is allowed.
+   */
+  assertTransferCanBeSent(input: {
+    availableQty: number;
+    requestedQty: number;
+    allowNegative?: boolean;
+  }): void {
+    if (input.allowNegative === true) return;
+    if (input.availableQty < input.requestedQty) {
+      throw new BusinessRuleViolationError('Insufficient stock for transfer');
+    }
+  },
+
+  /**
+   * Warehouse deactivation is blocked if it has:
+   * - stock (levels)
+   * - open transfers
+   * - pending receipts
+   * - active stock-count
+   */
+  assertWarehouseCanBeDeactivated(input: {
+    hasStock: boolean;
+    hasOpenTransfers: boolean;
+    hasPendingReceipts: boolean;
+    hasActiveStockCount: boolean;
+  }): void {
+    if (input.hasStock) {
+      throw new BusinessRuleViolationError(
+        'Cannot deactivate warehouse with stock'
+      );
+    }
+    if (input.hasOpenTransfers) {
+      throw new BusinessRuleViolationError(
+        'Cannot deactivate warehouse with open transfers'
+      );
+    }
+    if (input.hasPendingReceipts) {
+      throw new BusinessRuleViolationError(
+        'Cannot deactivate warehouse with pending receipts'
+      );
+    }
+    if (input.hasActiveStockCount) {
+      throw new BusinessRuleViolationError(
+        'Cannot deactivate warehouse with active stock count'
+      );
+    }
+  },
 } as const;
+
+// Transfer status
+export const TRANSFER_STATUSES = [
+  'draft',
+  'sent',
+  'received',
+  'cancelled',
+] as const;
+export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
+
+export function isTransferStatus(value: unknown): value is TransferStatus {
+  return (
+    typeof value === 'string' &&
+    (TRANSFER_STATUSES as readonly string[]).includes(value)
+  );
+}
+
+/** Transfer master data (workspace-scoped). */
+export interface TransferRecord {
+  id: string;
+  workspaceId: string;
+  referenceNum: string;
+  status: TransferStatus;
+  sourceWarehouseId: string;
+  destWarehouseId: string;
+  notes: string | null;
+  expectedReceiveDate: Date | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Transfer items (line items). */
+export interface TransferItemRecord {
+  id: string;
+  transferId: string;
+  workspaceId: string;
+  variantId: string;
+  requestedQty: number;
+  sentQty: number;
+  receivedQty: number;
+  damagedQty: number;
+  cancellationReason: string | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Create transfer input. */
+export interface CreateTransferInput {
+  workspaceId: string;
+  sourceWarehouseId: string;
+  destWarehouseId: string;
+  referenceNum: string;
+  items: Array<{
+    variantId: string;
+    requestedQty: number;
+  }>;
+  notes?: string;
+  expectedReceiveDate?: Date;
+}
+
+/** Send transfer input. */
+export interface SendTransferInput {
+  transferId: string;
+  idempotencyKey?: string;
+  expectedVersion: number;
+}
+
+/** Receive transfer input. */
+export interface ReceiveTransferInput {
+  transferId: string;
+  idempotencyKey?: string;
+  expectedVersion: number;
+  items: Array<{
+    itemId: string;
+    receivedQty: number;
+    damagedQty: number;
+  }>;
+}
+
+/** Cancel transfer input. */
+export interface CancelTransferInput {
+  transferId: string;
+  idempotencyKey?: string;
+  expectedVersion: number;
+  items: Array<{
+    itemId: string;
+    cancellationReason?: string;
+  }>;
+}
+
+/** Transfer with items. */
+export type TransferWithItems = TransferRecord & {
+  items: TransferItemRecord[];
+};
