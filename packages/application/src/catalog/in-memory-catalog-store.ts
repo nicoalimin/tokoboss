@@ -60,6 +60,12 @@ export class InMemoryCatalogStore implements CatalogStore {
   // is enforced on write (single-threaded memory semantics = atomic).
   private bundleLines = new Map<string, BundleLineRecord>();
 
+  // UTA-94: warehouse transfers
+  private transfers = new Map<string, TransferRecord>();
+  private transferItems = new Map<string, TransferItemRecord>();
+  // Idempotency keys for transfers (send/receive/cancel)
+  private transferIdempotencyIndex = new Map<string, string>();
+
   private skuIndex = new Map<string, string>();
   private warehouseCodeIndex = new Map<string, string>();
   private mappingKeyIndex = new Map<string, string>();
