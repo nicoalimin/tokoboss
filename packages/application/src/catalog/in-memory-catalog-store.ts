@@ -79,18 +79,10 @@ export class InMemoryCatalogStore implements CatalogStore {
   // UTA-81: per-workspace stock policy (default allowNegative: false).
   private stockSettings = new Map<string, StockSettingsRecord>();
 
+  private seq = 0;
+
   private transferIdCounter = 0;
   private transferItemIdCounter = 0;
-
-  // Idempotency keys for transfers (send/receive/cancel)
-  private transferIdempotencyIndex = new Map<string, string>();
-  // Index for looking up items by transfer ID
-  private transferItemsIndex = new Map<string, string[]>();
-  // Index for looking up transfers by reference number
-  private transferReferenceIndex = new Map<string, string>();
-
-  private nextId(prefix: string): string {
-    this.seq += 1;
     return `${prefix}_${this.seq.toString().padStart(4, '0')}`;
   }
 
