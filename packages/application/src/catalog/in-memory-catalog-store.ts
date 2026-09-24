@@ -82,14 +82,18 @@ export class InMemoryCatalogStore implements CatalogStore {
   private transferIdCounter = 0;
   private transferItemIdCounter = 0;
 
-  private seq = 0;
+  // Idempotency keys for transfers (send/receive/cancel)
+  private transferIdempotencyIndex = new Map<string, string>();
+  // Index for looking up items by transfer ID
+  private transferItemsIndex = new Map<string, string[]>();
+  // Index for looking up transfers by reference number
+  private transferReferenceIndex = new Map<string, string>();
 
   private nextId(prefix: string): string {
     this.seq += 1;
     return `${prefix}_${this.seq.toString().padStart(4, '0')}`;
   }
 
-  // UTA-94 transfer helper: next transfer ID
   private nextTransferId(): string {
     this.transferIdCounter += 1;
     return `trf_${this.transferIdCounter.toString().padStart(4, '0')}`;
