@@ -83,6 +83,9 @@ export class InMemoryCatalogStore implements CatalogStore {
 
   private transferIdCounter = 0;
   private transferItemIdCounter = 0;
+
+  private nextId(prefix: string): string {
+    this.seq += 1;
     return `${prefix}_${this.seq.toString().padStart(4, '0')}`;
   }
 
