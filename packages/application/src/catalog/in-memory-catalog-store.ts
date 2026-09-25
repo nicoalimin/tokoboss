@@ -23,7 +23,6 @@ import type {
   StockSettingsRecord,
   TransferItemRecord,
   TransferRecord,
-  TransferRecord,
   TransferWithItems,
   WarehouseRecord,
   WarehouseStatus,
