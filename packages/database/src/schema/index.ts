@@ -13,6 +13,7 @@ export * from './catalog';
 export * from './bundles';
 export * from './product-imports';
 export * from './legacy-store';
+export * from './transfers';
 
 import { auditEvents } from './audit-events';
 import { authPasswordResets, authSessions, authUsers } from './auth';
@@ -34,6 +35,7 @@ import { tenants } from './tenants';
 import { userProfiles } from './user-profiles';
 import { workspaceInvites } from './workspace-invites';
 import { workspaceMembers } from './workspace-members';
+import { catalogTransferItems, catalogTransfers } from './transfers';
 
 export const schema = {
   tenants,
@@ -60,4 +62,6 @@ export const schema = {
   productImportBatches,
   productImportRows,
   catalogBundleLines,
+  catalogTransfers,
+  catalogTransferItems,
 };
