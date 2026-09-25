@@ -6,7 +6,7 @@ import {
   catalogVersionConflict,
 } from './catalog-errors';
 import { bundleVersionConflict } from '../bundles/bundle-errors';
-import type { CatalogStore } from './catalog-ports';
+import type { CatalogStore, TransferStore } from './catalog-ports';
 import type {
   BundleLineRecord,
   NewBundleLineInput,
@@ -21,6 +21,10 @@ import type {
   ProductPicture,
   StockLedgerRecord,
   StockSettingsRecord,
+  TransferItemRecord,
+  TransferRecord,
+  TransferRecord,
+  TransferWithItems,
   WarehouseRecord,
   WarehouseStatus,
 } from './catalog-types';
@@ -45,7 +49,7 @@ function clone<T>(value: T): T {
  * `(workspace, warehouse_code)` uniqueness, compare-and-set versions, and
  * atomic ledger-append + level-advance.
  */
-export class InMemoryCatalogStore implements CatalogStore {
+export class InMemoryCatalogStore implements CatalogStore, TransferStore {
   private products = new Map<string, CatalogProductRecord>();
   private variants = new Map<string, CatalogVariantRecord>();
   private warehouses = new Map<string, WarehouseRecord>();
@@ -55,6 +59,11 @@ export class InMemoryCatalogStore implements CatalogStore {
   // UTA-79: BOM lines keyed by line id; `(bundle, component)` uniqueness
   // is enforced on write (single-threaded memory semantics = atomic).
   private bundleLines = new Map<string, BundleLineRecord>();
+  // UTA-94: Transfers
+  private transfers = new Map<string, TransferRecord>();
+  private transferItems = new Map<string, TransferItemRecord>();
+  // Index: (workspaceId, referenceNum) → transferId for uniqueness check
+  private transferReferenceIndex = new Map<string, string>();
 
   private skuIndex = new Map<string, string>();
   private warehouseCodeIndex = new Map<string, string>();
