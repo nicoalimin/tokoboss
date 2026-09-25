@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { InMemoryCatalogStore } from '../in-memory-catalog-store';
-import { catalogNotFound, catalogValidation } from '../catalog-errors';
 
 describe('TransferStore', () => {
   let store: InMemoryCatalogStore;
@@ -76,11 +75,12 @@ describe('TransferStore', () => {
       });
 
       expect(items).toHaveLength(2);
-      expect(items[0].sentQty).toBe(0);
-      expect(items[0].receivedQty).toBe(0);
-      expect(items[0].damagedQty).toBe(0);
-      expect(items[0].cancellationReason).toBeNull();
-      expect(items[0].version).toBe(1);
+      const item = items[0]!;
+      expect(item.sentQty).toBe(0);
+      expect(item.receivedQty).toBe(0);
+      expect(item.damagedQty).toBe(0);
+      expect(item.cancellationReason).toBeNull();
+      expect(item.version).toBe(1);
 
       const withItems = await store.findTransferWithItems('ws1', transfer.id);
       expect(withItems).not.toBeNull();
@@ -94,7 +94,7 @@ describe('TransferStore', () => {
           transferId: 'unknown',
           items: [{ variantId: 'var1', requestedQty: 10 }],
         })
-      ).rejects.toThrow(catalogNotFound);
+      ).rejects.toMatchObject({ code: 'CATALOG_NOT_FOUND' });
 
       const transfer = await store.createTransferDraft({
         workspaceId: 'ws1',
@@ -109,7 +109,7 @@ describe('TransferStore', () => {
           transferId: transfer.id,
           items: [{ variantId: 'var1', requestedQty: 0 }],
         })
-      ).rejects.toThrow(catalogValidation);
+      ).rejects.toMatchObject({ code: 'CATALOG_VALIDATION' });
 
       await expect(
         store.addTransferItems({
@@ -117,7 +117,7 @@ describe('TransferStore', () => {
           transferId: transfer.id,
           items: [{ variantId: 'var1', requestedQty: -5 }],
         })
-      ).rejects.toThrow(catalogValidation);
+      ).rejects.toMatchObject({ code: 'CATALOG_VALIDATION' });
     });
   });
 
@@ -153,8 +153,10 @@ describe('TransferStore', () => {
 
       expect(ws1Transfers).toHaveLength(1);
       expect(ws2Transfers).toHaveLength(1);
-      expect(ws1Transfers[0].referenceNum).toBe('REF-001');
-      expect(ws2Transfers[0].referenceNum).toBe('REF-002');
+      const ws1Transfer = ws1Transfers[0]!;
+      const ws2Transfer = ws2Transfers[0]!;
+      expect(ws1Transfer.referenceNum).toBe('REF-001');
+      expect(ws2Transfer.referenceNum).toBe('REF-002');
     });
   });
 });
