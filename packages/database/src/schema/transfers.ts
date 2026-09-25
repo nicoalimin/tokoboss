@@ -1,4 +1,5 @@
 import {
+  index,
   integer,
   pgTable,
   text,
@@ -70,7 +71,7 @@ export const catalogTransferItems = pgTable(
     ...utcTimestamps(),
   },
   (t) => [
-    uniqueIndex('catalog_transfer_items_workspace_transfer_idx').on(
+    index('catalog_transfer_items_workspace_transfer_idx').on(
       t.workspaceId,
       t.transferId
     ),
