@@ -85,6 +85,13 @@
       "when": 1789541269961,
       "tag": "0012_stock_ledger_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789566500000,
+      "tag": "0013_transfer_management",
+      "breakpoints": true
     }
   ]
 }
