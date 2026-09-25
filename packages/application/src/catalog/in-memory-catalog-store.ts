@@ -4,9 +4,10 @@ import {
   catalogInsufficientStock,
   catalogNotFound,
   catalogVersionConflict,
+  catalogValidation,
 } from './catalog-errors';
 import { bundleVersionConflict } from '../bundles/bundle-errors';
-import type { CatalogStore } from './catalog-ports';
+import type { CatalogStore, TransferStore } from './catalog-ports';
 import type {
   BundleLineRecord,
   NewBundleLineInput,
@@ -21,6 +22,9 @@ import type {
   ProductPicture,
   StockLedgerRecord,
   StockSettingsRecord,
+  TransferItemRecord,
+  TransferRecord,
+  TransferWithItems,
   WarehouseRecord,
   WarehouseStatus,
 } from './catalog-types';
@@ -45,7 +49,7 @@ function clone<T>(value: T): T {
  * `(workspace, warehouse_code)` uniqueness, compare-and-set versions, and
  * atomic ledger-append + level-advance.
  */
-export class InMemoryCatalogStore implements CatalogStore {
+export class InMemoryCatalogStore implements CatalogStore, TransferStore {
   private products = new Map<string, CatalogProductRecord>();
   private variants = new Map<string, CatalogVariantRecord>();
   private warehouses = new Map<string, WarehouseRecord>();
@@ -55,6 +59,154 @@ export class InMemoryCatalogStore implements CatalogStore {
   // UTA-79: BOM lines keyed by line id; `(bundle, component)` uniqueness
   // is enforced on write (single-threaded memory semantics = atomic).
   private bundleLines = new Map<string, BundleLineRecord>();
+  // UTA-94: Transfers
+  private transfers = new Map<string, TransferRecord>();
+  private transferItems = new Map<string, TransferItemRecord>();
+  // Index: (workspaceId, referenceNum) → transferId for uniqueness check
+  private transferReferenceIndex = new Map<string, string>();
+
+  // TransferStore methods
+  async createTransferDraft(input: {
+    workspaceId: string;
+    referenceNum: string;
+    sourceWarehouseId: string;
+    destWarehouseId: string;
+    notes?: string;
+    expectedReceiveDate?: Date;
+  }): Promise<TransferRecord> {
+    // Check for duplicate reference number in the same workspace
+    const refKey = `${input.workspaceId}::${input.referenceNum}`;
+    if (this.transferReferenceIndex.has(refKey)) {
+      throw catalogConflict(
+        `Reference number ${input.referenceNum} already exists.`
+      );
+    }
+
+    const now = new Date();
+    const transfer: TransferRecord = {
+      id: this.nextId('trf'),
+      workspaceId: input.workspaceId,
+      referenceNum: input.referenceNum,
+      sourceWarehouseId: input.sourceWarehouseId,
+      destWarehouseId: input.destWarehouseId,
+      status: 'draft',
+      notes: input.notes ?? null,
+      expectedReceiveDate: input.expectedReceiveDate ?? null,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.transfers.set(transfer.id, transfer);
+    this.transferReferenceIndex.set(refKey, transfer.id);
+    return clone(transfer);
+  }
+
+  async addTransferItems(input: {
+    workspaceId: string;
+    transferId: string;
+    items: Array<{ variantId: string; requestedQty: number }>;
+  }): Promise<TransferItemRecord[]> {
+    const transfer = this.transfers.get(input.transferId);
+    if (!transfer || transfer.workspaceId !== input.workspaceId) {
+      throw catalogNotFound('Transfer');
+    }
+
+    // Only allow adding items to draft transfers
+    if (transfer.status !== 'draft') {
+      throw catalogConflict(
+        'Cannot add items to a transfer that is not in draft status.'
+      );
+    }
+
+    // Validate requested quantities
+    for (const item of input.items) {
+      if (item.requestedQty <= 0) {
+        throw catalogValidation(
+          `Requested quantity must be greater than 0, got ${item.requestedQty}`
+        );
+      }
+    }
+
+    const now = new Date();
+    const storedItems: TransferItemRecord[] = input.items.map((item) => ({
+      id: this.nextId('tri'),
+      transferId: input.transferId,
+      workspaceId: input.workspaceId,
+      variantId: item.variantId,
+      requestedQty: item.requestedQty,
+      sentQty: 0,
+      receivedQty: 0,
+      damagedQty: 0,
+      cancellationReason: null,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    for (const item of storedItems) {
+      this.transferItems.set(item.id, item);
+    }
+
+    return storedItems.map(clone);
+  }
+
+  async findTransferById(
+    workspaceId: string,
+    transferId: string
+  ): Promise<TransferRecord | null> {
+    const record = this.transfers.get(transferId);
+    if (!record || record.workspaceId !== workspaceId) return null;
+    return clone(record);
+  }
+
+  async findTransferWithItems(
+    workspaceId: string,
+    transferId: string
+  ): Promise<TransferWithItems | null> {
+    const transfer = this.transfers.get(transferId);
+    if (!transfer || transfer.workspaceId !== workspaceId) return null;
+
+    const items: TransferItemRecord[] = [];
+    for (const item of this.transferItems.values()) {
+      if (item.workspaceId === workspaceId && item.transferId === transferId) {
+        items.push(clone(item));
+      }
+    }
+
+    return { transfer: clone(transfer), items };
+  }
+
+  async listTransfers(workspaceId: string): Promise<TransferRecord[]> {
+    const out: TransferRecord[] = [];
+    for (const t of this.transfers.values()) {
+      if (t.workspaceId === workspaceId) out.push(clone(t));
+    }
+    out.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    return out;
+  }
+
+  async listTransfersWithItems(
+    workspaceId: string
+  ): Promise<TransferWithItems[]> {
+    const transfers = await this.listTransfers(workspaceId);
+    const out: TransferWithItems[] = [];
+
+    for (const transfer of transfers) {
+      const items: TransferItemRecord[] = [];
+      for (const item of this.transferItems.values()) {
+        if (
+          item.workspaceId === workspaceId &&
+          item.transferId === transfer.id
+        ) {
+          items.push(clone(item));
+        }
+      }
+      out.push({ transfer: clone(transfer), items });
+    }
+
+    return out;
+  }
 
   private skuIndex = new Map<string, string>();
   private warehouseCodeIndex = new Map<string, string>();

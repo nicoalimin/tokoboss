@@ -8,6 +8,9 @@ import type {
   ProductPicture,
   StockLedgerRecord,
   StockSettingsRecord,
+  TransferItemRecord,
+  TransferRecord,
+  TransferWithItems,
   WarehouseRecord,
   WarehouseStatus,
 } from './catalog-types';
@@ -301,4 +304,30 @@ export interface CatalogStore {
 
   /** True when the variant holds ≥1 BOM lines (i.e. it is a bundle). */
   isBundleVariant(workspaceId: string, variantId: string): Promise<boolean>;
+}
+
+export interface TransferStore {
+  createTransferDraft(input: {
+    workspaceId: string;
+    referenceNum: string;
+    sourceWarehouseId: string;
+    destWarehouseId: string;
+    notes?: string;
+    expectedReceiveDate?: Date;
+  }): Promise<TransferRecord>;
+  addTransferItems(input: {
+    workspaceId: string;
+    transferId: string;
+    items: Array<{ variantId: string; requestedQty: number }>;
+  }): Promise<TransferItemRecord[]>;
+  findTransferById(
+    workspaceId: string,
+    transferId: string
+  ): Promise<TransferRecord | null>;
+  findTransferWithItems(
+    workspaceId: string,
+    transferId: string
+  ): Promise<TransferWithItems | null>;
+  listTransfers(workspaceId: string): Promise<TransferRecord[]>;
+  listTransfersWithItems(workspaceId: string): Promise<TransferWithItems[]>;
 }

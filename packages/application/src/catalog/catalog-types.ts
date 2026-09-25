@@ -179,3 +179,58 @@ export interface NewVariantInput {
   costSource?: string | null;
   listingName?: string | null;
 }
+
+/** Transfer statuses for inter-warehouse transfers (UTA-94, Story 06). */
+export const TRANSFER_STATUSES = [
+  'draft',
+  'sent',
+  'received',
+  'cancelled',
+] as const;
+export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
+
+export function isTransferStatus(value: unknown): value is TransferStatus {
+  return (
+    typeof value === 'string' &&
+    (TRANSFER_STATUSES as readonly string[]).includes(value)
+  );
+}
+
+/** Transfer header record (inter-warehouse transfer document). */
+export interface TransferRecord {
+  id: string;
+  workspaceId: string;
+  referenceNum: string;
+  sourceWarehouseId: string;
+  destWarehouseId: string;
+  status: TransferStatus;
+  notes: string | null;
+  expectedReceiveDate: Date | null;
+  /** Bumped on send/receive/cancel; never on draft edits. */
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Single line item in an inter-warehouse transfer. */
+export interface TransferItemRecord {
+  id: string;
+  transferId: string;
+  workspaceId: string;
+  variantId: string;
+  requestedQty: number;
+  sentQty: number;
+  receivedQty: number;
+  damagedQty: number;
+  cancellationReason: string | null;
+  /** Bumped on every qty or status change. */
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Transfer header plus its line items (projection for listings). */
+export interface TransferWithItems {
+  transfer: TransferRecord;
+  items: TransferItemRecord[];
+}
