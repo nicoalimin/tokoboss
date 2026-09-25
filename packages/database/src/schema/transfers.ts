@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm';
 import {
   integer,
   pgTable,
@@ -7,7 +6,6 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { utcTimestamps } from './helpers';
 import { catalogVariants, catalogWarehouses } from './catalog';
 import { tenants } from './tenants';
 
