@@ -42,11 +42,7 @@ export function prNumberFromBranchName(name) {
  * Refuses when the staging parent is missing, when it equals the known
  * production branch id, or when the parent name looks like production.
  */
-export function assertStagingParent({
-  parentBranchId,
-  parentName,
-  productionBranchId,
-}) {
+export function assertStagingParent({ parentBranchId, parentName, productionBranchId }) {
   if (!parentBranchId) {
     throw new Error(
       'Missing staging parent: set NEON_STAGING_BRANCH_ID to the Staging branch id. ' +
@@ -131,11 +127,7 @@ export function correlationRecord({
 }
 
 /** True when a preview branch is older than the TTL (eligible for reconcile-delete). */
-export function isStranded({
-  createdAt,
-  nowMs = Date.now(),
-  ttlHours = DEFAULT_TTL_HOURS,
-}) {
+export function isStranded({ createdAt, nowMs = Date.now(), ttlHours = DEFAULT_TTL_HOURS }) {
   const created = new Date(createdAt).getTime();
   if (Number.isNaN(created)) return false;
   return nowMs - created > ttlHours * 3_600_000;
@@ -186,11 +178,7 @@ async function throwOnError(res, context) {
   );
 }
 
-export async function listNeonBranches({
-  apiKey,
-  projectId,
-  fetchImpl = fetch,
-}) {
+export async function listNeonBranches({ apiKey, projectId, fetchImpl = fetch }) {
   const res = await fetchImpl(
     `${NEON_API_BASE}/projects/${encodeURIComponent(projectId)}/branches`,
     { headers: neonHeaders(apiKey) }
@@ -210,13 +198,8 @@ export function findBranchByName(branches, name) {
  * the branch it points at is not a safe preview parent.
  * Returns the staging branch object.
  */
-export function resolveStagingBranch(
-  branches,
-  stagingBranchId,
-  productionBranchId
-) {
-  const staging =
-    (branches ?? []).find((b) => b.id === stagingBranchId) ?? null;
+export function resolveStagingBranch(branches, stagingBranchId, productionBranchId) {
+  const staging = (branches ?? []).find((b) => b.id === stagingBranchId) ?? null;
   if (!staging) {
     throw new Error(
       `NEON_STAGING_BRANCH_ID ${JSON.stringify(stagingBranchId)} was not found ` +
@@ -285,12 +268,7 @@ export async function waitForBranchReady({
   }
 }
 
-export async function deleteNeonBranch({
-  apiKey,
-  projectId,
-  branchId,
-  fetchImpl = fetch,
-}) {
+export async function deleteNeonBranch({ apiKey, projectId, branchId, fetchImpl = fetch }) {
   const res = await fetchImpl(
     `${NEON_API_BASE}/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}`,
     { method: 'DELETE', headers: neonHeaders(apiKey) }
@@ -361,12 +339,7 @@ function vercelQuery(teamId) {
   return teamId ? `?teamId=${encodeURIComponent(teamId)}` : '';
 }
 
-export async function listVercelEnvs({
-  token,
-  projectId,
-  teamId,
-  fetchImpl = fetch,
-}) {
+export async function listVercelEnvs({ token, projectId, teamId, fetchImpl = fetch }) {
   const res = await fetchImpl(
     `${VERCEL_API_BASE}/v9/projects/${encodeURIComponent(projectId)}/env${vercelQuery(teamId)}`,
     { headers: vercelHeaders(token) }
@@ -388,15 +361,9 @@ export async function upsertVercelBranchEnv({
   value,
   fetchImpl = fetch,
 }) {
-  const existing = await listVercelEnvs({
-    token,
-    projectId,
-    teamId,
-    fetchImpl,
-  });
+  const existing = await listVercelEnvs({ token, projectId, teamId, fetchImpl });
   const stale = existing.filter(
-    (e) =>
-      e.key === 'DATABASE_URL' && (e.gitBranch ?? e.git_branch) === gitBranch
+    (e) => e.key === 'DATABASE_URL' && (e.gitBranch ?? e.git_branch) === gitBranch
   );
   for (const env of stale) {
     const id = env.id ?? env.uid;
@@ -428,15 +395,9 @@ export async function deleteVercelBranchEnv({
   gitBranch,
   fetchImpl = fetch,
 }) {
-  const existing = await listVercelEnvs({
-    token,
-    projectId,
-    teamId,
-    fetchImpl,
-  });
+  const existing = await listVercelEnvs({ token, projectId, teamId, fetchImpl });
   const targets = existing.filter(
-    (e) =>
-      e.key === 'DATABASE_URL' && (e.gitBranch ?? e.git_branch) === gitBranch
+    (e) => e.key === 'DATABASE_URL' && (e.gitBranch ?? e.git_branch) === gitBranch
   );
   let deleted = 0;
   for (const env of targets) {
