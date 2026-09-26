@@ -208,6 +208,27 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     return out;
   }
 
+  async findTransferItemsByWarehouse(
+    workspaceId: string,
+    warehouseId: string
+  ): Promise<TransferItemRecord[]> {
+    const out: TransferItemRecord[] = [];
+    for (const item of this.transferItems.values()) {
+      if (item.workspaceId === workspaceId) {
+        const transfer = this.transfers.get(item.transferId);
+        if (
+          transfer &&
+          transfer.workspaceId === workspaceId &&
+          (transfer.sourceWarehouseId === warehouseId ||
+            transfer.destWarehouseId === warehouseId)
+        ) {
+          out.push(clone(item));
+        }
+      }
+    }
+    return out;
+  }
+
   private skuIndex = new Map<string, string>();
   private warehouseCodeIndex = new Map<string, string>();
   private mappingKeyIndex = new Map<string, string>();

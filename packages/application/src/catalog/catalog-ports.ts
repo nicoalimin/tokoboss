@@ -330,4 +330,8 @@ export interface TransferStore {
   ): Promise<TransferWithItems | null>;
   listTransfers(workspaceId: string): Promise<TransferRecord[]>;
   listTransfersWithItems(workspaceId: string): Promise<TransferWithItems[]>;
+  findTransferItemsByWarehouse(
+    workspaceId: string,
+    warehouseId: string
+  ): Promise<TransferItemRecord[]>;
 }
