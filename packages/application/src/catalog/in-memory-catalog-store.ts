@@ -142,10 +142,15 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       receivedQty: number;
       damagedQty: number;
     }>,
+    expectedVersion: number,
     actorId: string | null,
-    correlationId?: string,
-    expectedVersion: number
+    correlationId?: string
   ): Promise<TransferRecord> {
+    // actorId and correlationId are unused in-memory but preserved for
+    // interface parity; they would be recorded when stock ledger entries
+    // are created (UTA-94 follow-up).
+    void actorId;
+    void correlationId;
     const transfer = this.transfers.get(transferId);
     if (!transfer || transfer.workspaceId !== workspaceId) {
       throw catalogNotFound('Transfer');
