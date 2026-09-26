@@ -346,9 +346,9 @@ export interface TransferStore {
       receivedQty: number;
       damagedQty: number;
     }>,
+    expectedVersion: number,
     actorId: string | null,
-    correlationId?: string,
-    expectedVersion: number
+    correlationId?: string
   ): Promise<TransferRecord>;
 
   cancelTransfer(
