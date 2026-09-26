@@ -23,10 +23,14 @@ import type {
   ProductPicture,
   StockLedgerRecord,
   StockSettingsRecord,
+  TransferItemRecord,
+  TransferRecord,
+  TransferStore,
+  TransferWithItems,
   WarehouseRecord,
   WarehouseStatus,
 } from '@tokoboss/application';
-import { and, count, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 import type { DatabaseHandle, Transaction } from '../db';
 import {
   catalogBundleLines,
@@ -35,6 +39,7 @@ import {
   catalogProducts,
   catalogStockLedger,
   catalogStockSettings,
+  catalogTransfers,
   catalogVariants,
   catalogWarehouses,
 } from '../schema/index';
@@ -174,6 +179,22 @@ function toBundleLine(row: CatalogBundleLineRow): BundleLineRecord {
   };
 }
 
+function toTransfer(row: typeof catalogTransfers.$inferSelect): TransferRecord {
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    referenceNum: row.referenceNum,
+    sourceWarehouseId: row.sourceWarehouseId,
+    destWarehouseId: row.destWarehouseId,
+    status: row.status as TransferRecord['status'],
+    notes: row.notes ?? null,
+    expectedReceiveDate: row.expectedReceiveDate ?? null,
+    version: row.version,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
 function extractSkuFromUniqueDetail(err: unknown): string | null {
   // postgres.js exposes the server `detail` on the driver error; drizzle
   // wraps it as `cause` (PGlite mirrors the shape). Format:
@@ -218,7 +239,7 @@ function isUniqueViolation(err: unknown): boolean {
  * `CATALOG_CONFLICT` with the existing row's path. Composite writes
  * (product + variants, ledger + level) run inside one transaction.
  */
-export class DrizzleCatalogStore implements CatalogStore {
+export class DrizzleCatalogStore implements CatalogStore, TransferStore {
   constructor(private readonly db: DbOrTx) {}
 
   withTransaction(tx: DbOrTx): DrizzleCatalogStore {
@@ -1298,5 +1319,85 @@ export class DrizzleCatalogStore implements CatalogStore {
       )
       .limit(1);
     return rows.length > 0;
+  }
+  async createTransferDraft(input: {
+    workspaceId: string;
+    referenceNum: string;
+    sourceWarehouseId: string;
+    destWarehouseId: string;
+    notes?: string;
+    expectedReceiveDate?: Date;
+  }): Promise<TransferRecord> {
+    try {
+      const inserted = await this.db
+        .insert(catalogTransfers)
+        .values({
+          workspaceId: input.workspaceId,
+          referenceNum: input.referenceNum,
+          sourceWarehouseId: input.sourceWarehouseId,
+          destWarehouseId: input.destWarehouseId,
+          status: 'draft',
+          notes: input.notes ?? null,
+          expectedReceiveDate: input.expectedReceiveDate ?? null,
+          version: 1,
+        })
+        .returning();
+      const row = inserted[0];
+      if (!row) throw new Error('Failed to insert transfer');
+      return toTransfer(row);
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+      throw catalogConflict(
+        `Reference number ${input.referenceNum} already exists.`
+      );
+    }
+  }
+
+  async findTransferById(
+    workspaceId: string,
+    transferId: string
+  ): Promise<TransferRecord | null> {
+    const rows = await this.db
+      .select()
+      .from(catalogTransfers)
+      .where(
+        and(
+          eq(catalogTransfers.workspaceId, workspaceId),
+          eq(catalogTransfers.id, transferId)
+        )
+      )
+      .limit(1);
+    const row = rows[0];
+    return row ? toTransfer(row) : null;
+  }
+
+  async listTransfers(workspaceId: string): Promise<TransferRecord[]> {
+    const rows = await this.db
+      .select()
+      .from(catalogTransfers)
+      .where(eq(catalogTransfers.workspaceId, workspaceId))
+      .orderBy(asc(catalogTransfers.createdAt));
+    return rows.map(toTransfer);
+  }
+
+  async addTransferItems(_input: {
+    workspaceId: string;
+    transferId: string;
+    items: Array<{ variantId: string; requestedQty: number }>;
+  }): Promise<TransferItemRecord[]> {
+    throw new Error('UTA-102');
+  }
+
+  async findTransferWithItems(
+    _workspaceId: string,
+    _transferId: string
+  ): Promise<TransferWithItems | null> {
+    throw new Error('UTA-102');
+  }
+
+  async listTransfersWithItems(
+    _workspaceId: string
+  ): Promise<TransferWithItems[]> {
+    throw new Error('UTA-102');
   }
 }
