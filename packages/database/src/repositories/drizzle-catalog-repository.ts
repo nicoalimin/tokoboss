@@ -3,6 +3,7 @@ import {
   catalogConflict,
   catalogInsufficientStock,
   catalogNotFound,
+  catalogValidation,
   catalogVersionConflict,
   isCatalogStatus,
   isWarehouseStatus,
@@ -39,6 +40,7 @@ import {
   catalogProducts,
   catalogStockLedger,
   catalogStockSettings,
+  catalogTransferItems,
   catalogTransfers,
   catalogVariants,
   catalogWarehouses,
@@ -50,11 +52,16 @@ import type {
   CatalogProductRow,
   CatalogStockLedgerRow,
   CatalogStockSettingsRow,
+  CatalogTransferItemRow,
   CatalogVariantRow,
   CatalogWarehouseRow,
 } from '../schema/index';
 
 type DbOrTx = Transaction | DatabaseHandle;
+
+function variantPath(workspaceId: string, v: CatalogVariantRecord): string {
+  return `/api/workspaces/${workspaceId}/catalog/products/${v.productId}/variants/${v.id}`;
+}
 
 function toProduct(row: CatalogProductRow): CatalogProductRecord {
   if (!isCatalogStatus(row.status)) {
@@ -211,11 +218,21 @@ function extractSkuFromUniqueDetail(err: unknown): string | null {
   return null;
 }
 
-function variantPath(
-  workspaceId: string,
-  variant: CatalogVariantRecord
-): string {
-  return `/api/workspaces/${workspaceId}/catalog/products/${variant.productId}/variants/${variant.id}`;
+function toTransferItem(item: CatalogTransferItemRow): TransferItemRecord {
+  return {
+    id: item.id,
+    transferId: item.transferId,
+    workspaceId: item.workspaceId,
+    variantId: item.variantId,
+    requestedQty: item.requestedQty,
+    sentQty: item.sentQty,
+    receivedQty: item.receivedQty,
+    damagedQty: item.damagedQty,
+    cancellationReason: item.cancellationReason ?? null,
+    version: item.version,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+  };
 }
 
 function isUniqueViolation(err: unknown): boolean {
@@ -1380,24 +1397,85 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
     return rows.map(toTransfer);
   }
 
-  async addTransferItems(_input: {
+  async addTransferItems(input: {
     workspaceId: string;
     transferId: string;
     items: Array<{ variantId: string; requestedQty: number }>;
   }): Promise<TransferItemRecord[]> {
-    throw new Error('UTA-102');
+    const transfer = await this.findTransferById(
+      input.workspaceId,
+      input.transferId
+    );
+    if (!transfer) throw catalogNotFound('Transfer');
+    if (transfer.status !== 'draft') {
+      throw catalogConflict(
+        'Cannot add items to a transfer that is not in draft status.'
+      );
+    }
+    for (const item of input.items) {
+      if (item.requestedQty <= 0) {
+        throw catalogValidation(
+          `Requested quantity must be greater than 0, got ${item.requestedQty}`
+        );
+      }
+    }
+    if (input.items.length === 0) return [];
+    const inserted = await this.db
+      .insert(catalogTransferItems)
+      .values(
+        input.items.map((item) => ({
+          transferId: input.transferId,
+          workspaceId: input.workspaceId,
+          variantId: item.variantId,
+          requestedQty: item.requestedQty,
+          sentQty: 0,
+          receivedQty: 0,
+          damagedQty: 0,
+          cancellationReason: null,
+          version: 1,
+        }))
+      )
+      .returning();
+    return inserted.map(toTransferItem);
   }
 
   async findTransferWithItems(
-    _workspaceId: string,
-    _transferId: string
+    workspaceId: string,
+    transferId: string
   ): Promise<TransferWithItems | null> {
-    throw new Error('UTA-102');
+    const transfer = await this.findTransferById(workspaceId, transferId);
+    if (!transfer) return null;
+    const rows = await this.db
+      .select()
+      .from(catalogTransferItems)
+      .where(
+        and(
+          eq(catalogTransferItems.workspaceId, workspaceId),
+          eq(catalogTransferItems.transferId, transferId)
+        )
+      )
+      .orderBy(asc(catalogTransferItems.createdAt));
+    return { transfer, items: rows.map(toTransferItem) };
   }
 
   async listTransfersWithItems(
-    _workspaceId: string
+    workspaceId: string
   ): Promise<TransferWithItems[]> {
-    throw new Error('UTA-102');
+    const transfers = await this.listTransfers(workspaceId);
+    const out: TransferWithItems[] = [];
+    for (const transfer of transfers) {
+      const rows = await this.db
+        .select()
+        .from(catalogTransferItems)
+        .where(
+          and(
+            eq(catalogTransferItems.workspaceId, workspaceId),
+            eq(catalogTransferItems.transferId, transfer.id)
+          )
+        )
+        .orderBy(asc(catalogTransferItems.createdAt));
+      out.push({ transfer, items: rows.map(toTransferItem) });
+    }
+    return out;
   }
 }
