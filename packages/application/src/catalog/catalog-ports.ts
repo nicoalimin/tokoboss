@@ -330,4 +330,31 @@ export interface TransferStore {
   ): Promise<TransferWithItems | null>;
   listTransfers(workspaceId: string): Promise<TransferRecord[]>;
   listTransfersWithItems(workspaceId: string): Promise<TransferWithItems[]>;
+
+  // Transfer status transitions (UTA-94, Story 06)
+  sendTransfer(
+    workspaceId: string,
+    transferId: string,
+    expectedVersion: number
+  ): Promise<TransferRecord>;
+
+  receiveTransfer(
+    workspaceId: string,
+    transferId: string,
+    receivedQtys: Array<{
+      itemId: string;
+      receivedQty: number;
+      damagedQty: number;
+    }>,
+    actorId: string | null,
+    correlationId?: string,
+    expectedVersion: number
+  ): Promise<TransferRecord>;
+
+  cancelTransfer(
+    workspaceId: string,
+    transferId: string,
+    cancellationReason: string | null,
+    expectedVersion: number
+  ): Promise<TransferRecord>;
 }

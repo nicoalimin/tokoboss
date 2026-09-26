@@ -102,6 +102,182 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     return clone(transfer);
   }
 
+  async sendTransfer(
+    workspaceId: string,
+    transferId: string,
+    expectedVersion: number
+  ): Promise<TransferRecord> {
+    const transfer = this.transfers.get(transferId);
+    if (!transfer || transfer.workspaceId !== workspaceId) {
+      throw catalogNotFound('Transfer');
+    }
+
+    if (transfer.version !== expectedVersion) {
+      throw catalogVersionConflict(transfer.version);
+    }
+
+    if (transfer.status !== 'draft') {
+      throw catalogConflict(
+        `Cannot send a transfer with status ${transfer.status}.`
+      );
+    }
+
+    const now = new Date();
+    const updated: TransferRecord = {
+      ...transfer,
+      status: 'sent',
+      version: transfer.version + 1,
+      updatedAt: now,
+    };
+
+    this.transfers.set(transferId, updated);
+    return clone(updated);
+  }
+
+  async receiveTransfer(
+    workspaceId: string,
+    transferId: string,
+    receivedQtys: Array<{
+      itemId: string;
+      receivedQty: number;
+      damagedQty: number;
+    }>,
+    actorId: string | null,
+    correlationId?: string,
+    expectedVersion: number
+  ): Promise<TransferRecord> {
+    const transfer = this.transfers.get(transferId);
+    if (!transfer || transfer.workspaceId !== workspaceId) {
+      throw catalogNotFound('Transfer');
+    }
+
+    if (transfer.version !== expectedVersion) {
+      throw catalogVersionConflict(transfer.version);
+    }
+
+    if (transfer.status !== 'sent') {
+      throw catalogConflict(
+        `Cannot receive a transfer with status ${transfer.status}.`
+      );
+    }
+
+    // Validate received quantities
+    for (const item of receivedQtys) {
+      if (item.receivedQty < 0) {
+        throw catalogValidation(
+          `Received quantity must be non-negative, got ${item.receivedQty}`
+        );
+      }
+      if (item.damagedQty < 0) {
+        throw catalogValidation(
+          `Damaged quantity must be non-negative, got ${item.damagedQty}`
+        );
+      }
+    }
+
+    const now = new Date();
+    const updated: TransferRecord = {
+      ...transfer,
+      status: 'received',
+      version: transfer.version + 1,
+      updatedAt: now,
+    };
+
+    this.transfers.set(transferId, updated);
+
+    // Update transfer items
+    const receivedByItemId = new Map<string, number>();
+    const damagedByItemId = new Map<string, number>();
+    for (const item of receivedQtys) {
+      receivedByItemId.set(item.itemId, item.receivedQty);
+      damagedByItemId.set(item.itemId, item.damagedQty);
+    }
+
+    // Process item updates
+    for (const [itemId, item] of this.transferItems) {
+      if (item.transferId === transferId && item.workspaceId === workspaceId) {
+        const receivedQty = receivedByItemId.get(itemId) ?? 0;
+        const damagedQty = damagedByItemId.get(itemId) ?? 0;
+
+        // Validate that received + damaged doesn't exceed requested
+        if (receivedQty + damagedQty > item.requestedQty) {
+          throw catalogValidation(
+            `Received and damaged quantities cannot exceed requested quantity`
+          );
+        }
+
+        const updatedItem: TransferItemRecord = {
+          ...item,
+          receivedQty,
+          damagedQty,
+          version: item.version + 1,
+          updatedAt: now,
+        };
+        this.transferItems.set(itemId, updatedItem);
+      }
+    }
+
+    // TODO: Add stock adjustments for received items (UTA-94 follow-up)
+    // This would involve:
+    // 1. Deducting from source warehouse for sentQty
+    // 2. Adding to dest warehouse for receivedQty
+
+    return clone(updated);
+  }
+
+  async cancelTransfer(
+    workspaceId: string,
+    transferId: string,
+    cancellationReason: string | null,
+    expectedVersion: number
+  ): Promise<TransferRecord> {
+    const transfer = this.transfers.get(transferId);
+    if (!transfer || transfer.workspaceId !== workspaceId) {
+      throw catalogNotFound('Transfer');
+    }
+
+    if (transfer.version !== expectedVersion) {
+      throw catalogVersionConflict(transfer.version);
+    }
+
+    if (transfer.status === 'received' || transfer.status === 'cancelled') {
+      const allowedStatuses = ['draft', 'sent'];
+      const statusesStr = allowedStatuses
+        .join(', ')
+        .replace(transfer.status, '');
+      throw catalogConflict(
+        `Cannot cancel a transfer with status ${transfer.status}. Only ${statusesStr} transfers can be cancelled.`
+      );
+    }
+
+    const now = new Date();
+    const updated: TransferRecord = {
+      ...transfer,
+      status: 'cancelled',
+      version: transfer.version + 1,
+      updatedAt: now,
+    };
+
+    this.transfers.set(transferId, updated);
+
+    // Mark items as cancelled
+    for (const [itemId, item] of this.transferItems) {
+      if (item.transferId === transferId && item.workspaceId === workspaceId) {
+        const updatedItem: TransferItemRecord = {
+          ...item,
+          cancellationReason,
+          version: item.version + 1,
+          updatedAt: now,
+        };
+        this.transferItems.set(itemId, updatedItem);
+      }
+    }
+
+    // TODO: Revert stock adjustments if transfer was sent (UTA-94 follow-up)
+
+    return clone(updated);
+  }
+
   async addTransferItems(input: {
     workspaceId: string;
     transferId: string;
