@@ -199,6 +199,7 @@ describe('TransferStore', () => {
         warehouseId: warehouse1.id,
         delta: 100,
         reason: 'initial_stock',
+        actorId: null,
       });
 
       // Create draft transfer
@@ -306,6 +307,7 @@ describe('TransferStore', () => {
         warehouseId: warehouse1.id,
         delta: 100,
         reason: 'initial_stock',
+        actorId: null,
       });
 
       // Create draft transfer and add items
@@ -466,6 +468,7 @@ describe('TransferStore', () => {
         warehouseId: warehouse1.id,
         delta: 100,
         reason: 'initial_stock',
+        actorId: null,
       });
 
       // Create draft transfer
