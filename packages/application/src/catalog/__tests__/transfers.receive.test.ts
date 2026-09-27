@@ -9,7 +9,7 @@ describe('TransferStore receiveTransfer', () => {
   });
 
   describe('receiveTransfer basic functionality', () => {
-    it('happy path with positive source stock, updates status to completed and increases ledger', async () => {
+    it('happy path with positive source stock, updates status to received and increases ledger', async () => {
       // Setup: create warehouses and product
       const warehouse1 = await store.createWarehouse({
         workspaceId: 'ws1',
@@ -82,12 +82,12 @@ describe('TransferStore receiveTransfer', () => {
         actorId: null,
       });
 
-      // Verify status is completed
-      expect(result.transfer.status).toBe('completed');
+      // Verify status is received
+      expect(result.transfer.status).toBe('received');
 
       // Verify received quantities match requested
       expect(result.items[0]!.receivedQty).toBe(10);
-      expect(result.items[0]!.version).toBe(2); // bumped by 1
+      expect(result.items[0]!.version).toBe(3); // send + receive each bump by 1
 
       // Verify transfer version bumped
       expect(result.transfer.version).toBe(3); // sent + receive = 2, then send bumps to 3
@@ -202,7 +202,7 @@ describe('TransferStore receiveTransfer', () => {
 
       // Check that only the received quantity increased
       const level = await store.getLevel('ws1', variant.id, warehouse2.id);
-      expect(level?.qty).toBe(5); // 5 received, 2 damaged = 3 valid stock
+      expect(level?.qty).toBe(5); // only the 5 good units enter stock
     });
 
     it('rejects when transfer is not in sent status', async () => {
@@ -315,7 +315,7 @@ describe('TransferStore receiveTransfer', () => {
         items: [{ variantId: variant.id, requestedQty: 10 }],
       });
 
-      await store.sendTransfer({
+      const sentResult = await store.sendTransfer({
         workspaceId: 'ws1',
         transferId: transfer.id,
         actorId: null,
@@ -329,7 +329,7 @@ describe('TransferStore receiveTransfer', () => {
           actorId: null,
           items: [
             {
-              itemId: 'unknown-id',
+              itemId: sentResult.items[0]!.id,
               receivedQty: -5,
             },
           ],
@@ -393,7 +393,7 @@ describe('TransferStore receiveTransfer', () => {
         items: [{ variantId: variant.id, requestedQty: 10 }],
       });
 
-      await store.sendTransfer({
+      const sentResult = await store.sendTransfer({
         workspaceId: 'ws1',
         transferId: transfer.id,
         actorId: null,
@@ -407,7 +407,7 @@ describe('TransferStore receiveTransfer', () => {
           actorId: null,
           items: [
             {
-              itemId: 'unknown-id',
+              itemId: sentResult.items[0]!.id,
               receivedQty: 15, // exceeds the remaining 10 qty
             },
           ],

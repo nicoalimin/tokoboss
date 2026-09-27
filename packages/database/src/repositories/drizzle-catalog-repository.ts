@@ -1617,7 +1617,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       damagedQty?: number;
     }>;
   }): Promise<TransferWithItems> {
-    return await this.db.transaction(async (tx) => {
+    return this.inTx(async (tx) => {
       // 1. Load transfer by id+workspace → missing → `catalogNotFound('Transfer')`
       const transferRows = await tx
         .select()
@@ -1665,30 +1665,53 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
 
       const now = new Date();
       const updatedItems: TransferItemRecord[] = [];
+      const receivedDeltas = new Map<string, number>();
+      const receiptByItemId = new Map(
+        input.items?.map((item) => [item.itemId, item]) ?? []
+      );
+
+      if (input.items) {
+        if (receiptByItemId.size !== input.items.length) {
+          throw catalogValidation(
+            'Each transfer item may only be received once.'
+          );
+        }
+        for (const itemData of input.items) {
+          if (itemData.receivedQty < 0 || (itemData.damagedQty ?? 0) < 0) {
+            throw catalogValidation(
+              'Received and damaged quantities must be non-negative.'
+            );
+          }
+          const item = itemRows.find(
+            (candidate: CatalogTransferItemRow) =>
+              candidate.id === itemData.itemId
+          );
+          if (!item) {
+            throw catalogValidation(
+              'Transfer item does not belong to transfer.'
+            );
+          }
+          const remaining =
+            item.sentQty - item.receivedQty - (item.damagedQty || 0);
+          if (itemData.receivedQty + (itemData.damagedQty ?? 0) > remaining) {
+            throw catalogValidation(
+              'Received and damaged quantities cannot exceed remaining quantity.'
+            );
+          }
+        }
+      }
 
       // 6. Process each item according to the requirements
       for (const row of itemRows) {
         // Calculate remaining quantity that can be received
-        const remaining = row.requestedQty - row.sentQty - row.receivedQty;
+        const remaining = row.sentQty - row.receivedQty - (row.damagedQty || 0);
 
         // If items array is provided, use that instead of full qty
-        if (input.items && input.items.length > 0) {
-          const itemData = input.items.find((i) => i.itemId === row.id);
+        if (input.items) {
+          const itemData = receiptByItemId.get(row.id);
           if (itemData) {
             // Process partial receipt
             const { receivedQty, damagedQty = 0 } = itemData;
-
-            if (receivedQty < 0 || damagedQty < 0) {
-              throw catalogValidation(
-                'Received and damaged quantities must be non-negative.'
-              );
-            }
-
-            if (receivedQty + damagedQty > remaining) {
-              throw catalogValidation(
-                'Received and damaged quantities cannot exceed remaining quantity.'
-              );
-            }
 
             // Update item
             const updated = await tx
@@ -1709,6 +1732,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
               .returning();
             const updatedItem = toTransferItem(updated[0]);
             updatedItems.push(updatedItem);
+            receivedDeltas.set(row.id, receivedQty);
           } else {
             // Item not provided in partial receipt - no change
             updatedItems.push(toTransferItem(row));
@@ -1734,6 +1758,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
               .returning();
             const updatedItem = toTransferItem(updated[0]);
             updatedItems.push(updatedItem);
+            receivedDeltas.set(row.id, fullReceived);
           } else {
             // No update needed if no quantity to receive
             updatedItems.push(toTransferItem(row));
@@ -1742,13 +1767,11 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       }
 
       // 7. Increment warehouse stock for received quantities
+      const txStore = this.withTransaction(tx);
       for (const item of updatedItems) {
-        if (item.receivedQty > item.sentQty + (item.damagedQty || 0)) {
-          // Calculate how much to credit
-          const toCredit =
-            item.receivedQty - item.sentQty - (item.damagedQty || 0);
-
-          await this.adjustLevel({
+        const toCredit = receivedDeltas.get(item.id) ?? 0;
+        if (toCredit > 0) {
+          await txStore.adjustLevel({
             workspaceId: input.workspaceId,
             variantId: item.variantId,
             warehouseId: transfer.destWarehouseId,
@@ -1759,7 +1782,6 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
             idempotencyKey: input.idempotencyKey
               ? `${input.idempotencyKey}:${item.id}`
               : undefined,
-            transaction: tx,
           });
         }
       }
@@ -1768,7 +1790,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       let allReceived = true;
       for (const item of updatedItems) {
         const remainingToReceive =
-          item.requestedQty - item.sentQty - item.receivedQty;
+          item.sentQty - item.receivedQty - (item.damagedQty || 0);
         if (remainingToReceive > 0) {
           allReceived = false;
           break;
@@ -1776,11 +1798,11 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       }
 
       if (allReceived) {
-        // If all items fully received, update transfer status to completed
+        // If all items fully received, update transfer status to received
         const updatedTransfer = await tx
           .update(catalogTransfers)
           .set({
-            status: 'completed',
+            status: 'received',
             version: transfer.version + 1,
             updatedAt: now,
           })

@@ -1219,30 +1219,51 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
 
     const now = new Date();
     const updatedItems: TransferItemRecord[] = [];
+    const receivedDeltas = new Map<string, number>();
+    const receiptByItemId = new Map(
+      input.items?.map((item) => [item.itemId, item]) ?? []
+    );
+
+    if (input.items) {
+      if (receiptByItemId.size !== input.items.length) {
+        throw catalogValidation(
+          'Each transfer item may only be received once.'
+        );
+      }
+      for (const itemData of input.items) {
+        if (itemData.receivedQty < 0 || (itemData.damagedQty ?? 0) < 0) {
+          throw catalogValidation(
+            'Received and damaged quantities must be non-negative.'
+          );
+        }
+        const item = items.find(
+          (candidate) => candidate.id === itemData.itemId
+        );
+        if (!item) {
+          throw catalogValidation('Transfer item does not belong to transfer.');
+        }
+        const remaining =
+          item.sentQty - item.receivedQty - (item.damagedQty || 0);
+        if (itemData.receivedQty + (itemData.damagedQty ?? 0) > remaining) {
+          throw catalogValidation(
+            'Received and damaged quantities cannot exceed remaining quantity.'
+          );
+        }
+      }
+    }
 
     // 6. Process each item according to the requirements
     for (const item of items) {
       // Calculate remaining quantity that can be received
-      const remaining = item.requestedQty - item.sentQty - item.receivedQty;
+      const remaining =
+        item.sentQty - item.receivedQty - (item.damagedQty || 0);
 
       // If items array is provided, use that instead of full qty
-      if (input.items && input.items.length > 0) {
-        const itemData = input.items.find((i) => i.itemId === item.id);
+      if (input.items) {
+        const itemData = receiptByItemId.get(item.id);
         if (itemData) {
           // Process partial receipt
           const { receivedQty, damagedQty = 0 } = itemData;
-
-          if (receivedQty < 0 || damagedQty < 0) {
-            throw catalogValidation(
-              'Received and damaged quantities must be non-negative.'
-            );
-          }
-
-          if (receivedQty + damagedQty > remaining) {
-            throw catalogValidation(
-              'Received and damaged quantities cannot exceed remaining quantity.'
-            );
-          }
 
           // Add to updated items
           const updatedItem = {
@@ -1254,6 +1275,9 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
           };
           this.transferItems.set(item.id, updatedItem);
           updatedItems.push(updatedItem);
+          receivedDeltas.set(item.id, receivedQty);
+        } else {
+          updatedItems.push(item);
         }
       } else {
         // Full receipt - all remaining quantity goes to received
@@ -1267,6 +1291,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
           };
           this.transferItems.set(item.id, updatedItem);
           updatedItems.push(updatedItem);
+          receivedDeltas.set(item.id, fullReceived);
         } else {
           // No update needed if no quantity to receive
           updatedItems.push(item);
@@ -1276,22 +1301,8 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
 
     // 7. Increment warehouse stock for received quantities
     for (const item of updatedItems) {
-      const variant = this.variants.get(item.variantId);
-      if (!variant) {
-        throw catalogNotFound('Variant');
-      }
-
-      const warehouse = this.warehouses.get(transfer.destWarehouseId);
-      if (!warehouse) {
-        throw catalogNotFound('Warehouse');
-      }
-
-      // Only handle positive received quantities (not damaged)
-      if (item.receivedQty > item.sentQty + (item.damagedQty || 0)) {
-        // Calculate how much to credit
-        const toCredit =
-          item.receivedQty - item.sentQty - (item.damagedQty || 0);
-
+      const toCredit = receivedDeltas.get(item.id) ?? 0;
+      if (toCredit > 0) {
         await this.adjustLevel({
           workspaceId: input.workspaceId,
           variantId: item.variantId,
@@ -1311,7 +1322,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     let allReceived = true;
     for (const item of updatedItems) {
       const remainingToReceive =
-        item.requestedQty - item.sentQty - item.receivedQty;
+        item.sentQty - item.receivedQty - (item.damagedQty || 0);
       if (remainingToReceive > 0) {
         allReceived = false;
         break;
@@ -1319,10 +1330,10 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     }
 
     if (allReceived) {
-      // If all items fully received, update transfer status to completed
+      // If all items fully received, update transfer status to received
       const updatedTransfer: TransferRecord = {
         ...transfer,
-        status: 'completed',
+        status: 'received',
         version: transfer.version + 1,
         updatedAt: now,
       };
