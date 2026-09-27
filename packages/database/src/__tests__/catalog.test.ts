@@ -20,14 +20,17 @@ import { describe, expect, it } from 'vitest';
  */
 import {
   adjustStock,
+  archiveProduct,
   createMapping,
   createProduct,
   createWarehouse,
   getLedger,
   getStockBalance,
+  getStockSettings,
   searchCatalog,
+  updateStockSettings,
+  updateVariant,
   type CatalogStore,
-  type TransferStore,
 } from '@tokoboss/application';
 import { schema, tenants } from '../schema/index';
 import { DrizzleCatalogStore } from '../repositories/drizzle-catalog-repository';
@@ -46,7 +49,6 @@ const CHAIN = [
   '0010_product_imports.sql',
   '0011_bundle_bom.sql',
   '0012_stock_ledger_hardening.sql',
-  '0013_transfer_management.sql',
 ];
 
 async function createMigratedDb() {
@@ -190,235 +192,191 @@ describe('catalog migration + drizzle store', () => {
       });
       expect(adjusted.level.qty).toBe(12);
 
-      // Search works.
-      const found = await searchCatalog(store, {
-        ctx,
-        workspaceId: tenant.id,
-        q: 'kemeja',
-      });
-      expect(found.products).toHaveLength(1);
-      expect(found.products[0]?.variants[0]?.skuCode).toBe('KEMEJA-PTH-M');
+      // SKU code is now locked by the movement + mapping.
+      await expect(
+        updateVariant(store, {
+          ctx,
+          workspaceId: tenant.id,
+          variantId,
+          skuCode: 'KEMEJA-NEW',
+          expectedVersion: 1,
+        })
+      ).rejects.toMatchObject({ code: 'CATALOG_SKU_LOCKED' });
 
-      // Ledger is updated.
-      const ledger = await getLedger(store, {
+      // Stale version writes are rejected.
+      await adjustStock(store, {
         ctx,
         workspaceId: tenant.id,
         variantId,
-        limit: 1,
+        warehouseId: warehouse.id,
+        delta: 1,
+        reason: 'recount',
       });
-      expect(ledger).toHaveLength(1);
-      expect(ledger[0]?.delta).toBe(12);
+      await expect(
+        adjustStock(store, {
+          ctx,
+          workspaceId: tenant.id,
+          variantId,
+          warehouseId: warehouse.id,
+          delta: 1,
+          reason: 'stale',
+          expectedVersion: 1,
+        })
+      ).rejects.toMatchObject({ code: 'CATALOG_VERSION_CONFLICT' });
 
-      // Stock balance matches.
+      const hits = await searchCatalog(store, {
+        ctx,
+        workspaceId: tenant.id,
+        q: 'seller-kemeja',
+      });
+      expect(hits.variants.map((v) => v.variant.skuCode)).toContain(
+        'KEMEJA-PTH-M'
+      );
+
+      const archived = await archiveProduct(store, {
+        ctx,
+        workspaceId: tenant.id,
+        productId: created.product.id,
+      });
+      expect(archived.status).toBe('archived');
+      const level = await store.getLevel(tenant.id, variantId, warehouse.id);
+      expect(level?.qty).toBe(13);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('UTA-81: idempotency dedupes retries, policy gates oversell, reads consolidate', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const [tenant] = await db
+        .insert(tenants)
+        .values({ name: 'Acme', slug: 'acme-catalog-uta81' })
+        .returning({ id: tenants.id });
+      if (!tenant) throw new Error('seed tenant failed');
+      const store: CatalogStore = new DrizzleCatalogStore(db);
+      const adminCtx = {
+        workspaceId: tenant.id,
+        userId: 'user_admin_1',
+        role: 'admin' as const,
+        warehouseScope: null,
+        status: 'active' as const,
+        authVersion: 1,
+      };
+      const managerCtx = {
+        ...adminCtx,
+        userId: 'user_mgr_1',
+        role: 'manager' as const,
+      };
+      const wh1 = await createWarehouse(store, {
+        ctx: adminCtx,
+        workspaceId: tenant.id,
+        code: 'JKT-01',
+        name: 'Jakarta',
+      });
+      const wh2 = await createWarehouse(store, {
+        ctx: adminCtx,
+        workspaceId: tenant.id,
+        code: 'SBY-01',
+        name: 'Surabaya',
+      });
+      const created = await createProduct(store, {
+        ctx: adminCtx,
+        workspaceId: tenant.id,
+        name: 'Kaos UTA-81',
+        variants: [{ skuCode: 'UTA81-A', sellingPriceCents: 99000 }],
+      });
+      const variantId = created.variants[0]?.id ?? '';
+
+      // Idempotent adjustment: retry resolves to the original entry.
+      const first = await adjustStock(store, {
+        ctx: managerCtx,
+        workspaceId: tenant.id,
+        variantId,
+        warehouseId: wh1.id,
+        delta: 10,
+        reason: 'initial stock',
+        idempotencyKey: 'uta81-retry-1',
+      });
+      const retry = await adjustStock(store, {
+        ctx: managerCtx,
+        workspaceId: tenant.id,
+        variantId,
+        warehouseId: wh1.id,
+        delta: 10,
+        reason: 'initial stock',
+        idempotencyKey: 'uta81-retry-1',
+      });
+      expect(retry.deduplicated).toBe(true);
+      expect(retry.entry.id).toBe(first.entry.id);
+      expect(await store.countMovements(tenant.id, variantId)).toBe(1);
+
+      // Negative stock blocked by default (fresh workspace policy OFF).
+      expect(
+        (
+          await getStockSettings(store, {
+            ctx: adminCtx,
+            workspaceId: tenant.id,
+          })
+        ).allowNegative
+      ).toBe(false);
+      await expect(
+        adjustStock(store, {
+          ctx: managerCtx,
+          workspaceId: tenant.id,
+          variantId,
+          warehouseId: wh1.id,
+          delta: -50,
+          reason: 'oversell',
+        })
+      ).rejects.toMatchObject({ code: 'CATALOG_INSUFFICIENT_STOCK' });
+
+      // Admin toggles the policy; oversell then applies.
+      const enabled = await updateStockSettings(store, {
+        ctx: adminCtx,
+        workspaceId: tenant.id,
+        allowNegative: true,
+        expectedVersion: 1,
+      });
+      expect(enabled.allowNegative).toBe(true);
+      const over = await adjustStock(store, {
+        ctx: managerCtx,
+        workspaceId: tenant.id,
+        variantId,
+        warehouseId: wh1.id,
+        delta: -12,
+        reason: 'oversell allowed',
+      });
+      expect(over.level.qty).toBe(-2);
+
+      // Second warehouse + consolidated/per-WH reads + ledger filter.
+      await adjustStock(store, {
+        ctx: managerCtx,
+        workspaceId: tenant.id,
+        variantId,
+        warehouseId: wh2.id,
+        delta: 5,
+        reason: 'sby stock',
+      });
       const balance = await getStockBalance(store, {
-        ctx,
+        ctx: adminCtx,
         workspaceId: tenant.id,
         variantId,
       });
-      expect(balance.perWarehouse[0]?.qty).toBe(12);
-    } finally {
-      await client.close();
-    }
-  });
-
-  it('handles transfer workflow including sendTransfer', async () => {
-    const { client, db } = await createMigratedDb();
-    try {
-      const [tenant] = await db
-        .insert(tenants)
-        .values({ name: 'Acme', slug: 'acme-transfer' })
-        .returning({ id: tenants.id });
-      if (!tenant) throw new Error('seed tenant failed');
-
-      const store: CatalogStore & TransferStore = new DrizzleCatalogStore(db);
-      const ctx = {
-        workspaceId: tenant.id,
-        userId: 'user_admin_1',
-        role: 'admin' as const,
-        warehouseScope: null,
-        status: 'active' as const,
-        authVersion: 1,
-      };
-
-      // Create warehouses
-      const sourceWarehouse = await createWarehouse(store, {
-        ctx,
-        workspaceId: tenant.id,
-        code: 'SRC-WH',
-        name: 'Source Warehouse',
-      });
-
-      const destWarehouse = await createWarehouse(store, {
-        ctx,
-        workspaceId: tenant.id,
-        code: 'DEST-WH',
-        name: 'Destination Warehouse',
-      });
-
-      // Create product and variant
-      const createdProduct = await createProduct(store, {
-        ctx,
-        workspaceId: tenant.id,
-        name: 'Test Product',
-        unit: 'pcs',
-        variants: [{ skuCode: 'TEST-SKU-1', sellingPriceCents: 10000 }],
-      });
-      const variantId = createdProduct.variants[0]?.id ?? '';
-
-      // Add stock to source warehouse
-      await adjustStock(store, {
-        ctx,
+      expect(balance.totalQty).toBe(3);
+      expect(
+        new Map(balance.perWarehouse.map((p) => [p.warehouseId, p.qty])).get(
+          wh2.id
+        )
+      ).toBe(5);
+      const filtered = await getLedger(store, {
+        ctx: adminCtx,
         workspaceId: tenant.id,
         variantId,
-        warehouseId: sourceWarehouse.id,
-        delta: 100,
-        reason: 'initial stock',
+        warehouseId: wh2.id,
       });
-
-      // Create transfer draft
-      const transferDraft = await store.createTransferDraft({
-        workspaceId: tenant.id,
-        referenceNum: 'TRF-001',
-        sourceWarehouseId: sourceWarehouse.id,
-        destWarehouseId: destWarehouse.id,
-        notes: 'Test transfer',
-      });
-
-      expect(transferDraft.status).toBe('draft');
-
-      // Add items to transfer
-      const transferItems = await store.addTransferItems({
-        workspaceId: tenant.id,
-        transferId: transferDraft.id,
-        items: [{ variantId, requestedQty: 25 }],
-      });
-
-      expect(transferItems).toHaveLength(1);
-      expect(transferItems[0]?.requestedQty).toBe(25);
-
-      // Send the transfer
-      const sentTransfer = await store.sendTransfer({
-        workspaceId: tenant.id,
-        transferId: transferDraft.id,
-        actorId: 'user_admin_1',
-      });
-
-      // Verify the transfer status is updated to 'sent'
-      expect(sentTransfer.transfer.status).toBe('sent');
-
-      // Verify that items were updated with sent quantities
-      expect(sentTransfer.items).toHaveLength(1);
-      expect(sentTransfer.items[0]?.sentQty).toBe(25);
-
-      // Verify stock was adjusted in source warehouse (reduced by 25)
-      const finalBalance = await getStockBalance(store, {
-        ctx,
-        workspaceId: tenant.id,
-        variantId,
-      });
-      expect(finalBalance.perWarehouse[0]?.qty).toBe(75); // 100 - 25
-
-      // Verify the method returns correct data types and structure
-      expect(sentTransfer.transfer).toBeDefined();
-      expect(sentTransfer.items).toBeDefined();
-    } finally {
-      await client.close();
-    }
-  });
-
-  it('handles sendTransfer edge cases', async () => {
-    const { client, db } = await createMigratedDb();
-    try {
-      const [tenant] = await db
-        .insert(tenants)
-        .values({ name: 'Acme', slug: 'acme-transfer-edge' })
-        .returning({ id: tenants.id });
-      if (!tenant) throw new Error('seed tenant failed');
-
-      const store: CatalogStore & TransferStore = new DrizzleCatalogStore(db);
-      const ctx = {
-        workspaceId: tenant.id,
-        userId: 'user_admin_1',
-        role: 'admin' as const,
-        warehouseScope: null,
-        status: 'active' as const,
-        authVersion: 1,
-      };
-
-      // Create warehouses
-      const sourceWarehouse = await createWarehouse(store, {
-        ctx,
-        workspaceId: tenant.id,
-        code: 'SRC-WH',
-        name: 'Source Warehouse',
-      });
-
-      const destWarehouse = await createWarehouse(store, {
-        ctx,
-        workspaceId: tenant.id,
-        code: 'DEST-WH',
-        name: 'Destination Warehouse',
-      });
-
-      // Create product and variant
-      const createdProduct = await createProduct(store, {
-        ctx,
-        workspaceId: tenant.id,
-        name: 'Test Product',
-        unit: 'pcs',
-        variants: [{ skuCode: 'TEST-SKU-1', sellingPriceCents: 10000 }],
-      });
-      const variantId = createdProduct.variants[0]?.id ?? '';
-
-      // Add stock to source warehouse
-      await adjustStock(store, {
-        ctx,
-        workspaceId: tenant.id,
-        variantId,
-        warehouseId: sourceWarehouse.id,
-        delta: 100,
-        reason: 'initial stock',
-      });
-
-      // Create transfer draft
-      const transferDraft = await store.createTransferDraft({
-        workspaceId: tenant.id,
-        referenceNum: 'TRF-002',
-        sourceWarehouseId: sourceWarehouse.id,
-        destWarehouseId: destWarehouse.id,
-      });
-
-      // Try to send a transfer with no items (should fail)
-      await expect(
-        store.sendTransfer({
-          workspaceId: tenant.id,
-          transferId: transferDraft.id,
-          actorId: 'user_admin_1',
-        })
-      ).rejects.toThrow('Cannot send a transfer with no items.');
-
-      // Add items to transfer
-      await store.addTransferItems({
-        workspaceId: tenant.id,
-        transferId: transferDraft.id,
-        items: [{ variantId, requestedQty: 25 }],
-      });
-
-      // Send the transfer first time successfully
-      await store.sendTransfer({
-        workspaceId: tenant.id,
-        transferId: transferDraft.id,
-        actorId: 'user_admin_1',
-      });
-
-      // Try to send the same transfer again (should fail because it's no longer in draft)
-      await expect(
-        store.sendTransfer({
-          workspaceId: tenant.id,
-          transferId: transferDraft.id,
-          actorId: 'user_admin_1',
-        })
-      ).rejects.toThrow('Only draft transfers can be sent.');
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0]?.reason).toBe('sby stock');
     } finally {
       await client.close();
     }

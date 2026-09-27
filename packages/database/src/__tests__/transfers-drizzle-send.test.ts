@@ -56,7 +56,7 @@ async function createMigratedDb() {
   return { client, db };
 }
 
-describe('drizzle TransferStore sendTransfer (UTA-101)', () => {
+describe('drizzle TransferStore sendTransfer (UTA-108)', () => {
   it('sends transfer and adjusts stock correctly', async () => {
     const { client, db } = await createMigratedDb();
     try {
@@ -620,6 +620,106 @@ describe('drizzle TransferStore sendTransfer (UTA-101)', () => {
           actorId: null,
         })
       ).rejects.toThrow('Transfer not found.');
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('rejects insufficient source stock when allowNegative is false', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const [tenant] = await db
+        .insert(tenants)
+        .values({ name: 'Acme', slug: 'acme-xfer-insufficient' })
+        .returning({ id: tenants.id });
+      if (!tenant) throw new Error('seed tenant failed');
+
+      const store = new DrizzleCatalogStore(db) as CatalogStore & TransferStore;
+      const ctx = {
+        workspaceId: tenant.id,
+        userId: 'user_admin_1',
+        role: 'admin' as const,
+        warehouseScope: null,
+        status: 'active' as const,
+        authVersion: 1,
+      };
+
+      const source = await createWarehouse(store, {
+        ctx,
+        workspaceId: tenant.id,
+        code: 'SRC-01',
+        name: 'Source WH',
+      });
+      const dest = await createWarehouse(store, {
+        ctx,
+        workspaceId: tenant.id,
+        code: 'DST-01',
+        name: 'Dest WH',
+      });
+
+      // Create a product with variants directly in the database
+      const productResult = await db
+        .insert(schema.catalogProducts)
+        .values({
+          workspaceId: tenant.id,
+          name: 'Test Product',
+          description: null,
+          unit: 'pcs',
+          pictures: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning({ id: schema.catalogProducts.id });
+
+      const productId = productResult[0]!.id;
+
+      const variantResult = await db
+        .insert(schema.catalogVariants)
+        .values({
+          productId: productId,
+          workspaceId: tenant.id,
+          skuCode: 'SKU-001',
+          name: 'Test Variant',
+          sellingPriceCents: 1000,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning({ id: schema.catalogVariants.id });
+
+      const variantId = variantResult[0]!.id;
+
+      // Set up insufficient stock in source warehouse (only 5 available, but want to send 10)
+      await adjustStock(store, {
+        ctx,
+        workspaceId: tenant.id,
+        variantId: variantId,
+        warehouseId: source.id,
+        delta: 5,
+        reason: 'initial_stock',
+      });
+
+      // Create draft transfer and add items
+      const transfer = await store.createTransferDraft({
+        workspaceId: tenant.id,
+        referenceNum: 'TRF-007',
+        sourceWarehouseId: source.id,
+        destWarehouseId: dest.id,
+      });
+
+      await store.addTransferItems({
+        workspaceId: tenant.id,
+        transferId: transfer.id,
+        items: [{ variantId: variantId, requestedQty: 10 }],
+      });
+
+      // Try to send with insufficient stock - should reject
+      await expect(
+        store.sendTransfer({
+          workspaceId: tenant.id,
+          transferId: transfer.id,
+          actorId: null,
+        })
+      ).rejects.toThrow('Insufficient stock for adjustment.');
     } finally {
       await client.close();
     }
