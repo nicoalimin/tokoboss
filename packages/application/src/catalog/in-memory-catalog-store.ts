@@ -280,6 +280,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
 
     // 7. Set each item `sentQty = requestedQty`, bump `item.version`, `updatedAt = now`
     const now = new Date();
+    const updatedItems: TransferItemRecord[] = [];
     for (const item of items) {
       const updatedItem: TransferItemRecord = {
         ...item,
@@ -288,6 +289,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
         updatedAt: now,
       };
       this.transferItems.set(item.id, updatedItem);
+      updatedItems.push(updatedItem);
     }
 
     // 8. Set transfer `status = 'sent'`, bump `transfer.version`, `updatedAt = now`
@@ -302,7 +304,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     // 9. Return `{ transfer, items }` clones
     return {
       transfer: clone(updatedTransfer),
-      items: items.map(clone),
+      items: updatedItems.map(clone),
     };
   }
 

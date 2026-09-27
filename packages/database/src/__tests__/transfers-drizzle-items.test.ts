@@ -182,6 +182,44 @@ describe('drizzle TransferStore items (UTA-102)', () => {
       const cross = await store.findTransferWithItems(tenantB.id, draft.id);
       expect(cross).toBeNull();
 
+      await store.adjustLevel({
+        workspaceId: tenantA.id,
+        variantId: variant.id,
+        warehouseId: source.id,
+        delta: 10,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+      const sent = await store.sendTransfer({
+        workspaceId: tenantA.id,
+        transferId: draft.id,
+        actorId: null,
+      });
+      expect(sent.transfer.status).toBe('sent');
+      expect(sent.transfer.version).toBe(2);
+      expect(sent.items[0]?.sentQty).toBe(5);
+      expect(sent.items[0]?.version).toBe(2);
+
+      const sourceLevel = await store.getLevel(
+        tenantA.id,
+        variant.id,
+        source.id
+      );
+      expect(sourceLevel?.qty).toBe(5);
+      const ledger = await store.listLedgerByVariant(
+        tenantA.id,
+        variant.id,
+        100
+      );
+      expect(
+        ledger.some(
+          (entry) =>
+            entry.reason === 'transfer_send' &&
+            entry.correlationId === draft.id &&
+            entry.delta === -5
+        )
+      ).toBe(true);
+
       const second = await store.createTransferDraft({
         workspaceId: tenantA.id,
         referenceNum: 'TRF-ITEMS-002',

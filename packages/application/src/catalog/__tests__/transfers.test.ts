@@ -324,13 +324,12 @@ describe('TransferStore', () => {
         items: [{ variantId: variant.id, requestedQty: 10 }],
       });
 
-      // Manually change status to sent
-      const updatedTransfer = {
-        ...transfer,
-        status: 'sent',
-        version: 2,
-      };
-      store.transfers.set(transfer.id, updatedTransfer);
+      // Send once so the transfer is no longer a draft.
+      await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+      });
 
       await expect(
         store.sendTransfer({
@@ -404,6 +403,7 @@ describe('TransferStore', () => {
         warehouseId: warehouse1.id,
         delta: 5,
         reason: 'initial_stock',
+        actorId: null,
       });
 
       // Create draft transfer
