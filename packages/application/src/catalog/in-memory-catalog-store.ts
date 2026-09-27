@@ -1312,7 +1312,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
           actorId: input.actorId,
           correlationId: transfer.id,
           idempotencyKey: input.idempotencyKey
-            ? `${input.idempotencyKey}:${item.id}`
+            ? `${input.idempotencyKey}:${item.id}:receive`
             : undefined,
         });
       }
