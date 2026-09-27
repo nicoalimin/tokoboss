@@ -27,6 +27,7 @@ import {
   getStockBalance,
   searchCatalog,
   type CatalogStore,
+  type TransferStore,
 } from '@tokoboss/application';
 import { schema, tenants } from '../schema/index';
 import { DrizzleCatalogStore } from '../repositories/drizzle-catalog-repository';
@@ -196,7 +197,7 @@ describe('catalog migration + drizzle store', () => {
         q: 'kemeja',
       });
       expect(found.products).toHaveLength(1);
-      expect(found.products[0].variants[0].skuCode).toBe('KEMEJA-PTH-M');
+      expect(found.products[0]?.variants[0]?.skuCode).toBe('KEMEJA-PTH-M');
 
       // Ledger is updated.
       const ledger = await getLedger(store, {
@@ -206,16 +207,15 @@ describe('catalog migration + drizzle store', () => {
         limit: 1,
       });
       expect(ledger).toHaveLength(1);
-      expect(ledger[0].delta).toBe(12);
+      expect(ledger[0]?.delta).toBe(12);
 
       // Stock balance matches.
       const balance = await getStockBalance(store, {
         ctx,
         workspaceId: tenant.id,
         variantId,
-        warehouseId: warehouse.id,
       });
-      expect(balance.perWarehouse[0].qty).toBe(12);
+      expect(balance.perWarehouse[0]?.qty).toBe(12);
     } finally {
       await client.close();
     }
@@ -230,7 +230,7 @@ describe('catalog migration + drizzle store', () => {
         .returning({ id: tenants.id });
       if (!tenant) throw new Error('seed tenant failed');
 
-      const store: CatalogStore = new DrizzleCatalogStore(db);
+      const store: CatalogStore & TransferStore = new DrizzleCatalogStore(db);
       const ctx = {
         workspaceId: tenant.id,
         userId: 'user_admin_1',
@@ -294,7 +294,7 @@ describe('catalog migration + drizzle store', () => {
       });
 
       expect(transferItems).toHaveLength(1);
-      expect(transferItems[0].requestedQty).toBe(25);
+      expect(transferItems[0]?.requestedQty).toBe(25);
 
       // Send the transfer
       const sentTransfer = await store.sendTransfer({
@@ -308,16 +308,15 @@ describe('catalog migration + drizzle store', () => {
 
       // Verify that items were updated with sent quantities
       expect(sentTransfer.items).toHaveLength(1);
-      expect(sentTransfer.items[0].sentQty).toBe(25);
+      expect(sentTransfer.items[0]?.sentQty).toBe(25);
 
       // Verify stock was adjusted in source warehouse (reduced by 25)
       const finalBalance = await getStockBalance(store, {
         ctx,
         workspaceId: tenant.id,
         variantId,
-        warehouseId: sourceWarehouse.id,
       });
-      expect(finalBalance.perWarehouse[0].qty).toBe(75); // 100 - 25
+      expect(finalBalance.perWarehouse[0]?.qty).toBe(75); // 100 - 25
 
       // Verify the method returns correct data types and structure
       expect(sentTransfer.transfer).toBeDefined();
@@ -336,7 +335,7 @@ describe('catalog migration + drizzle store', () => {
         .returning({ id: tenants.id });
       if (!tenant) throw new Error('seed tenant failed');
 
-      const store: CatalogStore = new DrizzleCatalogStore(db);
+      const store: CatalogStore & TransferStore = new DrizzleCatalogStore(db);
       const ctx = {
         workspaceId: tenant.id,
         userId: 'user_admin_1',
