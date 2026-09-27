@@ -1319,10 +1319,10 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     }
 
     if (allReceived) {
-      // If all items fully received, update transfer status to received
+      // If all items fully received, update transfer status to completed
       const updatedTransfer: TransferRecord = {
         ...transfer,
-        status: 'received',
+        status: 'completed',
         version: transfer.version + 1,
         updatedAt: now,
       };

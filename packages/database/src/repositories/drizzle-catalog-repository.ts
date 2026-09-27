@@ -1603,4 +1603,222 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       };
     });
   }
+
+  async receiveTransfer(input: {
+    workspaceId: string;
+    transferId: string;
+    actorId: string | null;
+    expectedVersion?: number;
+    idempotencyKey?: string;
+    /** Omit = full remaining as good receipt for every item. */
+    items?: Array<{
+      itemId: string;
+      receivedQty: number;
+      damagedQty?: number;
+    }>;
+  }): Promise<TransferWithItems> {
+    return await this.db.transaction(async (tx) => {
+      // 1. Load transfer by id+workspace → missing → `catalogNotFound('Transfer')`
+      const transferRows = await tx
+        .select()
+        .from(catalogTransfers)
+        .where(
+          and(
+            eq(catalogTransfers.id, input.transferId),
+            eq(catalogTransfers.workspaceId, input.workspaceId)
+          )
+        )
+        .limit(1);
+      const transfer = transferRows[0];
+      if (!transfer) {
+        throw catalogNotFound('Transfer');
+      }
+
+      // 2. If `expectedVersion` provided and ≠ `transfer.version` → `catalogVersionConflict(transfer.version)`
+      if (
+        input.expectedVersion !== undefined &&
+        input.expectedVersion !== transfer.version
+      ) {
+        throw catalogVersionConflict(transfer.version);
+      }
+
+      // 3. If `status !== 'sent'` → `catalogConflict('Only sent transfers can be received.')`
+      if (transfer.status !== 'sent') {
+        throw catalogConflict('Only sent transfers can be received.');
+      }
+
+      // 4. Collect items for this transfer
+      const itemRows = await tx
+        .select()
+        .from(catalogTransferItems)
+        .where(
+          and(
+            eq(catalogTransferItems.workspaceId, input.workspaceId),
+            eq(catalogTransferItems.transferId, transfer.id)
+          )
+        );
+
+      // 5. If no items, reject with validation error
+      if (itemRows.length === 0) {
+        throw catalogValidation('Cannot receive a transfer with no items.');
+      }
+
+      const now = new Date();
+      const updatedItems: TransferItemRecord[] = [];
+
+      // 6. Process each item according to the requirements
+      for (const row of itemRows) {
+        // Calculate remaining quantity that can be received
+        const remaining = row.requestedQty - row.sentQty - row.receivedQty;
+
+        // If items array is provided, use that instead of full qty
+        if (input.items && input.items.length > 0) {
+          const itemData = input.items.find((i) => i.itemId === row.id);
+          if (itemData) {
+            // Process partial receipt
+            const { receivedQty, damagedQty = 0 } = itemData;
+
+            if (receivedQty < 0 || damagedQty < 0) {
+              throw catalogValidation(
+                'Received and damaged quantities must be non-negative.'
+              );
+            }
+
+            if (receivedQty + damagedQty > remaining) {
+              throw catalogValidation(
+                'Received and damaged quantities cannot exceed remaining quantity.'
+              );
+            }
+
+            // Update item
+            const updated = await tx
+              .update(catalogTransferItems)
+              .set({
+                receivedQty: row.receivedQty + receivedQty,
+                damagedQty: (row.damagedQty || 0) + damagedQty,
+                version: row.version + 1,
+                updatedAt: now,
+              })
+              .where(
+                and(
+                  eq(catalogTransferItems.id, row.id),
+                  eq(catalogTransferItems.workspaceId, input.workspaceId),
+                  eq(catalogTransferItems.version, row.version)
+                )
+              )
+              .returning();
+            const updatedItem = toTransferItem(updated[0]);
+            updatedItems.push(updatedItem);
+          } else {
+            // Item not provided in partial receipt - no change
+            updatedItems.push(toTransferItem(row));
+          }
+        } else {
+          // Full receipt - all remaining quantity goes to received
+          const fullReceived = remaining;
+          if (fullReceived > 0) {
+            const updated = await tx
+              .update(catalogTransferItems)
+              .set({
+                receivedQty: row.receivedQty + fullReceived,
+                version: row.version + 1,
+                updatedAt: now,
+              })
+              .where(
+                and(
+                  eq(catalogTransferItems.id, row.id),
+                  eq(catalogTransferItems.workspaceId, input.workspaceId),
+                  eq(catalogTransferItems.version, row.version)
+                )
+              )
+              .returning();
+            const updatedItem = toTransferItem(updated[0]);
+            updatedItems.push(updatedItem);
+          } else {
+            // No update needed if no quantity to receive
+            updatedItems.push(toTransferItem(row));
+          }
+        }
+      }
+
+      // 7. Increment warehouse stock for received quantities
+      for (const item of updatedItems) {
+        if (item.receivedQty > item.sentQty + (item.damagedQty || 0)) {
+          // Calculate how much to credit
+          const toCredit =
+            item.receivedQty - item.sentQty - (item.damagedQty || 0);
+
+          await this.adjustLevel({
+            workspaceId: input.workspaceId,
+            variantId: item.variantId,
+            warehouseId: transfer.destWarehouseId,
+            delta: toCredit,
+            reason: 'transfer_receive',
+            actorId: input.actorId,
+            correlationId: transfer.id,
+            idempotencyKey: input.idempotencyKey
+              ? `${input.idempotencyKey}:${item.id}`
+              : undefined,
+            transaction: tx,
+          });
+        }
+      }
+
+      // 8. Check if all items are fully received, update transfer status if needed
+      let allReceived = true;
+      for (const item of updatedItems) {
+        const remainingToReceive =
+          item.requestedQty - item.sentQty - item.receivedQty;
+        if (remainingToReceive > 0) {
+          allReceived = false;
+          break;
+        }
+      }
+
+      if (allReceived) {
+        // If all items fully received, update transfer status to completed
+        const updatedTransfer = await tx
+          .update(catalogTransfers)
+          .set({
+            status: 'completed',
+            version: transfer.version + 1,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(catalogTransfers.id, transfer.id),
+              eq(catalogTransfers.workspaceId, input.workspaceId),
+              eq(catalogTransfers.status, 'sent'),
+              eq(catalogTransfers.version, transfer.version)
+            )
+          )
+          .returning();
+        return {
+          transfer: toTransfer(updatedTransfer[0]),
+          items: updatedItems,
+        };
+      } else {
+        // If not all received, keep status as sent
+        const updatedTransfer = await tx
+          .update(catalogTransfers)
+          .set({
+            version: transfer.version + 1,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(catalogTransfers.id, transfer.id),
+              eq(catalogTransfers.workspaceId, input.workspaceId),
+              eq(catalogTransfers.status, 'sent'),
+              eq(catalogTransfers.version, transfer.version)
+            )
+          )
+          .returning();
+        return {
+          transfer: toTransfer(updatedTransfer[0]),
+          items: updatedItems,
+        };
+      }
+    });
+  }
 }
