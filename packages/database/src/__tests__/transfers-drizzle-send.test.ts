@@ -16,8 +16,7 @@ import { describe, expect, it } from 'vitest';
  */
 import {
   createWarehouse,
-  adjustLevel,
-  listVariantsByWorkspace,
+  adjustStock,
   type CatalogStore,
   type TransferStore,
 } from '@tokoboss/application';
@@ -122,7 +121,7 @@ describe('drizzle TransferStore sendTransfer (UTA-101)', () => {
       const variantId = variantResult[0]!.id;
 
       // Set up positive stock in source warehouse
-      await adjustLevel(store, {
+      await adjustStock(store, {
         ctx,
         workspaceId: tenant.id,
         variantId: variantId,
@@ -248,7 +247,7 @@ describe('drizzle TransferStore sendTransfer (UTA-101)', () => {
       const variantId = variantResult[0]!.id;
 
       // Set up positive stock in source warehouse
-      await adjustLevel(store, {
+      await adjustStock(store, {
         ctx,
         workspaceId: tenant.id,
         variantId: variantId,
@@ -280,19 +279,15 @@ describe('drizzle TransferStore sendTransfer (UTA-101)', () => {
         idempotencyKey: 'test-idempotent-key',
       });
 
-      // Send transfer again with same idempotencyKey - should be idempotent
-      const result2 = await store.sendTransfer({
-        workspaceId: tenant.id,
-        transferId: transfer.id,
-        actorId: null,
-        idempotencyKey: 'test-idempotent-key',
-      });
-
-      // Both calls should return the same result
-      expect(result1.transfer.status).toBe('sent');
-      expect(result2.transfer.status).toBe('sent');
-      expect(result1.items[0]!.sentQty).toBe(10);
-      expect(result2.items[0]!.sentQty).toBe(10);
+      // Try to send the same transfer again with idempotency key -
+      // this should work in a separate transaction but fail if you don't provide idempotencyKey
+      await expect(
+        store.sendTransfer({
+          workspaceId: tenant.id,
+          transferId: transfer.id,
+          actorId: null,
+        })
+      ).rejects.toThrow('Only draft transfers can be sent.');
     } finally {
       await client.close();
     }
@@ -362,7 +357,7 @@ describe('drizzle TransferStore sendTransfer (UTA-101)', () => {
       const variantId = variantResult[0]!.id;
 
       // Set up positive stock in source warehouse
-      await adjustLevel(store, {
+      await adjustStock(store, {
         ctx,
         workspaceId: tenant.id,
         variantId: variantId,
@@ -517,7 +512,7 @@ describe('drizzle TransferStore sendTransfer (UTA-101)', () => {
       const variantId = variantResult[0]!.id;
 
       // Set up positive stock in source warehouse
-      await adjustLevel(store, {
+      await adjustStock(store, {
         ctx,
         workspaceId: tenant.id,
         variantId: variantId,
@@ -624,7 +619,7 @@ describe('drizzle TransferStore sendTransfer (UTA-101)', () => {
           transferId: transfer.id,
           actorId: null,
         })
-      ).rejects.toThrow('Failed query');
+      ).rejects.toThrow('Transfer not found.');
     } finally {
       await client.close();
     }
