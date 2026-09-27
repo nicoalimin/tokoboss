@@ -159,4 +159,397 @@ describe('TransferStore', () => {
       expect(ws2Transfer.referenceNum).toBe('REF-002');
     });
   });
+
+  describe('sendTransfer', () => {
+    it('sends a draft transfer with items, adjusts stock and updates status', async () => {
+      // Setup
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        code: 'WH1',
+        name: 'Warehouse 1',
+      });
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        code: 'WH2',
+        name: 'Warehouse 2',
+      });
+
+      const product = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Product Variant 1',
+            barcode: '123456789',
+            sellingPriceCents: 100,
+            hppCents: 50,
+            costSource: 'supplier',
+          },
+        ],
+      });
+
+      const variant = product.variants[0]!;
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 10,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      const draft = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'TRF-SEND-001',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: draft.id,
+        items: [{ variantId: variant.id, requestedQty: 5 }],
+      });
+
+      // Execute
+      const sent = await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: draft.id,
+        actorId: null,
+      });
+
+      // Verify
+      expect(sent.transfer.status).toBe('sent');
+      expect(sent.transfer.version).toBe(2);
+      expect(sent.items[0]?.sentQty).toBe(5);
+      expect(sent.items[0]?.version).toBe(2);
+
+      const sourceLevel = await store.getLevel(
+        'ws1',
+        variant.id,
+        warehouse1.id
+      );
+      expect(sourceLevel?.qty).toBe(5);
+
+      const ledger = await store.listLedgerByVariant('ws1', variant.id, 100);
+      expect(
+        ledger.some(
+          (entry) =>
+            entry.reason === 'transfer_send' &&
+            entry.correlationId === draft.id &&
+            entry.delta === -5
+        )
+      ).toBe(true);
+    });
+
+    it('fails for non-draft transfers', async () => {
+      // Setup
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        code: 'WH1',
+        name: 'Warehouse 1',
+      });
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        code: 'WH2',
+        name: 'Warehouse 2',
+      });
+
+      const product = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Product Variant 1',
+            barcode: '123456789',
+            sellingPriceCents: 100,
+            hppCents: 50,
+            costSource: 'supplier',
+          },
+        ],
+      });
+
+      const variant = product.variants[0]!;
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 10,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      const draft = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'TRF-SEND-002',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      // Send it first
+      await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: draft.id,
+        items: [{ variantId: variant.id, requestedQty: 5 }],
+      });
+
+      await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: draft.id,
+        actorId: null,
+      });
+
+      // Try to send again - should fail
+      await expect(
+        store.sendTransfer({
+          workspaceId: 'ws1',
+          transferId: draft.id,
+          actorId: null,
+        })
+      ).rejects.toThrow('Only draft transfers can be sent.');
+    });
+
+    it('fails for invalid version', async () => {
+      // Setup
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        code: 'WH1',
+        name: 'Warehouse 1',
+      });
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        code: 'WH2',
+        name: 'Warehouse 2',
+      });
+
+      const product = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Product Variant 1',
+            barcode: '123456789',
+            sellingPriceCents: 100,
+            hppCents: 50,
+            costSource: 'supplier',
+          },
+        ],
+      });
+
+      const variant = product.variants[0]!;
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 10,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      const draft = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'TRF-SEND-003',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: draft.id,
+        items: [{ variantId: variant.id, requestedQty: 5 }],
+      });
+
+      // Try with wrong version
+      await expect(
+        store.sendTransfer({
+          workspaceId: 'ws1',
+          transferId: draft.id,
+          actorId: null,
+          expectedVersion: 5, // Wrong version
+        })
+      ).rejects.toThrow('This record changed. Reload and try again.');
+    });
+
+    it('fails for insufficient stock', async () => {
+      // Setup
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        code: 'WH1',
+        name: 'Warehouse 1',
+      });
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        code: 'WH2',
+        name: 'Warehouse 2',
+      });
+
+      const product = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Product Variant 1',
+            barcode: '123456789',
+            sellingPriceCents: 100,
+            hppCents: 50,
+            costSource: 'supplier',
+          },
+        ],
+      });
+
+      const variant = product.variants[0]!;
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 5, // Only 5 in stock
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      const draft = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'TRF-SEND-004',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: draft.id,
+        items: [{ variantId: variant.id, requestedQty: 10 }], // Need 10 but only have 5
+      });
+
+      // Should reject due to insufficient stock
+      await expect(
+        store.sendTransfer({
+          workspaceId: 'ws1',
+          transferId: draft.id,
+          actorId: null,
+        })
+      ).rejects.toThrow('Insufficient stock for adjustment.');
+    });
+
+    it('fails gracefully when no items exist', async () => {
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        code: 'WH1',
+        name: 'Warehouse 1',
+      });
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        code: 'WH2',
+        name: 'Warehouse 2',
+      });
+
+      const draft = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'TRF-SEND-005',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      await expect(
+        store.sendTransfer({
+          workspaceId: 'ws1',
+          transferId: draft.id,
+          actorId: null,
+        })
+      ).rejects.toThrow('Cannot send a transfer with no items.');
+    });
+
+    it('handles idempotency keys correctly', async () => {
+      // Setup
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        code: 'WH1',
+        name: 'Warehouse 1',
+      });
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        code: 'WH2',
+        name: 'Warehouse 2',
+      });
+
+      const product = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Product Variant 1',
+            barcode: '123456789',
+            sellingPriceCents: 100,
+            hppCents: 50,
+            costSource: 'supplier',
+          },
+        ],
+      });
+
+      const variant = product.variants[0]!;
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 10,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      const draft = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'TRF-SEND-006',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: draft.id,
+        items: [{ variantId: variant.id, requestedQty: 5 }],
+      });
+
+      // First send
+      await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: draft.id,
+        actorId: null,
+        idempotencyKey: 'test-key',
+      });
+
+      // Send again with same key - should not duplicate adjustment
+      const result = await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: draft.id,
+        actorId: null,
+        idempotencyKey: 'test-key',
+      });
+
+      expect(result.transfer.status).toBe('sent');
+    });
+  });
 });

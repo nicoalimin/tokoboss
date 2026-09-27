@@ -208,6 +208,106 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     return out;
   }
 
+  async sendTransfer(input: {
+    workspaceId: string;
+    transferId: string;
+    actorId: string | null;
+    expectedVersion?: number;
+    idempotencyKey?: string;
+  }): Promise<TransferWithItems> {
+    // 1. Load transfer by id+workspace → missing → `catalogNotFound('Transfer')`
+    const transfer = this.transfers.get(input.transferId);
+    if (!transfer || transfer.workspaceId !== input.workspaceId) {
+      throw catalogNotFound('Transfer');
+    }
+
+    // 2. If `expectedVersion` provided and ≠ `transfer.version` → `catalogVersionConflict(transfer.version)`
+    if (
+      input.expectedVersion !== undefined &&
+      input.expectedVersion !== transfer.version
+    ) {
+      throw catalogVersionConflict(transfer.version);
+    }
+
+    // 3. If `status !== 'draft'` → `catalogConflict('Only draft transfers can be sent.')`
+    if (transfer.status !== 'draft') {
+      throw catalogConflict('Only draft transfers can be sent.');
+    }
+
+    // 4. Collect items for this transfer; if none → `catalogValidation('Cannot send a transfer with no items.')`
+    const items: TransferItemRecord[] = [];
+    for (const item of this.transferItems.values()) {
+      if (
+        item.workspaceId === input.workspaceId &&
+        item.transferId === transfer.id
+      ) {
+        items.push(item);
+      }
+    }
+
+    if (items.length === 0) {
+      throw catalogValidation('Cannot send a transfer with no items.');
+    }
+
+    // 5. Resolve `allowNegative` from existing stock settings for the workspace (default `false` via `getStockSettings`)
+    const stockSettings = await this.getStockSettings(input.workspaceId);
+    const allowNegative = stockSettings.allowNegative;
+
+    // 6. For each item, call `adjustLevel` with:
+    //    - `warehouseId`: transfer.sourceWarehouseId
+    //    - `delta`: -item.requestedQty
+    //    - `reason`: 'transfer_send'
+    //    - `actorId`: input.actorId
+    //    - `correlationId`: transfer.id
+    //    - `idempotencyKey`: input.idempotencyKey ? `${input.idempotencyKey}:${[item.id]}` : undefined
+    //    - `allowNegative` from step 5
+    //    - Insufficient stock → `catalogInsufficientStock` (already thrown by adjustLevel)
+    for (const item of items) {
+      await this.adjustLevel({
+        workspaceId: input.workspaceId,
+        variantId: item.variantId,
+        warehouseId: transfer.sourceWarehouseId,
+        delta: -item.requestedQty,
+        reason: 'transfer_send',
+        actorId: input.actorId,
+        correlationId: transfer.id,
+        idempotencyKey: input.idempotencyKey
+          ? `${input.idempotencyKey}:${item.id}`
+          : undefined,
+        allowNegative,
+      });
+    }
+
+    // 7. Set each item `sentQty = requestedQty`, bump `item.version`, `updatedAt = now`
+    const now = new Date();
+    const updatedItems: TransferItemRecord[] = [];
+    for (const item of items) {
+      const updatedItem: TransferItemRecord = {
+        ...item,
+        sentQty: item.requestedQty,
+        version: item.version + 1,
+        updatedAt: now,
+      };
+      this.transferItems.set(item.id, updatedItem);
+      updatedItems.push(updatedItem);
+    }
+
+    // 8. Set transfer `status = 'sent'`, bump `transfer.version`, `updatedAt = now`
+    const updatedTransfer: TransferRecord = {
+      ...transfer,
+      status: 'sent',
+      version: transfer.version + 1,
+      updatedAt: now,
+    };
+    this.transfers.set(transfer.id, updatedTransfer);
+
+    // 9. Return `{ transfer, items }` clones
+    return {
+      transfer: clone(updatedTransfer),
+      items: updatedItems.map(clone),
+    };
+  }
+
   private skuIndex = new Map<string, string>();
   private warehouseCodeIndex = new Map<string, string>();
   private mappingKeyIndex = new Map<string, string>();
