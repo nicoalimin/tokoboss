@@ -496,4 +496,129 @@ describe('TransferStore', () => {
       ).rejects.toThrow('This record changed. Reload and try again.');
     });
   });
+  describe('receiveTransfer', () => {
+    it('full receive (omit items) marks received, credits dest, and writes transfer_receive ledger', async () => {
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 1',
+        code: 'WH-001',
+      });
+
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 2',
+        code: 'WH-002',
+      });
+
+      const productResult = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Test Variant',
+            sellingPriceCents: 1000,
+          },
+        ],
+      });
+
+      const variant = productResult.variants[0]!;
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 100,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      const transfer = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'REF-RECV-001',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        items: [{ variantId: variant.id, requestedQty: 10 }],
+      });
+
+      await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+      });
+
+      const result = await store.receiveTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+      });
+
+      expect(result.transfer.status).toBe('received');
+      expect(result.items[0]!.receivedQty).toBe(result.items[0]!.sentQty);
+      expect(result.items[0]!.sentQty).toBe(10);
+
+      const destLevel = await store.getLevel('ws1', variant.id, warehouse2.id);
+      expect(destLevel?.qty).toBe(10);
+
+      const ledgerEntries = await store.listLedgerByVariant(
+        'ws1',
+        variant.id,
+        100
+      );
+      const receiveEntries = ledgerEntries.filter(
+        (entry) => entry.reason === 'transfer_receive'
+      );
+      expect(receiveEntries).toHaveLength(1);
+      expect(receiveEntries[0]!.delta).toBe(10);
+      expect(receiveEntries[0]!.correlationId).toBe(transfer.id);
+    });
+
+    it('non-sent transfer rejects with conflict error', async () => {
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 1',
+        code: 'WH-001',
+      });
+
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 2',
+        code: 'WH-002',
+      });
+
+      const transfer = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'REF-RECV-DRAFT',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      await expect(
+        store.receiveTransfer({
+          workspaceId: 'ws1',
+          transferId: transfer.id,
+          actorId: null,
+        })
+      ).rejects.toThrow('Only sent transfers can be received.');
+    });
+
+    it('unknown transfer or wrong workspace rejects with not found', async () => {
+      await expect(
+        store.receiveTransfer({
+          workspaceId: 'ws1',
+          transferId: 'missing-transfer-id',
+          actorId: null,
+        })
+      ).rejects.toThrow('Transfer');
+    });
+  });
+
 });

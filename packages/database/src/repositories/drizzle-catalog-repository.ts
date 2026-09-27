@@ -1603,4 +1603,21 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       };
     });
   }
+
+  async receiveTransfer(input: {
+    workspaceId: string;
+    transferId: string;
+    actorId: string | null;
+    expectedVersion?: number;
+    idempotencyKey?: string;
+    /** Omit = full remaining as good receipt for every item. */
+    items?: Array<{
+      itemId: string;
+      receivedQty: number;
+      damagedQty?: number;
+    }>;
+  }): Promise<TransferWithItems> {
+    void input;
+    throw catalogConflict('receiveTransfer not implemented in Drizzle yet');
+  }
 }
