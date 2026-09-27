@@ -211,4 +211,94 @@ describe('drizzle TransferStore items (UTA-102)', () => {
       await client.close();
     }
   });
+
+  it('sends atomically and deduplicates a retry by idempotency key', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const [tenant] = await db
+        .insert(tenants)
+        .values({ name: 'Send', slug: 'transfer-send' })
+        .returning({ id: tenants.id });
+      if (!tenant) throw new Error('seed tenant failed');
+
+      const store = new DrizzleCatalogStore(db);
+      const ctx = {
+        workspaceId: tenant.id,
+        userId: 'user_admin_1',
+        role: 'admin' as const,
+        warehouseScope: null,
+        status: 'active' as const,
+        authVersion: 1,
+      };
+      const source = await createWarehouse(store, {
+        ctx,
+        workspaceId: tenant.id,
+        code: 'SEND-SRC',
+        name: 'Send source',
+      });
+      const dest = await createWarehouse(store, {
+        ctx,
+        workspaceId: tenant.id,
+        code: 'SEND-DST',
+        name: 'Send destination',
+      });
+      const product = await createProduct(store, {
+        ctx,
+        workspaceId: tenant.id,
+        name: 'Send widget',
+        unit: 'pcs',
+        variants: [{ skuCode: 'SEND-001', sellingPriceCents: 10000 }],
+      });
+      const variant = product.variants[0];
+      if (!variant) throw new Error('seed variant failed');
+
+      await store.adjustLevel({
+        workspaceId: tenant.id,
+        variantId: variant.id,
+        warehouseId: source.id,
+        delta: 10,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+      const draft = await store.createTransferDraft({
+        workspaceId: tenant.id,
+        referenceNum: 'TRF-SEND-001',
+        sourceWarehouseId: source.id,
+        destWarehouseId: dest.id,
+      });
+      await store.addTransferItems({
+        workspaceId: tenant.id,
+        transferId: draft.id,
+        items: [{ variantId: variant.id, requestedQty: 4 }],
+      });
+
+      const sent = await store.sendTransfer({
+        workspaceId: tenant.id,
+        transferId: draft.id,
+        actorId: ctx.userId,
+        expectedVersion: draft.version,
+        idempotencyKey: 'send-once',
+      });
+      expect(sent.transfer.status).toBe('sent');
+      expect(sent.transfer.version).toBe(2);
+      expect(sent.items[0]?.sentQty).toBe(4);
+      expect(sent.items[0]?.version).toBe(2);
+      expect(
+        (await store.getLevel(tenant.id, variant.id, source.id))?.qty
+      ).toBe(6);
+
+      const retried = await store.sendTransfer({
+        workspaceId: tenant.id,
+        transferId: draft.id,
+        actorId: ctx.userId,
+        idempotencyKey: 'send-once',
+      });
+      expect(retried).toEqual(sent);
+      expect(
+        (await store.getLevel(tenant.id, variant.id, source.id))?.qty
+      ).toBe(6);
+    } finally {
+      await client.close();
+    }
+  });
 });

@@ -1478,4 +1478,159 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
     }
     return out;
   }
+
+  async sendTransfer(input: {
+    workspaceId: string;
+    transferId: string;
+    actorId: string | null;
+    expectedVersion?: number;
+    idempotencyKey?: string;
+  }): Promise<TransferWithItems> {
+    return this.inTx(async (tx) => {
+      const transferRows = await tx
+        .select()
+        .from(catalogTransfers)
+        .where(
+          and(
+            eq(catalogTransfers.workspaceId, input.workspaceId),
+            eq(catalogTransfers.id, input.transferId)
+          )
+        )
+        .limit(1);
+      const transferRow = transferRows[0];
+      if (!transferRow) throw catalogNotFound('Transfer');
+      const transfer = toTransfer(transferRow);
+
+      if (
+        input.expectedVersion !== undefined &&
+        input.expectedVersion !== transfer.version
+      ) {
+        throw catalogVersionConflict(transfer.version);
+      }
+
+      const itemRows = await tx
+        .select()
+        .from(catalogTransferItems)
+        .where(
+          and(
+            eq(catalogTransferItems.workspaceId, input.workspaceId),
+            eq(catalogTransferItems.transferId, input.transferId)
+          )
+        )
+        .orderBy(asc(catalogTransferItems.createdAt));
+
+      // A completed request may be retried after its transaction committed.
+      // Recognise it only when every per-line ledger key matches this transfer;
+      // otherwise the normal status conflict remains authoritative.
+      if (transfer.status === 'sent' && input.idempotencyKey) {
+        let isRetry = itemRows.length > 0;
+        for (const item of itemRows) {
+          const ledgerRows = await tx
+            .select()
+            .from(catalogStockLedger)
+            .where(
+              and(
+                eq(catalogStockLedger.workspaceId, input.workspaceId),
+                eq(
+                  catalogStockLedger.idempotencyKey,
+                  `${input.idempotencyKey}:${item.id}`
+                )
+              )
+            )
+            .limit(1);
+          const entry = ledgerRows[0];
+          if (
+            !entry ||
+            entry.variantId !== item.variantId ||
+            entry.warehouseId !== transfer.sourceWarehouseId ||
+            entry.delta !== -item.requestedQty ||
+            entry.reason !== 'transfer_send' ||
+            entry.correlationId !== transfer.id
+          ) {
+            isRetry = false;
+            break;
+          }
+        }
+        if (isRetry) {
+          return {
+            transfer,
+            items: itemRows.map(toTransferItem),
+          };
+        }
+      }
+
+      if (transfer.status !== 'draft') {
+        throw catalogConflict('Only draft transfers can be sent.');
+      }
+      if (itemRows.length === 0) {
+        throw catalogValidation('Cannot send a transfer with no items.');
+      }
+
+      const store = this.withTransaction(tx);
+      const { allowNegative } = await store.getStockSettings(input.workspaceId);
+      for (const item of itemRows) {
+        await store.adjustLevel({
+          workspaceId: input.workspaceId,
+          variantId: item.variantId,
+          warehouseId: transfer.sourceWarehouseId,
+          delta: -item.requestedQty,
+          reason: 'transfer_send',
+          actorId: input.actorId,
+          correlationId: transfer.id,
+          idempotencyKey: input.idempotencyKey
+            ? `${input.idempotencyKey}:${item.id}`
+            : undefined,
+          allowNegative,
+        });
+      }
+
+      const now = new Date();
+      const updatedItems: TransferItemRecord[] = [];
+      for (const item of itemRows) {
+        const updated = await tx
+          .update(catalogTransferItems)
+          .set({
+            sentQty: item.requestedQty,
+            version: item.version + 1,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(catalogTransferItems.id, item.id),
+              eq(catalogTransferItems.workspaceId, input.workspaceId),
+              eq(catalogTransferItems.transferId, input.transferId),
+              eq(catalogTransferItems.version, item.version)
+            )
+          )
+          .returning();
+        const updatedItem = updated[0];
+        if (!updatedItem) throw catalogVersionConflict(item.version);
+        updatedItems.push(toTransferItem(updatedItem));
+      }
+
+      const updatedTransfers = await tx
+        .update(catalogTransfers)
+        .set({
+          status: 'sent',
+          version: transfer.version + 1,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(catalogTransfers.id, transfer.id),
+            eq(catalogTransfers.workspaceId, input.workspaceId),
+            eq(catalogTransfers.status, 'draft'),
+            eq(catalogTransfers.version, transfer.version)
+          )
+        )
+        .returning();
+      const updatedTransfer = updatedTransfers[0];
+      if (!updatedTransfer) throw catalogVersionConflict(transfer.version);
+
+      return {
+        transfer: toTransfer(updatedTransfer),
+        items: updatedItems,
+      };
+    });
+  }
 }

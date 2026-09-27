@@ -229,12 +229,8 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       throw catalogVersionConflict(transfer.version);
     }
 
-    // 3. If `status !== 'draft'` → `catalogConflict('Only draft transfers can be sent.')`
-    if (transfer.status !== 'draft') {
-      throw catalogConflict('Only draft transfers can be sent.');
-    }
-
-    // 4. Collect items for this transfer; if none → `catalogValidation('Cannot send a transfer with no items.')`
+    // 3. Collect the transfer items. They are also needed to recognise a
+    // completed request retried with the same idempotency key.
     const items: TransferItemRecord[] = [];
     for (const item of this.transferItems.values()) {
       if (
@@ -245,15 +241,45 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       }
     }
 
+    if (transfer.status === 'sent' && input.idempotencyKey) {
+      const isRetry =
+        items.length > 0 &&
+        items.every((item) => {
+          const entryId = this.idempotencyIndex.get(
+            `${input.workspaceId}::${input.idempotencyKey}:${item.id}`
+          );
+          const entry = entryId ? this.ledgerById.get(entryId) : undefined;
+          return (
+            entry?.variantId === item.variantId &&
+            entry.warehouseId === transfer.sourceWarehouseId &&
+            entry.delta === -item.requestedQty &&
+            entry.reason === 'transfer_send' &&
+            entry.correlationId === transfer.id
+          );
+        });
+      if (isRetry) {
+        return {
+          transfer: clone(transfer),
+          items: items.map(clone),
+        };
+      }
+    }
+
+    // 4. Only draft transfers can make new inventory adjustments.
+    if (transfer.status !== 'draft') {
+      throw catalogConflict('Only draft transfers can be sent.');
+    }
+
+    // 5. A transfer must contain at least one line before it can be sent.
     if (items.length === 0) {
       throw catalogValidation('Cannot send a transfer with no items.');
     }
 
-    // 5. Resolve `allowNegative` from existing stock settings for the workspace (default `false` via `getStockSettings`)
+    // 6. Resolve `allowNegative` from existing stock settings for the workspace (default `false` via `getStockSettings`)
     const stockSettings = await this.getStockSettings(input.workspaceId);
     const allowNegative = stockSettings.allowNegative;
 
-    // 6. For each item, call `adjustLevel` with:
+    // 7. For each item, call `adjustLevel` with:
     //    - `warehouseId`: transfer.sourceWarehouseId
     //    - `delta`: -item.requestedQty
     //    - `reason`: 'transfer_send'
@@ -278,7 +304,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       });
     }
 
-    // 7. Set each item `sentQty = requestedQty`, bump `item.version`, `updatedAt = now`
+    // 8. Set each item `sentQty = requestedQty`, bump `item.version`, `updatedAt = now`
     const now = new Date();
     const updatedItems: TransferItemRecord[] = [];
     for (const item of items) {
@@ -292,7 +318,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       updatedItems.push(updatedItem);
     }
 
-    // 8. Set transfer `status = 'sent'`, bump `transfer.version`, `updatedAt = now`
+    // 9. Set transfer `status = 'sent'`, bump `transfer.version`, `updatedAt = now`
     const updatedTransfer: TransferRecord = {
       ...transfer,
       status: 'sent',
@@ -301,7 +327,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     };
     this.transfers.set(transfer.id, updatedTransfer);
 
-    // 9. Return `{ transfer, items }` clones
+    // 10. Return `{ transfer, items }` clones
     return {
       transfer: clone(updatedTransfer),
       items: updatedItems.map(clone),
