@@ -272,7 +272,7 @@ describe('drizzle TransferStore sendTransfer (UTA-101)', () => {
       });
 
       // Send transfer with idempotencyKey - first time
-      const result1 = await store.sendTransfer({
+      await store.sendTransfer({
         workspaceId: tenant.id,
         transferId: transfer.id,
         actorId: null,
