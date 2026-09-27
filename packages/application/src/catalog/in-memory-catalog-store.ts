@@ -1168,4 +1168,175 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     }
     return false;
   }
+
+  async receiveTransfer(input: {
+    workspaceId: string;
+    transferId: string;
+    actorId: string | null;
+    expectedVersion?: number;
+    idempotencyKey?: string;
+    /** Omit = full remaining as good receipt for every item. */
+    items?: Array<{
+      itemId: string;
+      receivedQty: number;
+      damagedQty?: number;
+    }>;
+  }): Promise<TransferWithItems> {
+    // 1. Load transfer by id+workspace → missing → `catalogNotFound('Transfer')`
+    const transfer = this.transfers.get(input.transferId);
+    if (!transfer || transfer.workspaceId !== input.workspaceId) {
+      throw catalogNotFound('Transfer');
+    }
+
+    // 2. If `expectedVersion` provided and ≠ `transfer.version` → `catalogVersionConflict(transfer.version)`
+    if (
+      input.expectedVersion !== undefined &&
+      input.expectedVersion !== transfer.version
+    ) {
+      throw catalogVersionConflict(transfer.version);
+    }
+
+    // 3. If `status !== 'sent'` → `catalogConflict('Only sent transfers can be received.')`
+    if (transfer.status !== 'sent') {
+      throw catalogConflict('Only sent transfers can be received.');
+    }
+
+    // 4. Collect items for this transfer
+    const items: TransferItemRecord[] = [];
+    for (const item of this.transferItems.values()) {
+      if (
+        item.workspaceId === input.workspaceId &&
+        item.transferId === transfer.id
+      ) {
+        items.push(item);
+      }
+    }
+
+    // 5. If no items, reject with validation error
+    if (items.length === 0) {
+      throw catalogValidation('Cannot receive a transfer with no items.');
+    }
+
+    const now = new Date();
+    const updatedItems: TransferItemRecord[] = [];
+
+    // 6. Process each item according to the requirements
+    for (const item of items) {
+      // Calculate remaining quantity that can be received
+      const remaining = item.requestedQty - item.sentQty - item.receivedQty;
+
+      // If items array is provided, use that instead of full qty
+      if (input.items && input.items.length > 0) {
+        const itemData = input.items.find((i) => i.itemId === item.id);
+        if (itemData) {
+          // Process partial receipt
+          const { receivedQty, damagedQty = 0 } = itemData;
+
+          if (receivedQty < 0 || damagedQty < 0) {
+            throw catalogValidation(
+              'Received and damaged quantities must be non-negative.'
+            );
+          }
+
+          if (receivedQty + damagedQty > remaining) {
+            throw catalogValidation(
+              'Received and damaged quantities cannot exceed remaining quantity.'
+            );
+          }
+
+          // Add to updated items
+          const updatedItem = {
+            ...item,
+            receivedQty: item.receivedQty + receivedQty,
+            damagedQty: (item.damagedQty || 0) + damagedQty,
+            version: item.version + 1,
+            updatedAt: now,
+          };
+          this.transferItems.set(item.id, updatedItem);
+          updatedItems.push(updatedItem);
+        }
+      } else {
+        // Full receipt - all remaining quantity goes to received
+        const fullReceived = remaining;
+        if (fullReceived > 0) {
+          const updatedItem = {
+            ...item,
+            receivedQty: item.receivedQty + fullReceived,
+            version: item.version + 1,
+            updatedAt: now,
+          };
+          this.transferItems.set(item.id, updatedItem);
+          updatedItems.push(updatedItem);
+        } else {
+          // No update needed if no quantity to receive
+          updatedItems.push(item);
+        }
+      }
+    }
+
+    // 7. Increment warehouse stock for received quantities
+    for (const item of updatedItems) {
+      const variant = this.variants.get(item.variantId);
+      if (!variant) {
+        throw catalogNotFound('Variant');
+      }
+
+      const warehouse = this.warehouses.get(transfer.destWarehouseId);
+      if (!warehouse) {
+        throw catalogNotFound('Warehouse');
+      }
+
+      // Only handle positive received quantities (not damaged)
+      if (item.receivedQty > item.sentQty + (item.damagedQty || 0)) {
+        // Calculate how much to credit
+        const toCredit =
+          item.receivedQty - item.sentQty - (item.damagedQty || 0);
+
+        await this.adjustLevel({
+          workspaceId: input.workspaceId,
+          variantId: item.variantId,
+          warehouseId: transfer.destWarehouseId,
+          delta: toCredit,
+          reason: 'transfer_receive',
+          actorId: input.actorId,
+          correlationId: transfer.id,
+          idempotencyKey: input.idempotencyKey
+            ? `${input.idempotencyKey}:${item.id}`
+            : undefined,
+        });
+      }
+    }
+
+    // 8. Check if all items are fully received, update transfer status if needed
+    let allReceived = true;
+    for (const item of updatedItems) {
+      const remainingToReceive =
+        item.requestedQty - item.sentQty - item.receivedQty;
+      if (remainingToReceive > 0) {
+        allReceived = false;
+        break;
+      }
+    }
+
+    if (allReceived) {
+      // If all items fully received, update transfer status to received
+      const updatedTransfer: TransferRecord = {
+        ...transfer,
+        status: 'received',
+        version: transfer.version + 1,
+        updatedAt: now,
+      };
+      this.transfers.set(transfer.id, updatedTransfer);
+      return { transfer: clone(updatedTransfer), items: clone(updatedItems) };
+    } else {
+      // If not all received, keep status as sent
+      const updatedTransfer: TransferRecord = {
+        ...transfer,
+        version: transfer.version + 1,
+        updatedAt: now,
+      };
+      this.transfers.set(transfer.id, updatedTransfer);
+      return { transfer: clone(updatedTransfer), items: clone(updatedItems) };
+    }
+  }
 }

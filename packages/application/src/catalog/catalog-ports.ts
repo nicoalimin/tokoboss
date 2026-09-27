@@ -337,4 +337,17 @@ export interface TransferStore {
     expectedVersion?: number;
     idempotencyKey?: string;
   }): Promise<TransferWithItems>;
+  receiveTransfer(input: {
+    workspaceId: string;
+    transferId: string;
+    actorId: string | null;
+    expectedVersion?: number;
+    idempotencyKey?: string;
+    /** Omit = full remaining as good receipt for every item. */
+    items?: Array<{
+      itemId: string;
+      receivedQty: number;
+      damagedQty?: number;
+    }>;
+  }): Promise<TransferWithItems>;
 }
