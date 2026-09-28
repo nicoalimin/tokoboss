@@ -1361,4 +1361,36 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       return { transfer: clone(updatedTransfer), items: clone(updatedItems) };
     }
   }
+
+  async updateTransfer(input: {
+    workspaceId: string;
+    transferId: string;
+    patch: {
+      notes?: string | null;
+      expectedReceiveDate?: Date | null;
+    };
+    expectedVersion: number;
+  }): Promise<TransferRecord> {
+    const transfer = this.transfers.get(input.transferId);
+    if (!transfer || transfer.workspaceId !== input.workspaceId) {
+      throw catalogNotFound('Transfer');
+    }
+
+    if (transfer.version !== input.expectedVersion) {
+      throw catalogVersionConflict(transfer.version);
+    }
+
+    const updated: TransferRecord = {
+      ...transfer,
+      ...(input.patch.notes !== undefined ? { notes: input.patch.notes } : {}),
+      ...(input.patch.expectedReceiveDate !== undefined
+        ? { expectedReceiveDate: input.patch.expectedReceiveDate }
+        : {}),
+      version: transfer.version + 1,
+      updatedAt: new Date(),
+    };
+
+    this.transfers.set(input.transferId, updated);
+    return clone(updated);
+  }
 }
