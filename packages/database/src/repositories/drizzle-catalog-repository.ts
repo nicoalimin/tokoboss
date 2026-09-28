@@ -1836,14 +1836,17 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       let updatedTransfer;
 
       // Count how many items have been fully received
-      const fullyReceivedItems = itemRows.filter((item) => {
-        const existingItem = existingItems.get(item.id)!;
-        const alreadyReceived = existingItem.receivedQty || 0;
-        return (
-          alreadyReceived + (processedItems.get(item.id)?.receivedQty || 0) ===
-          item.sentQty
-        );
-      });
+      const fullyReceivedItems = itemRows.filter(
+        (item: CatalogTransferItemRow) => {
+          const existingItem = existingItems.get(item.id)!;
+          const alreadyReceived = existingItem.receivedQty || 0;
+          return (
+            alreadyReceived +
+              (processedItems.get(item.id)?.receivedQty || 0) ===
+            item.sentQty
+          );
+        }
+      );
 
       // If all items are received, set status to 'received'; otherwise keep 'sent'
       const newStatus =
