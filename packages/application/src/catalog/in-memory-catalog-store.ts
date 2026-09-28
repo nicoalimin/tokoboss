@@ -1219,7 +1219,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
 
     const now = new Date();
     const updatedItems: TransferItemRecord[] = [];
-    const receivedDeltas = new Map<string, number>();
+    const creditDeltas = new Map<string, number>();
     const receiptByItemId = new Map(
       input.items?.map((item) => [item.itemId, item]) ?? []
     );
@@ -1286,7 +1286,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
           };
           this.transferItems.set(item.id, updatedItem);
           updatedItems.push(updatedItem);
-          receivedDeltas.set(item.id, receivedQty); // Only good quantity for credit
+          creditDeltas.set(item.id, receivedQty); // Only good quantity for credit
         } else {
           updatedItems.push(item);
         }
@@ -1302,7 +1302,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
           };
           this.transferItems.set(item.id, updatedItem);
           updatedItems.push(updatedItem);
-          receivedDeltas.set(item.id, fullReceived);
+          creditDeltas.set(item.id, fullReceived);
         } else {
           // No update needed if no quantity to receive
           updatedItems.push(item);
@@ -1311,8 +1311,9 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     }
 
     // Increment warehouse stock for received quantities (only good items)
+    // Damaged quantities are tracked separately and don't affect inventory
     for (const item of updatedItems) {
-      const toCredit = receivedDeltas.get(item.id) ?? 0;
+      const toCredit = creditDeltas.get(item.id) ?? 0;
       if (toCredit > 0) {
         await this.adjustLevel({
           workspaceId: input.workspaceId,
