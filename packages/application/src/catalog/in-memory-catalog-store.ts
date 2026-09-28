@@ -1225,28 +1225,39 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     );
 
     if (input.items) {
-      if (receiptByItemId.size !== input.items.length) {
-        throw catalogValidation(
-          'Each transfer item may only be received once.'
-        );
-      }
+      // 6. Check for item ID duplicates first
+      const seenItemIds = new Set<string>();
       for (const itemData of input.items) {
+        if (seenItemIds.has(itemData.itemId)) {
+          throw catalogValidation(
+            'Each transfer item may only be received once.'
+          );
+        }
+        seenItemIds.add(itemData.itemId);
+      }
+
+      // 7. Validate that all items exist and pass validation
+      const itemMap = new Map(items.map((item) => [item.id, item]));
+      for (const itemData of input.items) {
+        const item = itemMap.get(itemData.itemId);
+        if (!item) {
+          throw catalogNotFound('TransferItem');
+        }
+
+        // 8. `receivedQty < 0` or `damagedQty < 0` → `catalogValidation`
         if (itemData.receivedQty < 0 || (itemData.damagedQty ?? 0) < 0) {
           throw catalogValidation(
             'Received and damaged quantities must be non-negative.'
           );
         }
-        const item = items.find(
-          (candidate) => candidate.id === itemData.itemId
-        );
-        if (!item) {
-          throw catalogValidation('Transfer item does not belong to transfer.');
-        }
+
         const remaining =
           item.sentQty - item.receivedQty - (item.damagedQty || 0);
+
+        // 9. `receivedQty + damagedQty` > remaining → `catalogValidation('Cannot receive more than remaining sent quantity.')`
         if (itemData.receivedQty + (itemData.damagedQty ?? 0) > remaining) {
           throw catalogValidation(
-            'Received and damaged quantities cannot exceed remaining quantity.'
+            'Cannot receive more than remaining sent quantity.'
           );
         }
       }
@@ -1265,7 +1276,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
           // Process partial receipt
           const { receivedQty, damagedQty = 0 } = itemData;
 
-          // Add to updated items
+          // Add to updated items - only increment good receivedQty for credit
           const updatedItem = {
             ...item,
             receivedQty: item.receivedQty + receivedQty,
@@ -1275,7 +1286,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
           };
           this.transferItems.set(item.id, updatedItem);
           updatedItems.push(updatedItem);
-          receivedDeltas.set(item.id, receivedQty);
+          receivedDeltas.set(item.id, receivedQty); // Only good quantity for credit
         } else {
           updatedItems.push(item);
         }
@@ -1299,7 +1310,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       }
     }
 
-    // 7. Increment warehouse stock for received quantities
+    // 9. Increment warehouse stock for received quantities (only good items)
     for (const item of updatedItems) {
       const toCredit = receivedDeltas.get(item.id) ?? 0;
       if (toCredit > 0) {
@@ -1318,7 +1329,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       }
     }
 
-    // 8. Check if all items are fully received, update transfer status if needed
+    // 10. Check if all items are fully received, update transfer status if needed
     let allReceived = true;
     for (const item of updatedItems) {
       const remainingToReceive =

@@ -581,6 +581,86 @@ describe('TransferStore', () => {
       expect(receiveEntries[0]!.correlationId).toBe(transfer.id);
     });
 
+    it('partial receive with items array processes correctly', async () => {
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 1',
+        code: 'WH-001',
+      });
+
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 2',
+        code: 'WH-002',
+      });
+
+      const productResult = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Test Variant',
+            sellingPriceCents: 1000,
+          },
+        ],
+      });
+
+      const variant = productResult.variants[0]!;
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 100,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      const transfer = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'REF-RECV-002',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      const items = await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        items: [{ variantId: variant.id, requestedQty: 10 }],
+      });
+
+      await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+      });
+
+      const result = await store.receiveTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+        items: [
+          {
+            itemId: items[0]!.id,
+            receivedQty: 5,
+            damagedQty: 2,
+          },
+        ],
+      });
+
+      expect(result.transfer.status).toBe('sent'); // not all received yet
+      expect(result.items[0]!.receivedQty).toBe(5);
+      expect(result.items[0]!.damagedQty).toBe(2);
+      expect(result.items[0]!.sentQty).toBe(10);
+
+      const destLevel = await store.getLevel('ws1', variant.id, warehouse2.id);
+      expect(destLevel?.qty).toBe(5); // only good quantity credited (not damaged)
+    });
+
     it('non-sent transfer rejects with conflict error', async () => {
       const warehouse1 = await store.createWarehouse({
         workspaceId: 'ws1',
@@ -619,6 +699,444 @@ describe('TransferStore', () => {
         })
       ).rejects.toThrow('Transfer');
     });
-  });
 
+    it('rejects with not found for unknown item in items array', async () => {
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 1',
+        code: 'WH-001',
+      });
+
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 2',
+        code: 'WH-002',
+      });
+
+      const productResult = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Test Variant',
+            sellingPriceCents: 1000,
+          },
+        ],
+      });
+
+      const variant = productResult.variants[0]!;
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 100,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      const transfer = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'REF-RECV-003',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      // Add items to the transfer
+      await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        items: [{ variantId: variant.id, requestedQty: 10 }],
+      });
+
+      await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+      });
+
+      // Try to receive using a completely fake item ID
+      await expect(
+        store.receiveTransfer({
+          workspaceId: 'ws1',
+          transferId: transfer.id,
+          actorId: null,
+          items: [
+            {
+              itemId: 'fake-item-id-which-does-not-exist',
+              receivedQty: 5,
+            },
+          ],
+        })
+      ).rejects.toThrow('TransferItem not found');
+    });
+
+    it('rejects with validation if receivedQty or damagedQty < 0', async () => {
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 1',
+        code: 'WH-001',
+      });
+
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 2',
+        code: 'WH-002',
+      });
+
+      const productResult = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Test Variant',
+            sellingPriceCents: 1000,
+          },
+        ],
+      });
+
+      const variant = productResult.variants[0]!;
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 100,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      const transfer = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'REF-RECV-004',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      const items = await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        items: [{ variantId: variant.id, requestedQty: 10 }],
+      });
+
+      await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+      });
+
+      // Test negative received quantity
+      await expect(
+        store.receiveTransfer({
+          workspaceId: 'ws1',
+          transferId: transfer.id,
+          actorId: null,
+          items: [
+            {
+              itemId: items[0]!.id,
+              receivedQty: -5,
+            },
+          ],
+        })
+      ).rejects.toThrow('Received and damaged quantities must be non-negative');
+
+      // Test negative damaged quantity
+      await expect(
+        store.receiveTransfer({
+          workspaceId: 'ws1',
+          transferId: transfer.id,
+          actorId: null,
+          items: [
+            {
+              itemId: items[0]!.id,
+              receivedQty: 5,
+              damagedQty: -2,
+            },
+          ],
+        })
+      ).rejects.toThrow('Received and damaged quantities must be non-negative');
+    });
+
+    it('rejects with validation if receivedQty + damagedQty > remaining quantity', async () => {
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 1',
+        code: 'WH-001',
+      });
+
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 2',
+        code: 'WH-002',
+      });
+
+      const productResult = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Test Variant',
+            sellingPriceCents: 1000,
+          },
+        ],
+      });
+
+      const variant = productResult.variants[0]!;
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 100,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      const transfer = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'REF-RECV-005',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      const items = await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        items: [{ variantId: variant.id, requestedQty: 10 }],
+      });
+
+      await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+      });
+
+      // Test exceeding remaining quantity
+      await expect(
+        store.receiveTransfer({
+          workspaceId: 'ws1',
+          transferId: transfer.id,
+          actorId: null,
+          items: [
+            {
+              itemId: items[0]!.id,
+              receivedQty: 7, // 7 + 4 = 11 > 10 (remaining)
+              damagedQty: 4,
+            },
+          ],
+        })
+      ).rejects.toThrow('Cannot receive more than remaining sent quantity');
+    });
+
+    it('handles multiple items with different receipt quantities correctly', async () => {
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 1',
+        code: 'WH-001',
+      });
+
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 2',
+        code: 'WH-002',
+      });
+
+      const productResult = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Test Variant 1',
+            sellingPriceCents: 1000,
+          },
+          {
+            skuCode: 'SKU-002',
+            name: 'Test Variant 2',
+            sellingPriceCents: 1500,
+          },
+        ],
+      });
+
+      const variant1 = productResult.variants[0]!;
+      const variant2 = productResult.variants[1]!;
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant1.id,
+        warehouseId: warehouse1.id,
+        delta: 100,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant2.id,
+        warehouseId: warehouse1.id,
+        delta: 100,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      const transfer = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'REF-RECV-006',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      const items = await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        items: [
+          { variantId: variant1.id, requestedQty: 10 },
+          { variantId: variant2.id, requestedQty: 15 },
+        ],
+      });
+
+      await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+      });
+
+      // Partially receive first item, fully receive second
+      const result = await store.receiveTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+        items: [
+          {
+            itemId: items[0]!.id,
+            receivedQty: 5,
+            damagedQty: 2,
+          },
+          {
+            itemId: items[1]!.id,
+            receivedQty: 15, // full quantity
+          },
+        ],
+      });
+
+      expect(result.transfer.status).toBe('sent'); // not all received yet (still one item)
+
+      const item1 = result.items.find((i) => i.id === items[0]!.id)!;
+      const item2 = result.items.find((i) => i.id === items[1]!.id)!;
+
+      expect(item1.receivedQty).toBe(5);
+      expect(item1.damagedQty).toBe(2);
+
+      expect(item2.receivedQty).toBe(15);
+      expect(item2.sentQty).toBe(15);
+
+      // Only good quantity should be credited (5 for item1, 15 for item2)
+      const destLevel1 = await store.getLevel(
+        'ws1',
+        variant1.id,
+        warehouse2.id
+      );
+      expect(destLevel1?.qty).toBe(5);
+
+      const destLevel2 = await store.getLevel(
+        'ws1',
+        variant2.id,
+        warehouse2.id
+      );
+      expect(destLevel2?.qty).toBe(15);
+    });
+
+    it('rejects with validation for duplicate item IDs in items array', async () => {
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 1',
+        code: 'WH-001',
+      });
+
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 2',
+        code: 'WH-002',
+      });
+
+      const productResult = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Test Variant',
+            sellingPriceCents: 1000,
+          },
+        ],
+      });
+
+      const variant = productResult.variants[0]!;
+
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 100,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
+      const transfer = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'REF-RECV-007',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+
+      const items = await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        items: [{ variantId: variant.id, requestedQty: 10 }],
+      });
+
+      await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+      });
+
+      // Duplicate item ID
+      await expect(
+        store.receiveTransfer({
+          workspaceId: 'ws1',
+          transferId: transfer.id,
+          actorId: null,
+          items: [
+            {
+              itemId: items[0]!.id,
+              receivedQty: 5,
+            },
+            {
+              itemId: items[0]!.id, // duplicate ID
+              receivedQty: 3,
+            },
+          ],
+        })
+      ).rejects.toThrow('Each transfer item may only be received once');
+    });
+  });
 });
