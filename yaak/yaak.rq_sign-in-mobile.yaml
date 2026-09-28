@@ -19,10 +19,10 @@ body:
 bodyType: application/json
 description: Creates a mobile session and returns a bearer token. Copy token to access_token to call authenticated endpoints.
 headers:
-  - enabled: true
-    name: Content-Type
-    value: application/json
-    id: null
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: null
 method: POST
 name: Sign in (mobile token)
 sortPriority: 2.0

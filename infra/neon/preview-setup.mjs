@@ -52,9 +52,7 @@ function log(record) {
 
 function runMigrateAndSeed({ databaseUrl, skipMigrate }) {
   if (skipMigrate) {
-    console.log(
-      '[preview-setup] --skip-migrate: skipping Drizzle migrate + seed.'
-    );
+    console.log('[preview-setup] --skip-migrate: skipping Drizzle migrate + seed.');
     return;
   }
   const env = {
@@ -62,27 +60,24 @@ function runMigrateAndSeed({ databaseUrl, skipMigrate }) {
     APP_ENV: 'preview',
     DATABASE_URL: databaseUrl,
   };
-  console.log(
-    '[preview-setup] Running reviewed Drizzle migrations against the preview branch ...'
+  console.log('[preview-setup] Running reviewed Drizzle migrations against the preview branch ...');
+  execFileSync(
+    'pnpm',
+    ['--filter', '@tokoboss/database', 'db:migrate'],
+    { cwd: REPO_ROOT, env, stdio: 'inherit' }
   );
-  execFileSync('pnpm', ['--filter', '@tokoboss/database', 'db:migrate'], {
-    cwd: REPO_ROOT,
-    env,
-    stdio: 'inherit',
-  });
-  console.log(
-    '[preview-setup] Loading synthetic seed (never production data) ...'
+  console.log('[preview-setup] Loading synthetic seed (never production data) ...');
+  execFileSync(
+    'pnpm',
+    ['--filter', '@tokoboss/database', 'db:seed'],
+    { cwd: REPO_ROOT, env, stdio: 'inherit' }
   );
-  execFileSync('pnpm', ['--filter', '@tokoboss/database', 'db:seed'], {
-    cwd: REPO_ROOT,
-    env,
-    stdio: 'inherit',
-  });
 }
 
 async function main() {
   const args = new Set(process.argv.slice(2));
-  const dryRun = args.has('--dry-run') || process.env.PREVIEW_DRY_RUN === '1';
+  const dryRun =
+    args.has('--dry-run') || process.env.PREVIEW_DRY_RUN === '1';
   const skipMigrate = args.has('--skip-migrate');
   const skipVercel = args.has('--skip-vercel');
 
@@ -91,9 +86,7 @@ async function main() {
   const appEnv = process.env.APP_ENV ?? 'preview';
   if (!prNumber) usageError('PR_NUMBER is required.');
   if (!gitBranch && !skipVercel) {
-    usageError(
-      'GIT_BRANCH is required (scopes the Vercel DATABASE_URL to this PR branch).'
-    );
+    usageError('GIT_BRANCH is required (scopes the Vercel DATABASE_URL to this PR branch).');
   }
 
   let name;
@@ -131,8 +124,7 @@ async function main() {
   // is re-verified against the live branch list in step 1 below.
   try {
     assertStagingParent({
-      parentBranchId:
-        env.stagingBranchId === '(unset)' ? null : env.stagingBranchId,
+      parentBranchId: env.stagingBranchId === '(unset)' ? null : env.stagingBranchId,
       parentName: process.env.NEON_STAGING_BRANCH_NAME ?? 'staging',
       productionBranchId: env.productionBranchId,
     });
@@ -214,9 +206,7 @@ async function main() {
     });
   } catch (error) {
     console.error(`preview-setup failed: branch step: ${error.message}`);
-    console.error(
-      'preview-setup: retry is safe — re-run the workflow for the same PR.'
-    );
+    console.error('preview-setup: retry is safe — re-run the workflow for the same PR.');
     process.exit(1);
   }
 
@@ -233,9 +223,7 @@ async function main() {
     });
     assertNoProductionUrl(databaseUrl);
   } catch (error) {
-    console.error(
-      `preview-setup failed: connection-string step: ${error.message}`
-    );
+    console.error(`preview-setup failed: connection-string step: ${error.message}`);
     if (created) {
       console.error(
         '[preview-setup] Cleaning up the just-created branch so a retry starts clean ...'
@@ -275,9 +263,7 @@ async function main() {
         value: databaseUrl,
       });
     } catch (error) {
-      console.error(
-        `preview-setup failed: vercel wiring step: ${error.message}`
-      );
+      console.error(`preview-setup failed: vercel wiring step: ${error.message}`);
       console.error(
         'preview-setup: the Neon branch is migrated and seeded, but the preview ' +
           'is NOT wired. Re-run to retry wiring (branch will be reused).'
