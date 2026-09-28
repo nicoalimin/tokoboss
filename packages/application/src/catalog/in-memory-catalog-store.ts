@@ -1431,13 +1431,13 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       }
     }
 
-    // 5. Set each item `cancelledQty = requestedQty`, bump `item.version`, `updatedAt = now`
+    // 5. Set each item `cancellationReason` to indicate cancellation, bump `item.version`, `updatedAt = now`
     const now = new Date();
     const updatedItems: TransferItemRecord[] = [];
     for (const item of items) {
       const updatedItem: TransferItemRecord = {
         ...item,
-        cancelledQty: item.requestedQty,
+        cancellationReason: 'Transfer cancelled',
         version: item.version + 1,
         updatedAt: now,
       };
