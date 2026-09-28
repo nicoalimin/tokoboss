@@ -96,6 +96,7 @@ describe('transfer send (Story 06)', () => {
       await store.sendTransfer({
         workspaceId: WS,
         transferId: draft.id,
+        actorId: null,
       });
       expect.fail('Expected sendTransfer to throw an error');
     } catch (err) {
@@ -138,6 +139,7 @@ describe('transfer send (Story 06)', () => {
     // Create a transfer draft and add items in a way supported by current store
     const draft = await store.createTransferDraft({
       workspaceId: WS,
+      referenceNum: 'REF-NO-PERMISSION',
       sourceWarehouseId: fromWh.id,
       destWarehouseId: toWh.id,
       notes: 'Test transfer no permission',
@@ -148,6 +150,7 @@ describe('transfer send (Story 06)', () => {
       await store.sendTransfer({
         workspaceId: WS,
         transferId: draft.id,
+        actorId: null,
       });
       expect.fail('Expected sendTransfer to throw an error');
     } catch (err) {
@@ -190,6 +193,7 @@ describe('transfer send (Story 06)', () => {
     // Create a transfer draft with NO items - this is invalid in the store's validation
     const draft = await store.createTransferDraft({
       workspaceId: WS,
+      referenceNum: 'REF-NO-ITEMS',
       sourceWarehouseId: fromWh.id,
       destWarehouseId: toWh.id,
       notes: 'Test transfer no items',
@@ -200,6 +204,7 @@ describe('transfer send (Story 06)', () => {
       await store.sendTransfer({
         workspaceId: WS,
         transferId: draft.id,
+        actorId: null,
       });
       expect.fail('Expected sendTransfer to throw an error');
     } catch (err) {
@@ -242,6 +247,7 @@ describe('transfer send (Story 06)', () => {
     // Create a transfer draft
     const draft = await store.createTransferDraft({
       workspaceId: WS,
+      referenceNum: 'REF-WAREHOUSE-SCOPE',
       sourceWarehouseId: fromWh.id,
       destWarehouseId: toWh.id,
       notes: 'Test transfer scope',
@@ -252,6 +258,7 @@ describe('transfer send (Story 06)', () => {
       await store.sendTransfer({
         workspaceId: WS,
         transferId: draft.id,
+        actorId: null,
       });
       expect.fail('Expected sendTransfer to throw an error');
     } catch (err) {
@@ -294,6 +301,7 @@ describe('transfer send (Story 06)', () => {
     // Create a transfer draft
     const draft = await store.createTransferDraft({
       workspaceId: WS,
+      referenceNum: 'REF-INSUFFICIENT-STOCK',
       sourceWarehouseId: fromWh.id,
       destWarehouseId: toWh.id,
       notes: 'Test transfer insufficient stock',
@@ -304,6 +312,7 @@ describe('transfer send (Story 06)', () => {
       await store.sendTransfer({
         workspaceId: WS,
         transferId: draft.id,
+        actorId: null,
       });
       expect.fail('Expected sendTransfer to throw an error');
     } catch (err) {
