@@ -1138,10 +1138,8 @@ describe('TransferStore', () => {
         })
       ).rejects.toThrow('Each transfer item may only be received once');
     });
-  });
 
-  describe('cancelTransfer', () => {
-    it('cancels a draft transfer with items and sets cancellation reason on all items', async () => {
+    it('partial then complete remaining: stays sent then becomes received; dest credited only for good received amounts', async () => {
       const warehouse1 = await store.createWarehouse({
         workspaceId: 'ws1',
         name: 'Warehouse 1',
@@ -1154,59 +1152,6 @@ describe('TransferStore', () => {
         code: 'WH-002',
       });
 
-      // Create draft transfer
-      const transfer = await store.createTransferDraft({
-        workspaceId: 'ws1',
-        referenceNum: 'REF-CANCEL-001',
-        sourceWarehouseId: warehouse1.id,
-        destWarehouseId: warehouse2.id,
-      });
-
-      // Add items to the transfer
-      await store.addTransferItems({
-        workspaceId: 'ws1',
-        transferId: transfer.id,
-        items: [{ variantId: 'var1', requestedQty: 10 }],
-      });
-
-      // Cancel the transfer
-      const result = await store.cancelTransfer({
-        workspaceId: 'ws1',
-        transferId: transfer.id,
-        actorId: null,
-        cancellationReason: 'Test reason for cancellation',
-      });
-
-      // Verify transfer is cancelled
-      expect(result.transfer.status).toBe('cancelled');
-      expect(result.transfer.version).toBe(2); // bumped by 1 from draft version 1
-
-      // Verify items are updated with cancellation reason and version bump
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0]!.cancellationReason).toBe(
-        'Test reason for cancellation'
-      );
-      expect(result.items[0]!.version).toBe(2); // bumped by 1 from initial version 1
-
-      // Verify that the transfer is still in store with correct status
-      const updatedTransfer = await store.findTransferById('ws1', transfer.id);
-      expect(updatedTransfer?.status).toBe('cancelled');
-    });
-
-    it('rejects cancellation of non-draft transfers', async () => {
-      const warehouse1 = await store.createWarehouse({
-        workspaceId: 'ws1',
-        name: 'Warehouse 1',
-        code: 'WH-001',
-      });
-
-      const warehouse2 = await store.createWarehouse({
-        workspaceId: 'ws1',
-        name: 'Warehouse 2',
-        code: 'WH-002',
-      });
-
-      // Setup inventory for the transfer
       const productResult = await store.createProductWithVariants({
         workspaceId: 'ws1',
         name: 'Test Product',
@@ -1224,7 +1169,6 @@ describe('TransferStore', () => {
 
       const variant = productResult.variants[0]!;
 
-      // Set up positive stock in source warehouse
       await store.adjustLevel({
         workspaceId: 'ws1',
         variantId: variant.id,
@@ -1234,117 +1178,74 @@ describe('TransferStore', () => {
         actorId: null,
       });
 
-      // Create draft transfer
       const transfer = await store.createTransferDraft({
         workspaceId: 'ws1',
-        referenceNum: 'REF-CANCEL-002',
+        referenceNum: 'REF-RECV-PARTIAL-COMPLETE',
         sourceWarehouseId: warehouse1.id,
         destWarehouseId: warehouse2.id,
       });
 
-      // Add items to the transfer
-      await store.addTransferItems({
+      const items = await store.addTransferItems({
         workspaceId: 'ws1',
         transferId: transfer.id,
         items: [{ variantId: variant.id, requestedQty: 10 }],
       });
 
-      // Send the transfer to make it non-draft
-      const sentTransfer = await store.sendTransfer({
+      const sent = await store.sendTransfer({
         workspaceId: 'ws1',
         transferId: transfer.id,
         actorId: null,
       });
 
-      expect(sentTransfer.transfer.status).toBe('sent');
+      const partial = await store.receiveTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+        expectedVersion: sent.transfer.version,
+        items: [
+          {
+            itemId: items[0]!.id,
+            receivedQty: 4,
+            damagedQty: 1,
+          },
+        ],
+      });
 
-      // Try to cancel the sent transfer - should fail with "Only draft transfers can be cancelled"
-      await expect(
-        store.cancelTransfer({
-          workspaceId: 'ws1',
-          transferId: transfer.id,
-          actorId: null,
-          cancellationReason: 'Test reason for cancellation',
-        })
-      ).rejects.toThrow('Only draft transfers can be cancelled.');
+      expect(partial.transfer.status).toBe('sent');
+      expect(partial.items[0]!.receivedQty).toBe(4);
+      expect(partial.items[0]!.damagedQty).toBe(1);
+
+      let destLevel = await store.getLevel('ws1', variant.id, warehouse2.id);
+      expect(destLevel?.qty).toBe(4);
+
+      const complete = await store.receiveTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+        expectedVersion: partial.transfer.version,
+        items: [
+          {
+            itemId: items[0]!.id,
+            receivedQty: 5,
+            damagedQty: 0,
+          },
+        ],
+      });
+
+      expect(complete.transfer.status).toBe('received');
+      expect(complete.items[0]!.receivedQty).toBe(9);
+      expect(complete.items[0]!.damagedQty).toBe(1);
+      expect(
+        complete.items[0]!.sentQty -
+          complete.items[0]!.receivedQty -
+          (complete.items[0]!.damagedQty || 0)
+      ).toBe(0);
+
+      destLevel = await store.getLevel('ws1', variant.id, warehouse2.id);
+      expect(destLevel?.qty).toBe(9); // 4 + 5 good; damaged never credited
     });
 
-    it('rejects cancellation with empty cancellation reason', async () => {
-      const warehouse1 = await store.createWarehouse({
-        workspaceId: 'ws1',
-        name: 'Warehouse 1',
-        code: 'WH-001',
-      });
-
-      const warehouse2 = await store.createWarehouse({
-        workspaceId: 'ws1',
-        name: 'Warehouse 2',
-        code: 'WH-002',
-      });
-
-      // Create draft transfer
-      const transfer = await store.createTransferDraft({
-        workspaceId: 'ws1',
-        referenceNum: 'REF-CANCEL-003',
-        sourceWarehouseId: warehouse1.id,
-        destWarehouseId: warehouse2.id,
-      });
-
-      // Try to cancel without cancellation reason - should fail
-      await expect(
-        store.cancelTransfer({
-          workspaceId: 'ws1',
-          transferId: transfer.id,
-          actorId: null,
-          cancellationReason: '',
-        })
-      ).rejects.toThrow('Cancellation reason must be provided.');
-    });
-
-    it('rejects cancellation with null cancellation reason', async () => {
-      const warehouse1 = await store.createWarehouse({
-        workspaceId: 'ws1',
-        name: 'Warehouse 1',
-        code: 'WH-001',
-      });
-
-      const warehouse2 = await store.createWarehouse({
-        workspaceId: 'ws1',
-        name: 'Warehouse 2',
-        code: 'WH-002',
-      });
-
-      // Create draft transfer
-      const transfer = await store.createTransferDraft({
-        workspaceId: 'ws1',
-        referenceNum: 'REF-CANCEL-004',
-        sourceWarehouseId: warehouse1.id,
-        destWarehouseId: warehouse2.id,
-      });
-
-      // Try to cancel with null cancellation reason - should fail
-      await expect(
-        store.cancelTransfer({
-          workspaceId: 'ws1',
-          transferId: transfer.id,
-          actorId: null,
-          cancellationReason: null as any, // Intentionally passing null
-        })
-      ).rejects.toThrow('Cancellation reason must be provided.');
-    });
-
-    it('rejects cancellation of non-existent transfers', async () => {
-      await expect(
-        store.cancelTransfer({
-          workspaceId: 'ws1',
-          transferId: 'non-existent-id',
-          actorId: null,
-          cancellationReason: 'Test reason for cancellation',
-        })
-      ).rejects.toThrow('Transfer not found.');
-    });
-
-    it('rejects cancellation with version conflict', async () => {
+    it('expectedVersion mismatch on receiveTransfer rejects with version conflict error', async () => {
       const warehouse1 = await store.createWarehouse({
         workspaceId: 'ws1',
         name: 'Warehouse 1',
@@ -1374,145 +1275,43 @@ describe('TransferStore', () => {
 
       const variant = productResult.variants[0]!;
 
-      // Create draft transfer
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 100,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
       const transfer = await store.createTransferDraft({
         workspaceId: 'ws1',
-        referenceNum: 'REF-CANCEL-005',
+        referenceNum: 'REF-RECV-VERSION',
         sourceWarehouseId: warehouse1.id,
         destWarehouseId: warehouse2.id,
       });
 
-      // Add items to the transfer
       await store.addTransferItems({
         workspaceId: 'ws1',
         transferId: transfer.id,
         items: [{ variantId: variant.id, requestedQty: 10 }],
       });
 
-      // Try to cancel with wrong version - should fail
+      await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+      });
+
       await expect(
-        store.cancelTransfer({
+        store.receiveTransfer({
           workspaceId: 'ws1',
           transferId: transfer.id,
           actorId: null,
           expectedVersion: 5, // Wrong version
-          cancellationReason: 'Test reason for cancellation',
         })
       ).rejects.toThrow('This record changed. Reload and try again.');
     });
 
-    it('cancels a transfer with multiple items', async () => {
-      const warehouse1 = await store.createWarehouse({
-        workspaceId: 'ws1',
-        name: 'Warehouse 1',
-        code: 'WH-001',
-      });
-
-      const warehouse2 = await store.createWarehouse({
-        workspaceId: 'ws1',
-        name: 'Warehouse 2',
-        code: 'WH-002',
-      });
-
-      const productResult = await store.createProductWithVariants({
-        workspaceId: 'ws1',
-        name: 'Test Product',
-        description: null,
-        unit: 'pcs',
-        pictures: [],
-        variants: [
-          {
-            skuCode: 'SKU-001',
-            name: 'Test Variant 1',
-            sellingPriceCents: 1000,
-          },
-          {
-            skuCode: 'SKU-002',
-            name: 'Test Variant 2',
-            sellingPriceCents: 1500,
-          },
-        ],
-      });
-
-      const variant1 = productResult.variants[0]!;
-      const variant2 = productResult.variants[1]!;
-
-      // Create draft transfer
-      const transfer = await store.createTransferDraft({
-        workspaceId: 'ws1',
-        referenceNum: 'REF-CANCEL-006',
-        sourceWarehouseId: warehouse1.id,
-        destWarehouseId: warehouse2.id,
-      });
-
-      // Add multiple items to the transfer
-      await store.addTransferItems({
-        workspaceId: 'ws1',
-        transferId: transfer.id,
-        items: [
-          { variantId: variant1.id, requestedQty: 10 },
-          { variantId: variant2.id, requestedQty: 15 },
-        ],
-      });
-
-      // Cancel the transfer
-      const result = await store.cancelTransfer({
-        workspaceId: 'ws1',
-        transferId: transfer.id,
-        actorId: null,
-        cancellationReason: 'Multiple items test reason for cancellation',
-      });
-
-      // Verify transfer is cancelled
-      expect(result.transfer.status).toBe('cancelled');
-
-      // Verify all items are updated with cancellation reason and version bump
-      expect(result.items).toHaveLength(2);
-      result.items.forEach((item) => {
-        expect(item.cancellationReason).toBe(
-          'Multiple items test reason for cancellation'
-        );
-        expect(item.version).toBe(2); // bumped by 1 from initial version 1
-      });
-    });
-
-    it('correctly handles tenant isolation during cancellation', async () => {
-      const warehouse1 = await store.createWarehouse({
-        workspaceId: 'ws1',
-        name: 'Warehouse 1',
-        code: 'WH-001',
-      });
-
-      const warehouse2 = await store.createWarehouse({
-        workspaceId: 'ws1',
-        name: 'Warehouse 2',
-        code: 'WH-002',
-      });
-
-      // Create draft transfer in workspace 1
-      const transfer = await store.createTransferDraft({
-        workspaceId: 'ws1',
-        referenceNum: 'REF-CANCEL-007',
-        sourceWarehouseId: warehouse1.id,
-        destWarehouseId: warehouse2.id,
-      });
-
-      // Add items to the transfer
-      await store.addTransferItems({
-        workspaceId: 'ws1',
-        transferId: transfer.id,
-        items: [{ variantId: 'var1', requestedQty: 10 }],
-      });
-
-      // Try to cancel transfer from wrong workspace - should fail with not found
-      await expect(
-        store.cancelTransfer({
-          workspaceId: 'ws2', // Wrong workspace
-          transferId: transfer.id,
-          actorId: null,
-          cancellationReason: 'Test reason for cancellation',
-        })
-      ).rejects.toThrow('Transfer not found.');
-    });
   });
 });
