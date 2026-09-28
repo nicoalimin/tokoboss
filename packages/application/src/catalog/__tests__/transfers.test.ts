@@ -1206,6 +1206,34 @@ describe('TransferStore', () => {
         code: 'WH-002',
       });
 
+      // Setup inventory for the transfer
+      const productResult = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Test Variant',
+            sellingPriceCents: 1000,
+          },
+        ],
+      });
+
+      const variant = productResult.variants[0]!;
+
+      // Set up positive stock in source warehouse
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 100,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+
       // Create draft transfer
       const transfer = await store.createTransferDraft({
         workspaceId: 'ws1',
@@ -1218,22 +1246,13 @@ describe('TransferStore', () => {
       await store.addTransferItems({
         workspaceId: 'ws1',
         transferId: transfer.id,
-        items: [{ variantId: 'var1', requestedQty: 10 }],
+        items: [{ variantId: variant.id, requestedQty: 10 }],
       });
 
-      // Create a new transfer and make it go through send process
-      // so it's not a draft anymore (but we're testing the rejection path)
-      const anotherTransfer = await store.createTransferDraft({
-        workspaceId: 'ws1',
-        referenceNum: 'REF-CANCEL-003',
-        sourceWarehouseId: warehouse1.id,
-        destWarehouseId: warehouse2.id,
-      });
-
-      // We will manually update this to a "sent" state, but we'll do it carefully
+      // Send the transfer to make it non-draft
       const sentTransfer = await store.sendTransfer({
         workspaceId: 'ws1',
-        transferId: anotherTransfer.id,
+        transferId: transfer.id,
         actorId: null,
       });
 
@@ -1243,7 +1262,7 @@ describe('TransferStore', () => {
       await expect(
         store.cancelTransfer({
           workspaceId: 'ws1',
-          transferId: anotherTransfer.id,
+          transferId: transfer.id,
           actorId: null,
           cancellationReason: 'Test reason for cancellation',
         })
