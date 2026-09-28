@@ -1617,7 +1617,264 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       damagedQty?: number;
     }>;
   }): Promise<TransferWithItems> {
-    void input;
-    throw catalogConflict('receiveTransfer not implemented in Drizzle yet');
+    return this.inTx(async (tx) => {
+      const transferRows = await tx
+        .select()
+        .from(catalogTransfers)
+        .where(
+          and(
+            eq(catalogTransfers.workspaceId, input.workspaceId),
+            eq(catalogTransfers.id, input.transferId)
+          )
+        )
+        .limit(1);
+      const transferRow = transferRows[0];
+      if (!transferRow) throw catalogNotFound('Transfer');
+
+      const transfer = toTransfer(transferRow);
+      if (
+        input.expectedVersion !== undefined &&
+        input.expectedVersion !== transfer.version
+      ) {
+        throw catalogVersionConflict(transfer.version);
+      }
+      if (transfer.status !== 'sent') {
+        throw catalogConflict('Only sent transfers can be received.');
+      }
+
+      const itemRows = await tx
+        .select()
+        .from(catalogTransferItems)
+        .where(
+          and(
+            eq(catalogTransferItems.workspaceId, input.workspaceId),
+            eq(catalogTransferItems.transferId, input.transferId)
+          )
+        )
+        .orderBy(asc(catalogTransferItems.createdAt));
+
+      // If no items array provided, receive all items fully
+      if (input.items === undefined) {
+        const txStore = this.withTransaction(tx);
+        const stockSettings = await txStore.getStockSettings(input.workspaceId);
+
+        for (const item of itemRows) {
+          // Update item with full received quantity
+          const rows = await tx
+            .update(catalogTransferItems)
+            .set({
+              receivedQty: item.sentQty,
+              version: item.version + 1,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(catalogTransferItems.id, item.id),
+                eq(catalogTransferItems.workspaceId, input.workspaceId),
+                eq(catalogTransferItems.version, item.version)
+              )
+            )
+            .returning();
+          const updated = rows[0];
+          if (!updated) throw catalogVersionConflict(item.version + 1);
+        }
+
+        // Credit the destination warehouse with good received quantities
+        for (const item of itemRows) {
+          await txStore.adjustLevel({
+            workspaceId: input.workspaceId,
+            variantId: item.variantId,
+            warehouseId: transfer.destWarehouseId,
+            delta: item.sentQty - (item.damagedQty || 0),
+            reason: 'transfer_receive',
+            actorId: input.actorId,
+            correlationId: transfer.id,
+            idempotencyKey: input.idempotencyKey
+              ? `${input.idempotencyKey}:${item.id}`
+              : undefined,
+            allowNegative: stockSettings.allowNegative,
+          });
+        }
+
+        const updatedTransfer = await tx
+          .update(catalogTransfers)
+          .set({
+            status: 'received',
+            version: transfer.version + 1,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(catalogTransfers.id, transfer.id),
+              eq(catalogTransfers.workspaceId, input.workspaceId),
+              eq(catalogTransfers.status, 'sent'),
+              eq(catalogTransfers.version, transfer.version)
+            )
+          )
+          .returning();
+        const updated = updatedTransfer[0];
+        if (!updated) {
+          // Re-throw the version conflict error from the update
+          throw catalogVersionConflict(transfer.version);
+        }
+
+        return {
+          transfer: toTransfer(updated),
+          items: itemRows.map(toTransferItem),
+        };
+      }
+
+      // If items array is provided, validate and process partial receive
+      const processedItems = new Map<
+        string,
+        { receivedQty: number; damagedQty: number }
+      >();
+
+      // Validate all item IDs exist
+      const itemIds = input.items.map((i) => i.itemId);
+      if (new Set(itemIds).size !== itemIds.length) {
+        throw catalogValidation('Each transfer item may only be received once');
+      }
+
+      const existingItems = new Map<string, CatalogTransferItemRow>();
+      for (const row of itemRows) {
+        existingItems.set(row.id, row);
+      }
+
+      for (const itemInput of input.items) {
+        if (!existingItems.has(itemInput.itemId)) {
+          throw catalogNotFound('TransferItem');
+        }
+
+        const item = existingItems.get(itemInput.itemId)!;
+
+        // Validate quantities are non-negative
+        if (
+          itemInput.receivedQty < 0 ||
+          (itemInput.damagedQty !== undefined && itemInput.damagedQty < 0)
+        ) {
+          throw catalogValidation(
+            'Received and damaged quantities must be non-negative'
+          );
+        }
+
+        const goodQty = itemInput.receivedQty;
+        const damagedQty = itemInput.damagedQty ?? 0;
+
+        // Check if total received + damaged exceeds remaining quantity
+        const remainingSent = item.sentQty - (item.receivedQty || 0);
+        if (goodQty + damagedQty > remainingSent) {
+          throw catalogValidation(
+            'Cannot receive more than remaining sent quantity'
+          );
+        }
+
+        processedItems.set(itemInput.itemId, {
+          receivedQty: goodQty,
+          damagedQty,
+        });
+      }
+
+      const txStore = this.withTransaction(tx);
+      const stockSettings = await txStore.getStockSettings(input.workspaceId);
+
+      // Update items with specified received quantities
+      const updatedItems: TransferItemRecord[] = [];
+      for (const itemInput of input.items) {
+        const item = existingItems.get(itemInput.itemId)!;
+        const { receivedQty, damagedQty } = processedItems.get(
+          itemInput.itemId
+        )!;
+
+        const rows = await tx
+          .update(catalogTransferItems)
+          .set({
+            receivedQty: item.receivedQty + receivedQty,
+            damagedQty: item.damagedQty + damagedQty,
+            version: item.version + 1,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(catalogTransferItems.id, itemInput.itemId),
+              eq(catalogTransferItems.workspaceId, input.workspaceId),
+              eq(catalogTransferItems.version, item.version)
+            )
+          )
+          .returning();
+        const updated = rows[0];
+        if (!updated) throw catalogVersionConflict(item.version + 1);
+        updatedItems.push(toTransferItem(updated));
+      }
+
+      // Credit destination warehouse with good received quantities
+      for (const itemInput of input.items) {
+        const item = existingItems.get(itemInput.itemId)!;
+        const { receivedQty, damagedQty } = processedItems.get(
+          itemInput.itemId
+        )!;
+
+        // Only credit the "good" quantity (received minus damaged)
+        const goodQty = receivedQty - damagedQty;
+
+        await txStore.adjustLevel({
+          workspaceId: input.workspaceId,
+          variantId: item.variantId,
+          warehouseId: transfer.destWarehouseId,
+          delta: goodQty,
+          reason: 'transfer_receive',
+          actorId: input.actorId,
+          correlationId: transfer.id,
+          idempotencyKey: input.idempotencyKey
+            ? `${input.idempotencyKey}:${itemInput.itemId}`
+            : undefined,
+          allowNegative: stockSettings.allowNegative,
+        });
+      }
+
+      // Check if all items are fully received, and update transfer status accordingly
+      let updatedTransfer;
+
+      // Count how many items have been fully received
+      const fullyReceivedItems = itemRows.filter((item) => {
+        const existingItem = existingItems.get(item.id)!;
+        const alreadyReceived = existingItem.receivedQty || 0;
+        return (
+          alreadyReceived + (processedItems.get(item.id)?.receivedQty || 0) ===
+          item.sentQty
+        );
+      });
+
+      // If all items are received, set status to 'received'; otherwise keep 'sent'
+      const newStatus =
+        fullyReceivedItems.length === itemRows.length ? 'received' : 'sent';
+
+      updatedTransfer = await tx
+        .update(catalogTransfers)
+        .set({
+          status: newStatus,
+          version: transfer.version + 1,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(catalogTransfers.id, transfer.id),
+            eq(catalogTransfers.workspaceId, input.workspaceId),
+            eq(catalogTransfers.status, 'sent'),
+            eq(catalogTransfers.version, transfer.version)
+          )
+        )
+        .returning();
+      const updated = updatedTransfer[0];
+      if (!updated) {
+        // Re-throw the version conflict error from the update
+        throw catalogVersionConflict(transfer.version);
+      }
+
+      return {
+        transfer: toTransfer(updated),
+        items: updatedItems,
+      };
+    });
   }
 }

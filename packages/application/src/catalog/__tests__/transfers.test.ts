@@ -1312,6 +1312,5 @@ describe('TransferStore', () => {
         })
       ).rejects.toThrow('This record changed. Reload and try again.');
     });
-
   });
 });
