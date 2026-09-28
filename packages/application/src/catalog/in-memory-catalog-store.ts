@@ -1263,7 +1263,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       }
     }
 
-    // 6. Process each item according to the requirements
+    // Process each item according to the requirements
     for (const item of items) {
       // Calculate remaining quantity that can be received
       const remaining =
@@ -1277,7 +1277,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
           const { receivedQty, damagedQty = 0 } = itemData;
 
           // Add to updated items - only increment good receivedQty for credit
-          const updatedItem = {
+          const updatedItem: TransferItemRecord = {
             ...item,
             receivedQty: item.receivedQty + receivedQty,
             damagedQty: (item.damagedQty || 0) + damagedQty,
@@ -1294,7 +1294,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
         // Full receipt - all remaining quantity goes to received
         const fullReceived = remaining;
         if (fullReceived > 0) {
-          const updatedItem = {
+          const updatedItem: TransferItemRecord = {
             ...item,
             receivedQty: item.receivedQty + fullReceived,
             version: item.version + 1,
@@ -1310,7 +1310,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       }
     }
 
-    // 9. Increment warehouse stock for received quantities (only good items)
+    // Increment warehouse stock for received quantities (only good items)
     for (const item of updatedItems) {
       const toCredit = receivedDeltas.get(item.id) ?? 0;
       if (toCredit > 0) {
@@ -1329,7 +1329,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       }
     }
 
-    // 10. Check if all items are fully received, update transfer status if needed
+    // Check if all items are fully received, update transfer status if needed
     let allReceived = true;
     for (const item of updatedItems) {
       const remainingToReceive =
