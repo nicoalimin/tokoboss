@@ -190,6 +190,19 @@ export const AdjustStockBodySchema = z.object({
 export type AdjustStockBody = z.infer<typeof AdjustStockBodySchema>;
 
 /**
+ * POST /api/.../variants/:variantId/transfers (Manager/Admin).
+ * Transfer inventory between warehouses for a single variant.
+ */
+export const TransferStockBodySchema = z.object({
+  fromWarehouseId: z.string().min(1).max(200),
+  toWarehouseId: z.string().min(1).max(200),
+  quantity: z.number().int().positive(),
+  reason: z.string().trim().min(1).max(500),
+  expectedVersion: z.number().int().nonnegative().optional(),
+});
+export type TransferStockBody = z.infer<typeof TransferStockBodySchema>;
+
+/**
  * PUT /api/workspaces/:workspaceId/catalog/stock-settings (Admin only).
  * Toggles the workspace negative-stock policy (default OFF).
  */
