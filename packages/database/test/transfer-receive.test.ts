@@ -1,6 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDb } from '../src/db';
 import { DrizzleCatalogStore } from '../src/repositories/drizzle-catalog-repository';
+
+function queryReturning(rows: unknown[]) {
+  const query: any = {};
+  query.from = vi.fn(() => query);
+  query.where = vi.fn(() => query);
+  query.limit = vi.fn().mockResolvedValue(rows);
+  query.orderBy = vi.fn().mockResolvedValue(rows);
+  return query;
+}
+
+function updateReturning(rows: unknown[]) {
+  const query: any = {};
+  query.set = vi.fn(() => query);
+  query.where = vi.fn(() => query);
+  query.returning = vi.fn().mockResolvedValue(rows);
+  return query;
+}
 
 describe('DrizzleCatalogStore - Transfer Receive', () => {
   let db: any;
@@ -9,7 +25,7 @@ describe('DrizzleCatalogStore - Transfer Receive', () => {
   beforeEach(() => {
     // Create a mock database
     db = {
-      transaction: vi.fn(),
+      transaction: vi.fn(async (run) => run(db)),
       select: vi.fn(),
       update: vi.fn(),
       insert: vi.fn(),
@@ -19,7 +35,7 @@ describe('DrizzleCatalogStore - Transfer Receive', () => {
   });
 
   it('should throw an error when transfer is not found', async () => {
-    db.select.mockResolvedValue([]);
+    db.select.mockReturnValueOnce(queryReturning([]));
 
     await expect(
       store.receiveTransfer({
@@ -31,19 +47,21 @@ describe('DrizzleCatalogStore - Transfer Receive', () => {
   });
 
   it('should throw an error when transfer is not sent', async () => {
-    db.select.mockResolvedValue([
-      {
-        id: 'transfer-1',
-        workspaceId: 'workspace-1',
-        referenceNum: 'REF001',
-        sourceWarehouseId: 'warehouse-1',
-        destWarehouseId: 'warehouse-2',
-        status: 'draft',
-        version: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
+    db.select.mockReturnValueOnce(
+      queryReturning([
+        {
+          id: 'transfer-1',
+          workspaceId: 'workspace-1',
+          referenceNum: 'REF001',
+          sourceWarehouseId: 'warehouse-1',
+          destWarehouseId: 'warehouse-2',
+          status: 'draft',
+          version: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ])
+    );
 
     await expect(
       store.receiveTransfer({
@@ -80,6 +98,8 @@ describe('DrizzleCatalogStore - Transfer Receive', () => {
         receivedQty: 0,
         damagedQty: 0,
         version: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
     ];
 
@@ -92,14 +112,16 @@ describe('DrizzleCatalogStore - Transfer Receive', () => {
       updatedAt: new Date(),
     };
 
-    db.select.mockResolvedValueOnce([transferData]);
-    db.select.mockResolvedValueOnce([itemData[0]]);
-
-    // Mock getStockSettings
-    db.select.mockResolvedValue([stockSettings]);
+    db.select
+      .mockReturnValueOnce(queryReturning([transferData]))
+      .mockReturnValueOnce(queryReturning(itemData))
+      .mockReturnValueOnce(queryReturning([stockSettings]));
 
     // Mock adjustLevel calls
-    const adjustLevelSpy = vi.spyOn(store, 'adjustLevel');
+    const adjustLevelSpy = vi.spyOn(
+      DrizzleCatalogStore.prototype,
+      'adjustLevel'
+    );
     adjustLevelSpy.mockResolvedValue({
       level: {
         id: 'level-1',
@@ -127,24 +149,28 @@ describe('DrizzleCatalogStore - Transfer Receive', () => {
     });
 
     // Mock update item
-    db.update.mockResolvedValue([
-      {
-        ...itemData[0],
-        receivedQty: 10,
-        version: 2,
-        updatedAt: new Date(),
-      },
-    ]);
+    db.update.mockReturnValueOnce(
+      updateReturning([
+        {
+          ...itemData[0],
+          receivedQty: 10,
+          version: 2,
+          updatedAt: new Date(),
+        },
+      ])
+    );
 
     // Mock update transfer
-    db.update.mockResolvedValue([
-      {
-        ...transferData,
-        status: 'completed',
-        version: 2,
-        updatedAt: new Date(),
-      },
-    ]);
+    db.update.mockReturnValueOnce(
+      updateReturning([
+        {
+          ...transferData,
+          status: 'received',
+          version: 2,
+          updatedAt: new Date(),
+        },
+      ])
+    );
 
     const result = await store.receiveTransfer({
       workspaceId: 'workspace-1',
@@ -153,7 +179,7 @@ describe('DrizzleCatalogStore - Transfer Receive', () => {
     });
 
     expect(result).toBeDefined();
-    expect(result.transfer.status).toBe('completed');
+    expect(result.transfer.status).toBe('received');
     expect(adjustLevelSpy).toHaveBeenCalled();
   });
 });

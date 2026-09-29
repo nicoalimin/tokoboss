@@ -1642,7 +1642,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
         throw catalogConflict('Only sent transfers can be received.');
       }
 
-      const itemRows = await tx
+      const itemRows: CatalogTransferItemRow[] = await tx
         .select()
         .from(catalogTransferItems)
         .where(
