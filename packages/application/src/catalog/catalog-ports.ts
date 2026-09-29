@@ -350,4 +350,11 @@ export interface TransferStore {
       damagedQty?: number;
     }>;
   }): Promise<TransferWithItems>;
+  cancelTransfer(input: {
+    workspaceId: string;
+    transferId: string;
+    actorId: string | null;
+    expectedVersion?: number;
+    idempotencyKey?: string;
+  }): Promise<TransferWithItems>;
 }
