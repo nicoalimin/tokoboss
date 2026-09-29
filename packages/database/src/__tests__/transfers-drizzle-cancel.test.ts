@@ -245,3 +245,142 @@ describe('drizzle TransferStore cancelTransfer happy-path (UTA-119)', () => {
     }
   });
 });
+
+describe('drizzle TransferStore cancelTransfer edges (UTA-120)', () => {
+  it('rejects cancel after partial receive with validation error', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const { tenant, store, transfer, items } = await seedSentTransfer(
+        db,
+        'acme-xfer-cancel-partial'
+      );
+
+      const partial = await store.receiveTransfer({
+        workspaceId: tenant.id,
+        transferId: transfer.id,
+        actorId: null,
+        items: [{ itemId: items[0]!.id, receivedQty: 3 }],
+      });
+      expect(partial.transfer.status).toBe('sent');
+
+      await expect(
+        store.cancelTransfer({
+          workspaceId: tenant.id,
+          transferId: transfer.id,
+          actorId: null,
+        })
+      ).rejects.toThrow(/Cannot cancel a transfer after receiving has started/);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('rejects cancel of received transfer with conflict', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const { tenant, store, transfer } = await seedSentTransfer(
+        db,
+        'acme-xfer-cancel-received'
+      );
+
+      const received = await store.receiveTransfer({
+        workspaceId: tenant.id,
+        transferId: transfer.id,
+        actorId: null,
+      });
+      expect(received.transfer.status).toBe('received');
+
+      await expect(
+        store.cancelTransfer({
+          workspaceId: tenant.id,
+          transferId: transfer.id,
+          actorId: null,
+        })
+      ).rejects.toThrow(/Only draft or sent transfers can be cancelled/);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('rejects cancel of already-cancelled transfer with conflict', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const { tenant, store, transfer } = await seedSentTransfer(
+        db,
+        'acme-xfer-cancel-twice'
+      );
+
+      const first = await store.cancelTransfer({
+        workspaceId: tenant.id,
+        transferId: transfer.id,
+        actorId: null,
+      });
+      expect(first.transfer.status).toBe('cancelled');
+
+      await expect(
+        store.cancelTransfer({
+          workspaceId: tenant.id,
+          transferId: transfer.id,
+          actorId: null,
+        })
+      ).rejects.toThrow(/Only draft or sent transfers can be cancelled/);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('rejects expectedVersion mismatch with version conflict', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const { tenant, store, transfer } = await seedSentTransfer(
+        db,
+        'acme-xfer-cancel-ver'
+      );
+
+      await expect(
+        store.cancelTransfer({
+          workspaceId: tenant.id,
+          transferId: transfer.id,
+          actorId: null,
+          expectedVersion: 999,
+        })
+      ).rejects.toThrow(/This record changed. Reload and try again/);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('throws not found for unknown transfer or wrong workspace', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const { tenant, store, transfer } = await seedSentTransfer(
+        db,
+        'acme-xfer-cancel-nf'
+      );
+
+      await expect(
+        store.cancelTransfer({
+          workspaceId: tenant.id,
+          transferId: '00000000-0000-4000-8000-000000000099',
+          actorId: null,
+        })
+      ).rejects.toThrow(/Transfer not found/);
+
+      const [tenant2] = await db
+        .insert(tenants)
+        .values({ name: 'Beta', slug: 'beta-xfer-cancel-nf' })
+        .returning({ id: tenants.id });
+      if (!tenant2) throw new Error('seed tenant failed');
+
+      await expect(
+        store.cancelTransfer({
+          workspaceId: tenant2.id,
+          transferId: transfer.id,
+          actorId: null,
+        })
+      ).rejects.toThrow(/Transfer not found/);
+    } finally {
+      await client.close();
+    }
+  });
+});
