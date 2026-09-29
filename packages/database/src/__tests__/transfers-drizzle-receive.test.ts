@@ -334,3 +334,243 @@ describe('drizzle TransferStore receiveTransfer (UTA-117)', () => {
     }
   });
 });
+
+describe('drizzle TransferStore receiveTransfer edges (UTA-118)', () => {
+  it('partial receive via items keeps sent; dest credited for good qty only; receivedQty bumped', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const { tenant, store, dest, variantId, transfer, items } =
+        await seedSentTransfer(db, 'acme-xfer-recv-partial');
+
+      const result = await store.receiveTransfer({
+        workspaceId: tenant.id,
+        transferId: transfer.id,
+        actorId: null,
+        items: [
+          {
+            itemId: items[0]!.id,
+            receivedQty: 5,
+            damagedQty: 2,
+          },
+        ],
+      });
+
+      expect(result.transfer.status).toBe('sent');
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]!.receivedQty).toBe(5);
+      expect(result.items[0]!.damagedQty).toBe(2);
+      expect(result.items[0]!.sentQty).toBe(10);
+
+      const destLevel = await store.getLevel(tenant.id, variantId, dest.id);
+      expect(destLevel?.qty).toBe(5);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('partial then complete remaining becomes received; dest total equals good qty only', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const { tenant, store, dest, variantId, transfer, items } =
+        await seedSentTransfer(db, 'acme-xfer-recv-partial-complete');
+
+      const partial = await store.receiveTransfer({
+        workspaceId: tenant.id,
+        transferId: transfer.id,
+        actorId: null,
+        items: [
+          {
+            itemId: items[0]!.id,
+            receivedQty: 4,
+            damagedQty: 1,
+          },
+        ],
+      });
+
+      expect(partial.transfer.status).toBe('sent');
+      expect(partial.items[0]!.receivedQty).toBe(4);
+      expect(partial.items[0]!.damagedQty).toBe(1);
+
+      const complete = await store.receiveTransfer({
+        workspaceId: tenant.id,
+        transferId: transfer.id,
+        actorId: null,
+        expectedVersion: partial.transfer.version,
+        items: [
+          {
+            itemId: items[0]!.id,
+            receivedQty: 5,
+            damagedQty: 0,
+          },
+        ],
+      });
+
+      expect(complete.transfer.status).toBe('received');
+      expect(complete.items[0]!.receivedQty).toBe(9);
+      expect(complete.items[0]!.damagedQty).toBe(1);
+      expect(
+        complete.items[0]!.sentQty -
+          complete.items[0]!.receivedQty -
+          (complete.items[0]!.damagedQty || 0)
+      ).toBe(0);
+
+      const destLevel = await store.getLevel(tenant.id, variantId, dest.id);
+      expect(destLevel?.qty).toBe(9);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('damaged qty tracked; dest stock only gets good receivedQty', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const { tenant, store, dest, variantId, transfer, items } =
+        await seedSentTransfer(db, 'acme-xfer-recv-damaged');
+
+      const result = await store.receiveTransfer({
+        workspaceId: tenant.id,
+        transferId: transfer.id,
+        actorId: null,
+        items: [
+          {
+            itemId: items[0]!.id,
+            receivedQty: 3,
+            damagedQty: 7,
+          },
+        ],
+      });
+
+      expect(result.transfer.status).toBe('received');
+      expect(result.items[0]!.receivedQty).toBe(3);
+      expect(result.items[0]!.damagedQty).toBe(7);
+
+      const destLevel = await store.getLevel(tenant.id, variantId, dest.id);
+      expect(destLevel?.qty).toBe(3);
+
+      const ledgerEntries = await store.listLedgerByVariant(
+        tenant.id,
+        variantId,
+        100
+      );
+      const receiveEntries = ledgerEntries.filter(
+        (entry) => entry.reason === 'transfer_receive'
+      );
+      expect(receiveEntries).toHaveLength(1);
+      expect(receiveEntries[0]!.delta).toBe(3);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('over-receive receivedQty + damagedQty > remaining rejects with validation', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const { tenant, store, transfer, items } = await seedSentTransfer(
+        db,
+        'acme-xfer-recv-over'
+      );
+
+      await expect(
+        store.receiveTransfer({
+          workspaceId: tenant.id,
+          transferId: transfer.id,
+          actorId: null,
+          items: [
+            {
+              itemId: items[0]!.id,
+              receivedQty: 7,
+              damagedQty: 4,
+            },
+          ],
+        })
+      ).rejects.toThrow('Cannot receive more than remaining sent quantity');
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('negative receivedQty or damagedQty rejects with validation', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const { tenant, store, transfer, items } = await seedSentTransfer(
+        db,
+        'acme-xfer-recv-neg'
+      );
+
+      await expect(
+        store.receiveTransfer({
+          workspaceId: tenant.id,
+          transferId: transfer.id,
+          actorId: null,
+          items: [
+            {
+              itemId: items[0]!.id,
+              receivedQty: -5,
+            },
+          ],
+        })
+      ).rejects.toThrow('Received and damaged quantities must be non-negative');
+
+      await expect(
+        store.receiveTransfer({
+          workspaceId: tenant.id,
+          transferId: transfer.id,
+          actorId: null,
+          items: [
+            {
+              itemId: items[0]!.id,
+              receivedQty: 5,
+              damagedQty: -2,
+            },
+          ],
+        })
+      ).rejects.toThrow('Received and damaged quantities must be non-negative');
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('unknown itemId not-found; duplicate itemIds validation', async () => {
+    const { client, db } = await createMigratedDb();
+    try {
+      const { tenant, store, transfer, items } = await seedSentTransfer(
+        db,
+        'acme-xfer-recv-item-ids'
+      );
+
+      await expect(
+        store.receiveTransfer({
+          workspaceId: tenant.id,
+          transferId: transfer.id,
+          actorId: null,
+          items: [
+            {
+              itemId: '00000000-0000-4000-8000-0000000000aa',
+              receivedQty: 5,
+            },
+          ],
+        })
+      ).rejects.toThrow('TransferItem not found');
+
+      await expect(
+        store.receiveTransfer({
+          workspaceId: tenant.id,
+          transferId: transfer.id,
+          actorId: null,
+          items: [
+            {
+              itemId: items[0]!.id,
+              receivedQty: 5,
+            },
+            {
+              itemId: items[0]!.id,
+              receivedQty: 3,
+            },
+          ],
+        })
+      ).rejects.toThrow('Each transfer item may only be received once');
+    } finally {
+      await client.close();
+    }
+  });
+});
