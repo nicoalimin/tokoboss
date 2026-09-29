@@ -1667,7 +1667,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
 
       // Validate items and perform adjustments
       const updatedItems: TransferItemRecord[] = [];
-      for (const item of input.items) {
+      for (const item of input.items!) {
         const originalItem = itemRows.find((i) => i.id === item.itemId);
         if (!originalItem) {
           throw catalogNotFound('Transfer item');
