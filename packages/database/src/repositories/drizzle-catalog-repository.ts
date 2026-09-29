@@ -1854,7 +1854,8 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       // sent AND any item has receivedQty + damagedQty > 0
       if (transfer.status === 'sent') {
         const receivingStarted = itemRows.some(
-          (item) => item.receivedQty + (item.damagedQty || 0) > 0
+          (item: CatalogTransferItemRow) =>
+            item.receivedQty + (item.damagedQty || 0) > 0
         );
         if (receivingStarted) {
           throw catalogValidation(
