@@ -1620,4 +1620,15 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
     void input;
     throw catalogConflict('receiveTransfer not implemented in Drizzle yet');
   }
+
+  async cancelTransfer(input: {
+    workspaceId: string;
+    transferId: string;
+    actorId: string | null;
+    expectedVersion?: number;
+    idempotencyKey?: string;
+  }): Promise<TransferWithItems> {
+    void input;
+    throw catalogConflict('cancelTransfer not implemented in Drizzle yet');
+  }
 }
