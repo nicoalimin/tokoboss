@@ -31,7 +31,7 @@ import type {
   WarehouseRecord,
   WarehouseStatus,
 } from '@tokoboss/application';
-import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, or, sql } from 'drizzle-orm';
 import type { DatabaseHandle, Transaction } from '../db';
 import {
   catalogBundleLines,
