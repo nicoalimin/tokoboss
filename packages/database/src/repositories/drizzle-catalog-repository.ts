@@ -1760,9 +1760,9 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
         0
       );
 
-      let finalStatus: TransferRecord['status'] = 'sent';
+      let finalStatus: 'draft' | 'sent' | 'received' | 'cancelled' = 'sent';
       if (totalReceived + totalDamaged === totalSent) {
-        finalStatus = 'completed';
+        finalStatus = 'received';
       }
 
       const now = new Date();
