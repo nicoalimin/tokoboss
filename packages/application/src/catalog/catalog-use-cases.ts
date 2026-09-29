@@ -18,7 +18,7 @@ import {
   catalogValidation,
   catalogWarehouseInactive,
 } from './catalog-errors';
-import type { CatalogStore } from './catalog-ports';
+import type { CatalogStore, TransferStore } from './catalog-ports';
 import { activeBundlesUsing } from '../bundles/bundle-use-cases';
 import { bundleNoDirectStock } from '../bundles/bundle-errors';
 import type {
@@ -32,6 +32,9 @@ import type {
   StockBalance,
   StockLedgerRecord,
   StockSettingsRecord,
+  TransferItemRecord,
+  TransferRecord,
+  TransferWithItems,
   WarehouseRecord,
   WarehouseStatus,
 } from './catalog-types';
@@ -1092,4 +1095,144 @@ export async function searchCatalog(
     if (matchedProducts.length >= limit) break;
   }
   return { products: matchedProducts, variants: matchedVariants };
+}
+
+
+// Transfers (UTA-121 / Story 06) — application wrappers for draft + send only.
+// receiveTransfer / cancelTransfer use-cases are intentionally out of scope.
+
+export async function createTransferDraftUseCase(
+  store: CatalogStore & TransferStore,
+  input: {
+    ctx: WorkspaceContext;
+    workspaceId: string;
+    referenceNum: unknown;
+    sourceWarehouseId: unknown;
+    destWarehouseId: unknown;
+    notes?: unknown;
+    expectedReceiveDate?: Date;
+  }
+): Promise<TransferRecord> {
+  assertSameWorkspace(input.ctx, input.workspaceId);
+  assertManagerOrAdmin(input.ctx);
+  const referenceNum = cleanText(input.referenceNum, 'Reference number', 120);
+  const sourceWarehouseId = cleanText(
+    input.sourceWarehouseId,
+    'Source warehouse',
+    200
+  );
+  const destWarehouseId = cleanText(
+    input.destWarehouseId,
+    'Destination warehouse',
+    200
+  );
+  if (sourceWarehouseId === destWarehouseId) {
+    throw catalogValidation(
+      'Source and destination must not be the same warehouse'
+    );
+  }
+  const notes =
+    input.notes === undefined
+      ? undefined
+      : cleanNullableText(input.notes, 'Notes', 2000) ?? undefined;
+  return store.createTransferDraft({
+    workspaceId: input.workspaceId,
+    referenceNum,
+    sourceWarehouseId,
+    destWarehouseId,
+    notes,
+    expectedReceiveDate: input.expectedReceiveDate,
+  });
+}
+
+export async function addTransferItemsUseCase(
+  store: CatalogStore & TransferStore,
+  input: {
+    ctx: WorkspaceContext;
+    workspaceId: string;
+    transferId: unknown;
+    items: unknown;
+  }
+): Promise<TransferItemRecord[]> {
+  assertSameWorkspace(input.ctx, input.workspaceId);
+  assertManagerOrAdmin(input.ctx);
+  const transferId = cleanText(input.transferId, 'Transfer id', 200);
+  if (!Array.isArray(input.items) || input.items.length === 0) {
+    throw catalogValidation('Transfer items must be a non-empty array');
+  }
+  const items = input.items.map((raw, idx) => {
+    if (typeof raw !== 'object' || raw === null) {
+      throw catalogValidation(`Transfer item ${idx} must be an object`);
+    }
+    const rec = raw as Record<string, unknown>;
+    const variantId = cleanText(rec['variantId'], 'Variant id', 200);
+    const requestedQty = rec['requestedQty'];
+    if (
+      typeof requestedQty !== 'number' ||
+      !Number.isInteger(requestedQty) ||
+      requestedQty <= 0
+    ) {
+      throw catalogValidation(
+        'requestedQty must be a positive integer'
+      );
+    }
+    return { variantId, requestedQty };
+  });
+  return store.addTransferItems({
+    workspaceId: input.workspaceId,
+    transferId,
+    items,
+  });
+}
+
+export async function getTransferUseCase(
+  store: CatalogStore & TransferStore,
+  input: {
+    ctx: WorkspaceContext;
+    workspaceId: string;
+    transferId: unknown;
+  }
+): Promise<TransferWithItems> {
+  assertSameWorkspace(input.ctx, input.workspaceId);
+  const transferId = cleanText(input.transferId, 'Transfer id', 200);
+  const found = await store.findTransferWithItems(
+    input.workspaceId,
+    transferId
+  );
+  if (!found) throw catalogNotFound('Transfer');
+  return found;
+}
+
+export async function listTransfersUseCase(
+  store: CatalogStore & TransferStore,
+  input: {
+    ctx: WorkspaceContext;
+    workspaceId: string;
+  }
+): Promise<TransferWithItems[]> {
+  assertSameWorkspace(input.ctx, input.workspaceId);
+  return store.listTransfersWithItems(input.workspaceId);
+}
+
+export async function sendTransferUseCase(
+  store: CatalogStore & TransferStore,
+  input: {
+    ctx: WorkspaceContext;
+    workspaceId: string;
+    transferId: unknown;
+    expectedVersion?: number;
+    idempotencyKey?: unknown;
+  }
+): Promise<TransferWithItems> {
+  assertSameWorkspace(input.ctx, input.workspaceId);
+  assertManagerOrAdmin(input.ctx);
+  const transferId = cleanText(input.transferId, 'Transfer id', 200);
+  const idempotencyKey = cleanIdempotencyKey(input.idempotencyKey);
+  return store.sendTransfer({
+    workspaceId: input.workspaceId,
+    transferId,
+    actorId: input.ctx.userId,
+    expectedVersion: input.expectedVersion,
+    idempotencyKey,
+  });
 }
