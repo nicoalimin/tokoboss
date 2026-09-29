@@ -1840,7 +1840,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       }
 
       // Collect items
-      const itemRows = await tx
+      const itemRows: CatalogTransferItemRow[] = await tx
         .select()
         .from(catalogTransferItems)
         .where(
