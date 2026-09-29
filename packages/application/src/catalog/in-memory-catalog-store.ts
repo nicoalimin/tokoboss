@@ -1370,8 +1370,85 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     expectedVersion?: number;
     idempotencyKey?: string;
   }): Promise<TransferWithItems> {
-    void input;
-    throw catalogConflict('cancelTransfer not implemented in InMemory yet');
+    // 1. Missing transfer / wrong workspace → not found
+    const transfer = this.transfers.get(input.transferId);
+    if (!transfer || transfer.workspaceId !== input.workspaceId) {
+      throw catalogNotFound('Transfer');
+    }
+
+    // 2. expectedVersion mismatch → version conflict
+    if (
+      input.expectedVersion !== undefined &&
+      input.expectedVersion !== transfer.version
+    ) {
+      throw catalogVersionConflict(transfer.version);
+    }
+
+    // 3. received / cancelled → conflict
+    if (transfer.status === 'received' || transfer.status === 'cancelled') {
+      throw catalogConflict('Only draft or sent transfers can be cancelled.');
+    }
+
+    // Collect items for this transfer
+    const items: TransferItemRecord[] = [];
+    for (const item of this.transferItems.values()) {
+      if (
+        item.workspaceId === input.workspaceId &&
+        item.transferId === transfer.id
+      ) {
+        items.push(item);
+      }
+    }
+
+    // 4. sent AND any item has receivedQty + damagedQty > 0 → validation
+    if (transfer.status === 'sent') {
+      const receivingStarted = items.some(
+        (item) => item.receivedQty + (item.damagedQty || 0) > 0
+      );
+      if (receivingStarted) {
+        throw catalogValidation(
+          'Cannot cancel a transfer after receiving has started.'
+        );
+      }
+    }
+
+    // 5–6. draft: no adjustLevel. sent with zero receipts: restore source.
+    if (transfer.status === 'sent') {
+      const stockSettings = await this.getStockSettings(input.workspaceId);
+      const allowNegative = stockSettings.allowNegative;
+      for (const item of items) {
+        if (item.sentQty > 0) {
+          await this.adjustLevel({
+            workspaceId: input.workspaceId,
+            variantId: item.variantId,
+            warehouseId: transfer.sourceWarehouseId,
+            delta: item.sentQty,
+            reason: 'transfer_cancel',
+            actorId: input.actorId,
+            correlationId: transfer.id,
+            idempotencyKey: input.idempotencyKey
+              ? `${input.idempotencyKey}:${item.id}`
+              : undefined,
+            allowNegative,
+          });
+        }
+      }
+    }
+
+    // Keep item qty fields as-is; mark transfer cancelled
+    const now = new Date();
+    const updatedTransfer: TransferRecord = {
+      ...transfer,
+      status: 'cancelled',
+      version: transfer.version + 1,
+      updatedAt: now,
+    };
+    this.transfers.set(transfer.id, updatedTransfer);
+
+    return {
+      transfer: clone(updatedTransfer),
+      items: items.map(clone),
+    };
   }
 
   async updateTransfer(input: {

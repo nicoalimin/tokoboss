@@ -1312,6 +1312,265 @@ describe('TransferStore', () => {
         })
       ).rejects.toThrow('This record changed. Reload and try again.');
     });
+  });
 
+  describe('cancelTransfer', () => {
+    async function setupSentTransfer(opts?: {
+      partialReceive?: boolean;
+      fullReceive?: boolean;
+    }) {
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 1',
+        code: 'WH-001',
+      });
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 2',
+        code: 'WH-002',
+      });
+      const productResult = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Test Variant',
+            sellingPriceCents: 1000,
+          },
+        ],
+      });
+      const variant = productResult.variants[0]!;
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 100,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+      const transfer = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'REF-CANCEL-001',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+      const items = await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        items: [{ variantId: variant.id, requestedQty: 10 }],
+      });
+      const sent = await store.sendTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: null,
+      });
+      if (opts?.partialReceive) {
+        await store.receiveTransfer({
+          workspaceId: 'ws1',
+          transferId: transfer.id,
+          actorId: null,
+          items: [{ itemId: items[0]!.id, receivedQty: 3 }],
+        });
+      }
+      if (opts?.fullReceive) {
+        await store.receiveTransfer({
+          workspaceId: 'ws1',
+          transferId: transfer.id,
+          actorId: null,
+        });
+      }
+      return { warehouse1, warehouse2, variant, transfer, items, sent };
+    }
+
+    it('cancels a draft without touching stock levels', async () => {
+      const warehouse1 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 1',
+        code: 'WH-001',
+      });
+      const warehouse2 = await store.createWarehouse({
+        workspaceId: 'ws1',
+        name: 'Warehouse 2',
+        code: 'WH-002',
+      });
+      const productResult = await store.createProductWithVariants({
+        workspaceId: 'ws1',
+        name: 'Test Product',
+        description: null,
+        unit: 'pcs',
+        pictures: [],
+        variants: [
+          {
+            skuCode: 'SKU-001',
+            name: 'Test Variant',
+            sellingPriceCents: 1000,
+          },
+        ],
+      });
+      const variant = productResult.variants[0]!;
+      await store.adjustLevel({
+        workspaceId: 'ws1',
+        variantId: variant.id,
+        warehouseId: warehouse1.id,
+        delta: 50,
+        reason: 'initial_stock',
+        actorId: null,
+      });
+      const transfer = await store.createTransferDraft({
+        workspaceId: 'ws1',
+        referenceNum: 'REF-CANCEL-DRAFT',
+        sourceWarehouseId: warehouse1.id,
+        destWarehouseId: warehouse2.id,
+      });
+      await store.addTransferItems({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        items: [{ variantId: variant.id, requestedQty: 10 }],
+      });
+
+      const before = await store.getLevel('ws1', variant.id, warehouse1.id);
+      const result = await store.cancelTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: 'actor-1',
+      });
+      const after = await store.getLevel('ws1', variant.id, warehouse1.id);
+
+      expect(result.transfer.status).toBe('cancelled');
+      expect(result.transfer.version).toBe(transfer.version + 1);
+      expect(result.items[0]!.sentQty).toBe(0);
+      expect(after?.qty).toBe(before?.qty);
+      const ledgerEntries = await store.listLedgerByVariant(
+        'ws1',
+        variant.id,
+        100
+      );
+      expect(
+        ledgerEntries.filter((e) => e.reason === 'transfer_cancel')
+      ).toHaveLength(0);
+    });
+
+    it('cancels a sent transfer with no receives and restores source stock', async () => {
+      const { warehouse1, variant, transfer, items } =
+        await setupSentTransfer();
+
+      const before = await store.getLevel('ws1', variant.id, warehouse1.id);
+      expect(before?.qty).toBe(90);
+
+      const result = await store.cancelTransfer({
+        workspaceId: 'ws1',
+        transferId: transfer.id,
+        actorId: 'actor-1',
+        idempotencyKey: 'cancel-key',
+      });
+
+      expect(result.transfer.status).toBe('cancelled');
+      expect(result.items[0]!.sentQty).toBe(10);
+      expect(result.items[0]!.id).toBe(items[0]!.id);
+
+      const after = await store.getLevel('ws1', variant.id, warehouse1.id);
+      expect(after?.qty).toBe(100);
+
+      const ledgerEntries = await store.listLedgerByVariant(
+        'ws1',
+        variant.id,
+        100
+      );
+      const cancelEntries = ledgerEntries.filter(
+        (e) => e.reason === 'transfer_cancel'
+      );
+      expect(cancelEntries).toHaveLength(1);
+      expect(cancelEntries[0]!.delta).toBe(10);
+      expect(cancelEntries[0]!.warehouseId).toBe(warehouse1.id);
+      expect(cancelEntries[0]!.correlationId).toBe(transfer.id);
+    });
+
+    it('rejects cancel after partial receive with validation error', async () => {
+      const { transfer } = await setupSentTransfer({ partialReceive: true });
+      await expect(
+        store.cancelTransfer({
+          workspaceId: 'ws1',
+          transferId: transfer.id,
+          actorId: null,
+        })
+      ).rejects.toMatchObject({
+        code: 'CATALOG_VALIDATION',
+        message: expect.stringContaining(
+          'Cannot cancel a transfer after receiving has started.'
+        ),
+      });
+    });
+
+    it('rejects cancel of received or already cancelled transfers with conflict', async () => {
+      const received = await setupSentTransfer({ fullReceive: true });
+      await expect(
+        store.cancelTransfer({
+          workspaceId: 'ws1',
+          transferId: received.transfer.id,
+          actorId: null,
+        })
+      ).rejects.toMatchObject({
+        code: 'CATALOG_CONFLICT',
+        message: expect.stringContaining(
+          'Only draft or sent transfers can be cancelled.'
+        ),
+      });
+
+      // Fresh store for the already-cancelled case (setup helper reuses codes).
+      store = new InMemoryCatalogStore();
+      const sent = await setupSentTransfer();
+      await store.cancelTransfer({
+        workspaceId: 'ws1',
+        transferId: sent.transfer.id,
+        actorId: null,
+      });
+      await expect(
+        store.cancelTransfer({
+          workspaceId: 'ws1',
+          transferId: sent.transfer.id,
+          actorId: null,
+        })
+      ).rejects.toMatchObject({
+        code: 'CATALOG_CONFLICT',
+        message: expect.stringContaining(
+          'Only draft or sent transfers can be cancelled.'
+        ),
+      });
+    });
+
+    it('rejects expectedVersion mismatch with version conflict', async () => {
+      const { transfer, sent } = await setupSentTransfer();
+      await expect(
+        store.cancelTransfer({
+          workspaceId: 'ws1',
+          transferId: transfer.id,
+          actorId: null,
+          expectedVersion: sent.transfer.version + 5,
+        })
+      ).rejects.toMatchObject({ code: 'CATALOG_VERSION_CONFLICT' });
+    });
+
+    it('rejects unknown transfer or wrong workspace with not found', async () => {
+      await expect(
+        store.cancelTransfer({
+          workspaceId: 'ws1',
+          transferId: 'missing',
+          actorId: null,
+        })
+      ).rejects.toMatchObject({ code: 'CATALOG_NOT_FOUND' });
+
+      const { transfer } = await setupSentTransfer();
+      await expect(
+        store.cancelTransfer({
+          workspaceId: 'ws2',
+          transferId: transfer.id,
+          actorId: null,
+        })
+      ).rejects.toMatchObject({ code: 'CATALOG_NOT_FOUND' });
+    });
   });
 });
