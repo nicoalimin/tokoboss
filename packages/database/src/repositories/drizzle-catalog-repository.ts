@@ -1617,8 +1617,190 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       damagedQty?: number;
     }>;
   }): Promise<TransferWithItems> {
-    void input;
-    throw catalogConflict('receiveTransfer not implemented in Drizzle yet');
+    return this.inTx(async (tx) => {
+      const transferRows = await tx
+        .select()
+        .from(catalogTransfers)
+        .where(
+          and(
+            eq(catalogTransfers.workspaceId, input.workspaceId),
+            eq(catalogTransfers.id, input.transferId)
+          )
+        )
+        .limit(1);
+      const transferRow = transferRows[0];
+      if (!transferRow) throw catalogNotFound('Transfer');
+
+      const transfer = toTransfer(transferRow);
+      if (
+        input.expectedVersion !== undefined &&
+        input.expectedVersion !== transfer.version
+      ) {
+        throw catalogVersionConflict(transfer.version);
+      }
+      if (transfer.status !== 'sent') {
+        throw catalogConflict('Only sent transfers can be received.');
+      }
+
+      const itemRows: CatalogTransferItemRow[] = await tx
+        .select()
+        .from(catalogTransferItems)
+        .where(
+          and(
+            eq(catalogTransferItems.workspaceId, input.workspaceId),
+            eq(catalogTransferItems.transferId, input.transferId)
+          )
+        )
+        .orderBy(asc(catalogTransferItems.createdAt));
+      if (itemRows.length === 0) {
+        throw catalogValidation('Cannot receive a transfer with no items.');
+      }
+
+      type ReceiptLine = {
+        itemId: string;
+        receivedQty: number;
+        damagedQty?: number;
+      };
+      const receiptByItemId = new Map<string, ReceiptLine>(
+        (input.items ?? []).map((item) => [item.itemId, item])
+      );
+      if (input.items) {
+        const seenItemIds = new Set<string>();
+        const itemMap = new Map<string, CatalogTransferItemRow>(
+          itemRows.map((row) => [row.id, row])
+        );
+        for (const itemData of input.items) {
+          if (seenItemIds.has(itemData.itemId)) {
+            throw catalogValidation(
+              'Each transfer item may only be received once.'
+            );
+          }
+          seenItemIds.add(itemData.itemId);
+          const item = itemMap.get(itemData.itemId);
+          if (!item) throw catalogNotFound('TransferItem');
+          const damagedQty = itemData.damagedQty ?? 0;
+          if (itemData.receivedQty < 0 || damagedQty < 0) {
+            throw catalogValidation(
+              'Received and damaged quantities must be non-negative.'
+            );
+          }
+          const remaining =
+            item.sentQty - item.receivedQty - (item.damagedQty || 0);
+          if (itemData.receivedQty + damagedQty > remaining) {
+            throw catalogValidation(
+              'Cannot receive more than remaining sent quantity.'
+            );
+          }
+        }
+      }
+
+      const txStore = this.withTransaction(tx);
+      const now = new Date();
+      const updatedItems: TransferItemRecord[] = [];
+      const creditDeltas = new Map<string, number>();
+
+      for (const item of itemRows) {
+        const remaining =
+          item.sentQty - item.receivedQty - (item.damagedQty || 0);
+        let receiveQty = 0;
+        let damagedQty = 0;
+
+        if (input.items) {
+          const itemData = receiptByItemId.get(item.id);
+          if (!itemData) {
+            updatedItems.push(toTransferItem(item));
+            continue;
+          }
+          receiveQty = itemData.receivedQty;
+          damagedQty = itemData.damagedQty ?? 0;
+        } else {
+          receiveQty = remaining;
+        }
+
+        if (receiveQty === 0 && damagedQty === 0) {
+          updatedItems.push(toTransferItem(item));
+          continue;
+        }
+
+        const rows = await tx
+          .update(catalogTransferItems)
+          .set({
+            receivedQty: item.receivedQty + receiveQty,
+            damagedQty: (item.damagedQty || 0) + damagedQty,
+            version: item.version + 1,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(catalogTransferItems.id, item.id),
+              eq(catalogTransferItems.workspaceId, input.workspaceId),
+              eq(catalogTransferItems.version, item.version)
+            )
+          )
+          .returning();
+        const updated = rows[0];
+        if (!updated) throw catalogVersionConflict(item.version + 1);
+        updatedItems.push(toTransferItem(updated));
+        if (receiveQty > 0) creditDeltas.set(item.id, receiveQty);
+      }
+
+      for (const item of updatedItems) {
+        const toCredit = creditDeltas.get(item.id) ?? 0;
+        if (toCredit <= 0) continue;
+        await txStore.adjustLevel({
+          workspaceId: input.workspaceId,
+          variantId: item.variantId,
+          warehouseId: transfer.destWarehouseId,
+          delta: toCredit,
+          reason: 'transfer_receive',
+          actorId: input.actorId,
+          correlationId: transfer.id,
+          idempotencyKey: input.idempotencyKey
+            ? `${input.idempotencyKey}:${item.id}:receive`
+            : undefined,
+        });
+      }
+
+      const allReceived = updatedItems.every(
+        (item) => item.sentQty - item.receivedQty - (item.damagedQty || 0) === 0
+      );
+
+      const updatedTransfers = await tx
+        .update(catalogTransfers)
+        .set({
+          status: allReceived ? 'received' : 'sent',
+          version: transfer.version + 1,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(catalogTransfers.id, transfer.id),
+            eq(catalogTransfers.workspaceId, input.workspaceId),
+            eq(catalogTransfers.status, 'sent'),
+            eq(catalogTransfers.version, transfer.version)
+          )
+        )
+        .returning();
+      const updatedTransfer = updatedTransfers[0];
+      if (!updatedTransfer) {
+        const currentRows = await tx
+          .select()
+          .from(catalogTransfers)
+          .where(eq(catalogTransfers.id, transfer.id))
+          .limit(1);
+        const current = currentRows[0];
+        if (!current) throw catalogNotFound('Transfer');
+        if (current.status !== 'sent') {
+          throw catalogConflict('Only sent transfers can be received.');
+        }
+        throw catalogVersionConflict(current.version);
+      }
+
+      return {
+        transfer: toTransfer(updatedTransfer),
+        items: updatedItems,
+      };
+    });
   }
 
   async cancelTransfer(input: {
