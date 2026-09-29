@@ -31,7 +31,7 @@ import type {
   WarehouseRecord,
   WarehouseStatus,
 } from '@tokoboss/application';
-import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, or, sql } from 'drizzle-orm';
 import type { DatabaseHandle, Transaction } from '../db';
 import {
   catalogBundleLines,
@@ -1810,7 +1810,125 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
     expectedVersion?: number;
     idempotencyKey?: string;
   }): Promise<TransferWithItems> {
-    void input;
-    throw catalogConflict('cancelTransfer not implemented in Drizzle yet');
+    return this.inTx(async (tx) => {
+      const transferRows = await tx
+        .select()
+        .from(catalogTransfers)
+        .where(
+          and(
+            eq(catalogTransfers.workspaceId, input.workspaceId),
+            eq(catalogTransfers.id, input.transferId)
+          )
+        )
+        .limit(1);
+      const transferRow = transferRows[0];
+      if (!transferRow) throw catalogNotFound('Transfer');
+
+      const transfer = toTransfer(transferRow);
+
+      // expectedVersion mismatch
+      if (
+        input.expectedVersion !== undefined &&
+        input.expectedVersion !== transfer.version
+      ) {
+        throw catalogVersionConflict(transfer.version);
+      }
+
+      // received / cancelled
+      if (transfer.status === 'received' || transfer.status === 'cancelled') {
+        throw catalogConflict('Only draft or sent transfers can be cancelled.');
+      }
+
+      // Collect items
+      const itemRows: CatalogTransferItemRow[] = await tx
+        .select()
+        .from(catalogTransferItems)
+        .where(
+          and(
+            eq(catalogTransferItems.workspaceId, input.workspaceId),
+            eq(catalogTransferItems.transferId, input.transferId)
+          )
+        )
+        .orderBy(asc(catalogTransferItems.createdAt));
+
+      // sent AND any item has receivedQty + damagedQty > 0
+      if (transfer.status === 'sent') {
+        const receivingStarted = itemRows.some(
+          (item: CatalogTransferItemRow) =>
+            item.receivedQty + (item.damagedQty || 0) > 0
+        );
+        if (receivingStarted) {
+          throw catalogValidation(
+            'Cannot cancel a transfer after receiving has started.'
+          );
+        }
+      }
+
+      // sent with zero receipts: restore source stock
+      if (transfer.status === 'sent') {
+        const txStore = this.withTransaction(tx);
+        const stockSettings = await txStore.getStockSettings(input.workspaceId);
+        const allowNegative = stockSettings.allowNegative;
+        for (const item of itemRows) {
+          if (item.sentQty > 0) {
+            await txStore.adjustLevel({
+              workspaceId: input.workspaceId,
+              variantId: item.variantId,
+              warehouseId: transfer.sourceWarehouseId,
+              delta: item.sentQty,
+              reason: 'transfer_cancel',
+              actorId: input.actorId,
+              correlationId: transfer.id,
+              idempotencyKey: input.idempotencyKey
+                ? `${input.idempotencyKey}:${item.id}`
+                : undefined,
+              allowNegative,
+            });
+          }
+        }
+      }
+
+      const now = new Date();
+      const updatedTransfers = await tx
+        .update(catalogTransfers)
+        .set({
+          status: 'cancelled',
+          version: transfer.version + 1,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(catalogTransfers.id, transfer.id),
+            eq(catalogTransfers.workspaceId, input.workspaceId),
+            or(
+              eq(catalogTransfers.status, 'draft'),
+              eq(catalogTransfers.status, 'sent')
+            ),
+            eq(catalogTransfers.version, transfer.version)
+          )
+        )
+        .returning();
+      const updatedTransfer = updatedTransfers[0];
+      if (!updatedTransfer) {
+        const currentRows = await tx
+          .select()
+          .from(catalogTransfers)
+          .where(eq(catalogTransfers.id, transfer.id))
+          .limit(1);
+        const current = currentRows[0];
+        if (!current) throw catalogNotFound('Transfer');
+        if (current.status !== 'draft' && current.status !== 'sent') {
+          throw catalogConflict(
+            'Only draft or sent transfers can be cancelled.'
+          );
+        }
+        throw catalogVersionConflict(current.version);
+      }
+
+      return {
+        transfer: toTransfer(updatedTransfer),
+        items: itemRows.map(toTransferItem),
+      };
+    });
   }
 }
