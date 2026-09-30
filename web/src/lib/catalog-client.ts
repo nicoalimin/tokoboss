@@ -182,6 +182,30 @@ export interface CreateTransferDraftInput {
   expectedReceiveDate?: string;
 }
 
+export interface TransferItemView {
+  id: string;
+  transferId: string;
+  workspaceId: string;
+  variantId: string;
+  requestedQty: number;
+  sentQty: number;
+  receivedQty: number;
+  damagedQty: number;
+  cancellationReason: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TransferWithItemsView {
+  transfer: TransferView;
+  items: TransferItemView[];
+}
+
+export interface AddTransferItemsInput {
+  items: Array<{ variantId: string; requestedQty: number }>;
+}
+
 export class CatalogClientError extends Error {
   readonly status: number;
   readonly errorCode: string;
@@ -599,6 +623,37 @@ export async function listTransfers(
     opts.lang ?? 'en'
   );
   return Array.isArray(data.transfers) ? data.transfers : [];
+}
+
+/** Get a single transfer with its items. */
+export async function getTransfer(
+  workspaceId: string,
+  transferId: string,
+  opts: ClientOpts = {}
+): Promise<TransferWithItemsView> {
+  const data = await getJson<TransferWithItemsView>(
+    opts.fetchFn ?? fetch,
+    `${base(workspaceId)}/transfers/${encodeSegment(transferId)}`,
+    opts.lang ?? 'en'
+  );
+  return { transfer: data.transfer, items: data.items ?? [] };
+}
+
+/** Add line items to a transfer draft (Manager/Admin). */
+export async function addTransferItems(
+  workspaceId: string,
+  transferId: string,
+  input: AddTransferItemsInput,
+  opts: ClientOpts = {}
+): Promise<TransferItemView[]> {
+  const data = await sendJson<{ items?: TransferItemView[] }>(
+    opts.fetchFn ?? fetch,
+    `${base(workspaceId)}/transfers/${encodeSegment(transferId)}/items`,
+    'POST',
+    { items: input.items },
+    opts.lang ?? 'en'
+  );
+  return Array.isArray(data.items) ? data.items : [];
 }
 
 /** Create a transfer draft (Manager/Admin). */

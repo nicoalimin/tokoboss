@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   CatalogClientError,
+  addTransferItems,
   createTransferDraft,
+  getTransfer,
   listTransfers,
   toCatalogClientError,
 } from '../lib/catalog-client';
@@ -225,5 +227,189 @@ describe('transfer-client (UTA-129)', () => {
     const err = toCatalogClientError(401, { errorCode: 'INVALID_SESSION' });
     expect(err.needsReauth).toBe(true);
     expect(err.status).toBe(401);
+  });
+
+  /* ── UTA-130: getTransfer + addTransferItems ──────────────── */
+
+  function transferItemFixture(overrides = {}) {
+    return {
+      id: 'item_1',
+      transferId: 'trf_1',
+      workspaceId: WS,
+      variantId: 'var_1',
+      requestedQty: 10,
+      sentQty: 0,
+      receivedQty: 0,
+      damagedQty: 0,
+      cancellationReason: null,
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...overrides,
+    };
+  }
+
+  describe('UTA-130 getTransfer', () => {
+    it('happy path: GET encodes transferId, returns { transfer, items }', async () => {
+      const fetchFn = stubFetch(async (url: string, init?: RequestInit) => {
+        expect(url).toBe(
+          `/api/workspaces/${WS}/catalog/transfers/${encodeURIComponent(
+            'trf_special'
+          )}`
+        );
+        expect(init?.credentials).toBe('same-origin');
+        return jsonResponse(
+          {
+            transfer: transferFixture({ id: 'trf_special' }),
+            items: [
+              transferItemFixture({ variantId: 'var_a' }),
+              transferItemFixture({ id: 'item_2', variantId: 'var_b' }),
+            ],
+          },
+          200
+        );
+      });
+
+      const result = await getTransfer(WS, 'trf_special', { fetchFn });
+      expect(result.transfer.id).toBe('trf_special');
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0]?.variantId).toBe('var_a');
+      expect(result.items[1]?.variantId).toBe('var_b');
+    });
+
+    it('returns empty items array when items key is missing', async () => {
+      const fetchFn = stubFetch(async () =>
+        jsonResponse({ transfer: transferFixture() }, 200)
+      );
+
+      const result = await getTransfer(WS, 'trf_empty', { fetchFn });
+      expect(result.transfer.id).toBe('trf_1');
+      expect(result.items).toEqual([]);
+    });
+
+    it('maps 404 not-found through toCatalogClientError with no tokens in message', async () => {
+      const fetchFn = stubFetch(async () =>
+        jsonResponse(
+          { error: 'Not found.', errorCode: 'CATALOG_NOT_FOUND' },
+          404
+        )
+      );
+
+      const err = await getTransfer(WS, 'missing', { fetchFn }).catch(
+        (e: unknown) => e
+      );
+
+      expect(err).toBeInstanceOf(CatalogClientError);
+      const clientErr = err as CatalogClientError;
+      expect(clientErr.status).toBe(404);
+      expect(JSON.stringify(err)).not.toMatch(
+        /Bearer|tb_session|passwordHash|secret/
+      );
+    });
+  });
+
+  describe('UTA-130 addTransferItems', () => {
+    it('happy path: POST body matches { items: [...] }, returns items array, status 201 OK', async () => {
+      const fetchFn = stubFetch(async (url: string, init?: RequestInit) => {
+        expect(url).toBe(
+          `/api/workspaces/${WS}/catalog/transfers/${encodeURIComponent(
+            'trf_1'
+          )}/items`
+        );
+        expect(init?.method).toBe('POST');
+        expect(init?.credentials).toBe('same-origin');
+        const body = JSON.parse(String(init?.body));
+        expect(body.items).toEqual([
+          { variantId: 'var_x', requestedQty: 5 },
+          { variantId: 'var_y', requestedQty: 3 },
+        ]);
+        return jsonResponse(
+          {
+            items: [
+              transferItemFixture({ variantId: 'var_x', requestedQty: 5 }),
+              transferItemFixture({ variantId: 'var_y', requestedQty: 3 }),
+            ],
+          },
+          201
+        );
+      });
+
+      const result = await addTransferItems(
+        WS,
+        'trf_1',
+        {
+          items: [
+            { variantId: 'var_x', requestedQty: 5 },
+            { variantId: 'var_y', requestedQty: 3 },
+          ],
+        },
+        { fetchFn }
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]?.variantId).toBe('var_x');
+      expect(result[0]?.requestedQty).toBe(5);
+      expect(result[1]?.variantId).toBe('var_y');
+      expect(result[1]?.requestedQty).toBe(3);
+    });
+
+    it('returns empty array when items key is missing from response', async () => {
+      const fetchFn = stubFetch(async () => jsonResponse({}, 201));
+
+      const result = await addTransferItems(
+        WS,
+        'trf_1',
+        { items: [] },
+        {
+          fetchFn,
+        }
+      );
+      expect(result).toEqual([]);
+    });
+
+    it('maps 400 validation error through toCatalogClientError with no secrets', async () => {
+      const fetchFn = stubFetch(async () =>
+        jsonResponse(
+          { error: 'Bad request.', errorCode: 'CATALOG_VALIDATION' },
+          400
+        )
+      );
+
+      const err = await addTransferItems(
+        WS,
+        'trf_1',
+        { items: [{ variantId: '', requestedQty: -1 }] },
+        { fetchFn }
+      ).catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(CatalogClientError);
+      const clientErr = err as CatalogClientError;
+      expect(clientErr.status).toBe(400);
+      expect(clientErr.errorCode).toBe('CATALOG_VALIDATION');
+      expect(JSON.stringify(err)).not.toMatch(/Bearer|tb_session/);
+    });
+
+    it('maps 404 on missing transfer through toCatalogClientError', async () => {
+      const fetchFn = stubFetch(async () =>
+        jsonResponse(
+          { error: 'Transfer not found.', errorCode: 'CATALOG_NOT_FOUND' },
+          404
+        )
+      );
+
+      const err = await addTransferItems(
+        WS,
+        'trf_gone',
+        { items: [{ variantId: 'var_1', requestedQty: 1 }] },
+        { fetchFn }
+      ).catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(CatalogClientError);
+      const clientErr = err as CatalogClientError;
+      expect(clientErr.status).toBe(404);
+      expect(JSON.stringify(err)).not.toMatch(
+        /Bearer|tb_session|passwordHash|secret/
+      );
+    });
   });
 });
