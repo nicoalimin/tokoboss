@@ -44,6 +44,7 @@ import { GET as getTransfer } from '../app/api/workspaces/[workspaceId]/catalog/
 import { POST as addTransferItems } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/items/route';
 import { POST as sendTransfer } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/send/route';
 import { POST as receiveTransfer } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/receive/route';
+import { POST as cancelTransfer } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/cancel/route';
 
 /**
  * Catalog Route Handler flow (UTA-75, Story 01) through the memory
@@ -1345,6 +1346,150 @@ describe('catalog routes (memory wiring)', () => {
       const unknown = await receiveTransfer(
         apiRequest(
           `/api/workspaces/${workspaceId}/catalog/transfers/nonexistent/receive`,
+          {},
+          bearer(managerToken)
+        ),
+        {
+          params: Promise.resolve({
+            workspaceId,
+            transferId: 'nonexistent',
+          }),
+        }
+      );
+      expect(unknown.status).toBe(404);
+      const unknownBody = (await unknown.json()) as { errorCode: string };
+      expect(unknownBody.errorCode).toBe('CATALOG_NOT_FOUND');
+    });
+  });
+
+  describe('transfers cancel (UTA-128)', () => {
+    it('Manager cancels sent transfer (200 cancelled), Staff denied (403), invalid body (400), unknown id (404)', async () => {
+      const src = await seedWarehouse(managerToken, 'JKT-CAN-01');
+      const dst = await seedWarehouse(managerToken, 'SBY-CAN-01');
+
+      const { product } = await seedProduct(managerToken);
+      const variantId = product.variants[0]?.id ?? '';
+
+      const adjusted = await adjustStock(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/adjustments`,
+          { warehouseId: src.warehouse.id, delta: 10, reason: 'initial stock' },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, variantId }) }
+      );
+      expect(adjusted.status).toBe(201);
+
+      const created = await createTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers`,
+          {
+            referenceNum: 'TRF-CAN-001',
+            sourceWarehouseId: src.warehouse.id,
+            destWarehouseId: dst.warehouse.id,
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId }) }
+      );
+      expect(created.status).toBe(201);
+      const createdBody = (await created.json()) as {
+        transfer: { id: string };
+      };
+      const transferId = createdBody.transfer.id;
+
+      const added = await addTransferItems(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId}/items`,
+          {
+            items: [
+              {
+                variantId,
+                requestedQty: 5,
+              },
+            ],
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId }) }
+      );
+      expect(added.status).toBe(201);
+
+      const sent = await sendTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId}/send`,
+          {},
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId }) }
+      );
+      expect(sent.status).toBe(200);
+
+      const cancelled = await cancelTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId}/cancel`,
+          {},
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId }) }
+      );
+      expect(cancelled.status).toBe(200);
+      const cancelledBody = (await cancelled.json()) as {
+        transfer: { id: string; status: string };
+        items: Array<{ variantId: string }>;
+        storage: string;
+      };
+      expect(cancelledBody.transfer.id).toBe(transferId);
+      expect(cancelledBody.transfer.status).toBe('cancelled');
+      expect(cancelledBody.items).toHaveLength(1);
+      expect(cancelledBody.items[0]?.variantId).toBe(variantId);
+      expect(cancelledBody.storage).toBe('memory');
+
+      const draft2 = await createTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers`,
+          {
+            referenceNum: 'TRF-CAN-002',
+            sourceWarehouseId: src.warehouse.id,
+            destWarehouseId: dst.warehouse.id,
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId }) }
+      );
+      expect(draft2.status).toBe(201);
+      const draft2Body = (await draft2.json()) as {
+        transfer: { id: string };
+      };
+      const transferId2 = draft2Body.transfer.id;
+
+      const staffCancel = await cancelTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId2}/cancel`,
+          {},
+          bearer(staffToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId: transferId2 }) }
+      );
+      expect(staffCancel.status).toBe(403);
+      const staffDenial = (await staffCancel.json()) as { errorCode: string };
+      expect(staffDenial.errorCode).toBe('TENANCY_FORBIDDEN');
+
+      const invalid = await cancelTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId2}/cancel`,
+          { expectedVersion: 'nope' },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId: transferId2 }) }
+      );
+      expect(invalid.status).toBe(400);
+      const invalidBody = (await invalid.json()) as { errorCode: string };
+      expect(invalidBody.errorCode).toBe('CATALOG_VALIDATION');
+
+      const unknown = await cancelTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/nonexistent/cancel`,
           {},
           bearer(managerToken)
         ),
