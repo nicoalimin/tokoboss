@@ -40,6 +40,8 @@ import {
   GET as listTransfers,
   POST as createTransfer,
 } from '../app/api/workspaces/[workspaceId]/catalog/transfers/route';
+import { GET as getTransfer } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/route';
+import { POST as addTransferItems } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/items/route';
 
 /**
  * Catalog Route Handler flow (UTA-75, Story 01) through the memory
@@ -908,6 +910,134 @@ describe('catalog routes (memory wiring)', () => {
       expect(invalid.status).toBe(400);
       const invalidBody = (await invalid.json()) as { errorCode: string };
       expect(invalidBody.errorCode).toBe('CATALOG_VALIDATION');
+    });
+  });
+
+  describe('transfers get-by-id + add-items (UTA-125)', () => {
+    it('Manager creates draft, adds items (201), GET by id (200); Staff add-items (403); invalid body (400); unknown id (404)', async () => {
+      // Seed two warehouses for source & dest
+      const src = await seedWarehouse(managerToken, 'JKT-01');
+      const dst = await seedWarehouse(managerToken, 'SBY-01');
+
+      // Seed a product+variant to reference in items
+      const { product } = await seedProduct(managerToken);
+      const variantId = product.variants[0]?.id ?? '';
+
+      // 1. Manager POST create draft → 201
+      const created = await createTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers`,
+          {
+            referenceNum: 'TRF-002',
+            sourceWarehouseId: src.warehouse.id,
+            destWarehouseId: dst.warehouse.id,
+            notes: 'stock move',
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId }) }
+      );
+      expect(created.status).toBe(201);
+      const createdBody = (await created.json()) as {
+        transfer: { id: string; status: string };
+      };
+      const transferId = createdBody.transfer.id;
+
+      // 2. Manager POST add-items → 201, items include variantId + requestedQty
+      const added = await addTransferItems(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId}/items`,
+          {
+            items: [
+              {
+                variantId,
+                requestedQty: 5,
+              },
+            ],
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId }) }
+      );
+      expect(added.status).toBe(201);
+      const addedBody = (await added.json()) as {
+        items: Array<{ variantId: string; requestedQty: number }>;
+      };
+      expect(addedBody.items).toHaveLength(1);
+      expect(addedBody.items[0]?.variantId).toBe(variantId);
+      expect(addedBody.items[0]?.requestedQty).toBe(5);
+
+      // 3. Manager GET by id → 200, body has matching id/status and added items
+      const got = await getTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId}`,
+          undefined,
+          bearer(managerToken),
+          'GET'
+        ),
+        { params: Promise.resolve({ workspaceId, transferId }) }
+      );
+      expect(got.status).toBe(200);
+      const gotBody = (await got.json()) as {
+        transfer: { id: string; status: string };
+        items: Array<{ variantId: string }>;
+      };
+      expect(gotBody.transfer.id).toBe(transferId);
+      expect(gotBody.transfer.status).toBe('draft');
+      expect(gotBody.items).toHaveLength(1);
+      expect(gotBody.items[0]?.variantId).toBe(variantId);
+
+      // 4. Staff POST add-items → 403 TENANCY_FORBIDDEN
+      const staffAdded = await addTransferItems(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId}/items`,
+          {
+            items: [
+              {
+                variantId,
+                requestedQty: 1,
+              },
+            ],
+          },
+          bearer(staffToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId }) }
+      );
+      expect(staffAdded.status).toBe(403);
+      const staffDenial = (await staffAdded.json()) as { errorCode: string };
+      expect(staffDenial.errorCode).toBe('TENANCY_FORBIDDEN');
+
+      // 5. POST invalid body (empty items array) → 400 CATALOG_VALIDATION
+      const invalid = await addTransferItems(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId}/items`,
+          { items: [] },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId }) }
+      );
+      expect(invalid.status).toBe(400);
+      const invalidBody = (await invalid.json()) as { errorCode: string };
+      expect(invalidBody.errorCode).toBe('CATALOG_VALIDATION');
+
+      // 6. GET unknown transferId → 404 with CATALOG_NOT_FOUND
+      const unknown = await getTransfer(
+        apiRequest(
+          '/api/workspaces/FAKE/catalog/transfers/nonexistent',
+          undefined,
+          bearer(managerToken),
+          'GET'
+        ),
+        {
+          params: Promise.resolve({
+            workspaceId: 'FAKE',
+            transferId: 'nonexistent',
+          }),
+        }
+      );
+      expect(unknown.status).toBe(404);
+      const unknownBody = (await unknown.json()) as { errorCode: string };
+      expect(unknownBody.errorCode).toBe('CATALOG_NOT_FOUND');
     });
   });
 });
