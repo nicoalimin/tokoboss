@@ -86,6 +86,17 @@ export interface WarehouseView {
   updatedAt: string;
 }
 
+export interface CreateWarehouseInput {
+  code: string;
+  name: string;
+}
+
+export interface UpdateWarehouseInput {
+  expectedVersion: number; // required (positive int)
+  name?: string;
+  status?: 'active' | 'deactivated';
+}
+
 export interface LedgerEntryView {
   id: string;
   workspaceId: string;
@@ -632,6 +643,44 @@ export async function listWarehouses(
     opts.lang ?? 'en'
   );
   return Array.isArray(data.warehouses) ? data.warehouses : [];
+}
+
+/** Create a warehouse (Manager/Admin). */
+export async function createWarehouse(
+  workspaceId: string,
+  input: CreateWarehouseInput,
+  opts: ClientOpts = {}
+): Promise<WarehouseView> {
+  const data = await sendJson<{ warehouse: WarehouseView; storage?: unknown }>(
+    opts.fetchFn ?? fetch,
+    `${base(workspaceId)}/warehouses`,
+    'POST',
+    { code: input.code, name: input.name },
+    opts.lang ?? 'en'
+  );
+  return data.warehouse;
+}
+
+/** Update a warehouse (Manager/Admin; version-gated). */
+export async function updateWarehouse(
+  workspaceId: string,
+  warehouseId: string,
+  input: UpdateWarehouseInput,
+  opts: ClientOpts = {}
+): Promise<WarehouseView> {
+  const body: Record<string, unknown> = {
+    expectedVersion: input.expectedVersion,
+  };
+  if (input.name !== undefined) body.name = input.name;
+  if (input.status !== undefined) body.status = input.status;
+  const data = await sendJson<{ warehouse: WarehouseView; storage?: unknown }>(
+    opts.fetchFn ?? fetch,
+    `${base(workspaceId)}/warehouses/${encodeSegment(warehouseId)}`,
+    'PATCH',
+    body,
+    opts.lang ?? 'en'
+  );
+  return data.warehouse;
 }
 
 /** List transfers for the workspace (any active member). */
