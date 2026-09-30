@@ -35,6 +35,10 @@ import {
   type StockBalance,
   type StockLedgerRecord,
   type StockSettingsRecord,
+  type TransferItemRecord,
+  type TransferRecord,
+  type TransferStore,
+  type TransferWithItems,
   type WarehouseRecord,
   type WorkspaceContext,
 } from '@tokoboss/application';
@@ -47,6 +51,9 @@ import type {
   ProductView,
   StockBalanceView,
   StockSettingsView,
+  TransferItemView,
+  TransferView,
+  TransferWithItemsView,
   VariantView,
   WarehouseView,
 } from '@tokoboss/contracts';
@@ -73,7 +80,7 @@ function getMemoryCatalog(): InMemoryCatalogStore {
   return memoryCatalog;
 }
 
-export function getCatalogStore(): CatalogStore {
+export function getCatalogStore(): CatalogStore & TransferStore {
   if (storageKind() === 'postgres') {
     return new DrizzleCatalogStore(getDbHandle().db);
   }
@@ -429,5 +436,49 @@ export function toBundleSummaryView(summary: BundleSummary): BundleView {
       componentStatus: l.component.status,
     })),
     availability: [],
+  };
+}
+
+// Transfer view mappers (UTA-94, Story 06)
+
+export function toTransferItemView(item: TransferItemRecord): TransferItemView {
+  return {
+    id: item.id,
+    transferId: item.transferId,
+    workspaceId: item.workspaceId,
+    variantId: item.variantId,
+    requestedQty: item.requestedQty,
+    sentQty: item.sentQty,
+    receivedQty: item.receivedQty,
+    damagedQty: item.damagedQty,
+    cancellationReason: item.cancellationReason,
+    version: item.version,
+    createdAt: iso(item.createdAt),
+    updatedAt: iso(item.updatedAt),
+  };
+}
+
+export function toTransferView(record: TransferRecord): TransferView {
+  return {
+    id: record.id,
+    workspaceId: record.workspaceId,
+    referenceNum: record.referenceNum,
+    sourceWarehouseId: record.sourceWarehouseId,
+    destWarehouseId: record.destWarehouseId,
+    status: record.status,
+    notes: record.notes,
+    expectedReceiveDate: record.expectedReceiveDate?.toISOString() ?? null,
+    version: record.version,
+    createdAt: iso(record.createdAt),
+    updatedAt: iso(record.updatedAt),
+  };
+}
+
+export function toTransferWithItemsView(
+  twi: TransferWithItems
+): TransferWithItemsView {
+  return {
+    transfer: toTransferView(twi.transfer),
+    items: twi.items.map(toTransferItemView),
   };
 }
