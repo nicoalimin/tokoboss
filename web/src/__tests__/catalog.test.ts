@@ -42,6 +42,7 @@ import {
 } from '../app/api/workspaces/[workspaceId]/catalog/transfers/route';
 import { GET as getTransfer } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/route';
 import { POST as addTransferItems } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/items/route';
+import { POST as sendTransfer } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/send/route';
 
 /**
  * Catalog Route Handler flow (UTA-75, Story 01) through the memory
@@ -1027,6 +1028,151 @@ describe('catalog routes (memory wiring)', () => {
           undefined,
           bearer(managerToken),
           'GET'
+        ),
+        {
+          params: Promise.resolve({
+            workspaceId,
+            transferId: 'nonexistent',
+          }),
+        }
+      );
+      expect(unknown.status).toBe(404);
+      const unknownBody = (await unknown.json()) as { errorCode: string };
+      expect(unknownBody.errorCode).toBe('CATALOG_NOT_FOUND');
+    });
+  });
+
+  describe('transfers send (UTA-126)', () => {
+    it('Manager sends transfer (200 sent), Staff denied (403), invalid body (400), unknown id (404)', async () => {
+      // Seed source + dest warehouses
+      const src = await seedWarehouse(managerToken, 'JKT-01');
+      const dst = await seedWarehouse(managerToken, 'SBY-01');
+
+      // Seed a product+variant
+      const { product } = await seedProduct(managerToken);
+      const variantId = product.variants[0]?.id ?? '';
+
+      // Seed source stock +10
+      const adjusted = await adjustStock(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/adjustments`,
+          { warehouseId: src.warehouse.id, delta: 10, reason: 'initial stock' },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, variantId }) }
+      );
+      expect(adjusted.status).toBe(201);
+
+      // Create draft transfer
+      const created = await createTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers`,
+          {
+            referenceNum: 'TRF-SEND-001',
+            sourceWarehouseId: src.warehouse.id,
+            destWarehouseId: dst.warehouse.id,
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId }) }
+      );
+      expect(created.status).toBe(201);
+      const createdBody = (await created.json()) as {
+        transfer: { id: string };
+      };
+      const transferId = createdBody.transfer.id;
+
+      // Add items qty 5
+      const added = await addTransferItems(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId}/items`,
+          {
+            items: [
+              {
+                variantId,
+                requestedQty: 5,
+              },
+            ],
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId }) }
+      );
+      expect(added.status).toBe(201);
+
+      // 1. Manager POST send with empty body {} --> 200, status 'sent'
+      const sent = await sendTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId}/send`,
+          {},
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId }) }
+      );
+      expect(sent.status).toBe(200);
+      const sentBody = (await sent.json()) as {
+        transfer: { id: string; status: string };
+        items: Array<{ variantId: string; sentQty: number }>;
+        storage: string;
+      };
+      expect(sentBody.transfer.id).toBe(transferId);
+      expect(sentBody.transfer.status).toBe('sent');
+      expect(sentBody.items).toHaveLength(1);
+      expect(sentBody.items[0]?.variantId).toBe(variantId);
+      expect(sentBody.items[0]?.sentQty).toBe(5);
+      expect(sentBody.storage).toBe('memory');
+
+      // 2. Create a second draft to test Staff denial on send
+      const draft2 = await createTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers`,
+          {
+            referenceNum: 'TRF-SEND-002',
+            sourceWarehouseId: src.warehouse.id,
+            destWarehouseId: dst.warehouse.id,
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId }) }
+      );
+      expect(draft2.status).toBe(201);
+      const draft2Body = (await draft2.json()) as {
+        transfer: { id: string };
+      };
+      const transferId2 = draft2Body.transfer.id;
+
+      // Staff POST send --> 403 TENANCY_FORBIDDEN
+      const staffSent = await sendTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId2}/send`,
+          {},
+          bearer(staffToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId: transferId2 }) }
+      );
+      expect(staffSent.status).toBe(403);
+      const staffDenial = (await staffSent.json()) as { errorCode: string };
+      expect(staffDenial.errorCode).toBe('TENANCY_FORBIDDEN');
+
+      // 3. POST send with invalid body { expectedVersion: 'nope' } --> 400 CATALOG_VALIDATION
+      const invalid = await sendTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId2}/send`,
+          { expectedVersion: 'nope' },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId: transferId2 }) }
+      );
+      expect(invalid.status).toBe(400);
+      const invalidBody = (await invalid.json()) as { errorCode: string };
+      expect(invalidBody.errorCode).toBe('CATALOG_VALIDATION');
+
+      // 4. POST send on unknown transferId --> 404 with CATALOG_NOT_FOUND
+      const unknown = await sendTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/nonexistent/send`,
+          {},
+          bearer(managerToken)
         ),
         {
           params: Promise.resolve({
