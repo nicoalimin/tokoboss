@@ -40,7 +40,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     });
     return authJson(
       {
-        transfer: toTransferWithItemsView(transfer),
+        ...toTransferWithItemsView(transfer),
         storage: storageKind(),
       },
       200,
