@@ -1097,9 +1097,7 @@ export async function searchCatalog(
   return { products: matchedProducts, variants: matchedVariants };
 }
 
-
-// Transfers (UTA-121 / Story 06) — application wrappers for draft + send only.
-// receiveTransfer / cancelTransfer use-cases are intentionally out of scope.
+// Transfers (UTA-121 / UTA-122 / Story 06) — application wrappers for draft/send/receive/cancel.
 
 export async function createTransferDraftUseCase(
   store: CatalogStore & TransferStore,
@@ -1134,7 +1132,7 @@ export async function createTransferDraftUseCase(
   const notes =
     input.notes === undefined
       ? undefined
-      : cleanNullableText(input.notes, 'Notes', 2000) ?? undefined;
+      : (cleanNullableText(input.notes, 'Notes', 2000) ?? undefined);
   return store.createTransferDraft({
     workspaceId: input.workspaceId,
     referenceNum,
@@ -1172,9 +1170,7 @@ export async function addTransferItemsUseCase(
       !Number.isInteger(requestedQty) ||
       requestedQty <= 0
     ) {
-      throw catalogValidation(
-        'requestedQty must be a positive integer'
-      );
+      throw catalogValidation('requestedQty must be a positive integer');
     }
     return { variantId, requestedQty };
   });
@@ -1229,6 +1225,90 @@ export async function sendTransferUseCase(
   const transferId = cleanText(input.transferId, 'Transfer id', 200);
   const idempotencyKey = cleanIdempotencyKey(input.idempotencyKey);
   return store.sendTransfer({
+    workspaceId: input.workspaceId,
+    transferId,
+    actorId: input.ctx.userId,
+    expectedVersion: input.expectedVersion,
+    idempotencyKey,
+  });
+}
+
+export async function receiveTransferUseCase(
+  store: CatalogStore & TransferStore,
+  input: {
+    ctx: WorkspaceContext;
+    workspaceId: string;
+    transferId: unknown;
+    expectedVersion?: number;
+    idempotencyKey?: unknown;
+    items?: unknown;
+  }
+): Promise<TransferWithItems> {
+  assertSameWorkspace(input.ctx, input.workspaceId);
+  assertManagerOrAdmin(input.ctx);
+  const transferId = cleanText(input.transferId, 'Transfer id', 200);
+  const idempotencyKey = cleanIdempotencyKey(input.idempotencyKey);
+  let items:
+    | Array<{ itemId: string; receivedQty: number; damagedQty?: number }>
+    | undefined;
+  if (input.items !== undefined) {
+    if (!Array.isArray(input.items)) {
+      throw catalogValidation('Transfer receive items must be an array');
+    }
+    items = input.items.map((raw, idx) => {
+      if (typeof raw !== 'object' || raw === null) {
+        throw catalogValidation(
+          `Transfer receive item ${idx} must be an object`
+        );
+      }
+      const rec = raw as Record<string, unknown>;
+      const itemId = cleanText(rec['itemId'], 'Item id', 200);
+      const receivedQty = rec['receivedQty'];
+      if (
+        typeof receivedQty !== 'number' ||
+        !Number.isInteger(receivedQty) ||
+        receivedQty < 0
+      ) {
+        throw catalogValidation('receivedQty must be a non-negative integer');
+      }
+      let damagedQty: number | undefined;
+      if (rec['damagedQty'] !== undefined) {
+        const d = rec['damagedQty'];
+        if (typeof d !== 'number' || !Number.isInteger(d) || d < 0) {
+          throw catalogValidation('damagedQty must be a non-negative integer');
+        }
+        damagedQty = d;
+      }
+      return damagedQty === undefined
+        ? { itemId, receivedQty }
+        : { itemId, receivedQty, damagedQty };
+    });
+  }
+  return store.receiveTransfer({
+    workspaceId: input.workspaceId,
+    transferId,
+    actorId: input.ctx.userId,
+    expectedVersion: input.expectedVersion,
+    idempotencyKey,
+    items,
+  });
+}
+
+export async function cancelTransferUseCase(
+  store: CatalogStore & TransferStore,
+  input: {
+    ctx: WorkspaceContext;
+    workspaceId: string;
+    transferId: unknown;
+    expectedVersion?: number;
+    idempotencyKey?: unknown;
+  }
+): Promise<TransferWithItems> {
+  assertSameWorkspace(input.ctx, input.workspaceId);
+  assertManagerOrAdmin(input.ctx);
+  const transferId = cleanText(input.transferId, 'Transfer id', 200);
+  const idempotencyKey = cleanIdempotencyKey(input.idempotencyKey);
+  return store.cancelTransfer({
     workspaceId: input.workspaceId,
     transferId,
     actorId: input.ctx.userId,
