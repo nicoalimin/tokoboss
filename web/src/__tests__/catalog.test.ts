@@ -1023,14 +1023,14 @@ describe('catalog routes (memory wiring)', () => {
       // 6. GET unknown transferId → 404 with CATALOG_NOT_FOUND
       const unknown = await getTransfer(
         apiRequest(
-          '/api/workspaces/FAKE/catalog/transfers/nonexistent',
+          `/api/workspaces/${workspaceId}/catalog/transfers/nonexistent`,
           undefined,
           bearer(managerToken),
           'GET'
         ),
         {
           params: Promise.resolve({
-            workspaceId: 'FAKE',
+            workspaceId,
             transferId: 'nonexistent',
           }),
         }
