@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CatalogClientError,
   addTransferItems,
+  cancelTransfer,
   createTransferDraft,
   getTransfer,
   listTransfers,
@@ -692,6 +693,134 @@ describe('transfer-client (UTA-129)', () => {
       );
 
       const result = await receiveTransfer(WS, 'trf_1', {}, { fetchFn });
+      expect(result.items).toEqual([]);
+    });
+  });
+
+  /* ── UTA-133: cancelTransfer ──────────────── */
+
+  describe('UTA-133 cancelTransfer', () => {
+    it('happy path: POST URL ends with /cancel, method POST, same-origin credentials, empty body OK, returns { transfer, items } with status becoming cancelled', async () => {
+      const fetchFn = stubFetch(async (url: string, init?: RequestInit) => {
+        expect(url).toBe(
+          `/api/workspaces/${WS}/catalog/transfers/${encodeURIComponent(
+            'trf_1'
+          )}/cancel`
+        );
+        expect(init?.method).toBe('POST');
+        expect(init?.credentials).toBe('same-origin');
+        const body = JSON.parse(String(init?.body));
+        expect(body).toEqual({});
+        return jsonResponse(
+          {
+            transfer: transferFixture({ id: 'trf_1', status: 'cancelled' }),
+            items: [
+              transferItemFixture({
+                variantId: 'var_a',
+                cancellationReason: 'Customer request',
+              }),
+            ],
+          },
+          200
+        );
+      });
+
+      const result = await cancelTransfer(WS, 'trf_1', {}, { fetchFn });
+
+      expect(result.transfer.id).toBe('trf_1');
+      expect(result.transfer.status).toBe('cancelled');
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]?.variantId).toBe('var_a');
+      expect(result.items[0]?.cancellationReason).toBe('Customer request');
+    });
+
+    it('body includes expectedVersion and idempotencyKey when provided', async () => {
+      const fetchFn = stubFetch(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body));
+        expect(body.expectedVersion).toBe(5);
+        expect(body.idempotencyKey).toBe('cancel_idem_42');
+        return jsonResponse(
+          {
+            transfer: transferFixture({ status: 'cancelled', version: 5 }),
+            items: [],
+          },
+          200
+        );
+      });
+
+      const result = await cancelTransfer(
+        WS,
+        'trf_1',
+        {
+          expectedVersion: 5,
+          idempotencyKey: 'cancel_idem_42',
+        },
+        { fetchFn }
+      );
+
+      expect(result.transfer.version).toBe(5);
+      expect(result.transfer.status).toBe('cancelled');
+    });
+
+    it('maps 409 version conflict through CatalogClientError with no tokens in message', async () => {
+      const fetchFn = stubFetch(async () =>
+        jsonResponse(
+          {
+            error: 'Version conflict.',
+            errorCode: 'CATALOG_VERSION_CONFLICT',
+          },
+          409
+        )
+      );
+
+      const err = await cancelTransfer(
+        WS,
+        'trf_1',
+        { expectedVersion: 1 },
+        { fetchFn }
+      ).catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(CatalogClientError);
+      const clientErr = err as CatalogClientError;
+      expect(clientErr.status).toBe(409);
+      expect(clientErr.errorCode).toBe('CATALOG_VERSION_CONFLICT');
+      expect(JSON.stringify(err)).not.toMatch(
+        /Bearer|tb_session|passwordHash|secret/
+      );
+    });
+
+    it('maps 400 validation error through CatalogClientError with no secrets', async () => {
+      const fetchFn = stubFetch(async () =>
+        jsonResponse(
+          {
+            error: 'Validation failed.',
+            errorCode: 'CATALOG_VALIDATION',
+          },
+          400
+        )
+      );
+
+      const err = await cancelTransfer(WS, 'trf_1', {}, { fetchFn }).catch(
+        (e: unknown) => e
+      );
+
+      expect(err).toBeInstanceOf(CatalogClientError);
+      const clientErr = err as CatalogClientError;
+      expect(clientErr.status).toBe(400);
+      expect(clientErr.errorCode).toBe('CATALOG_VALIDATION');
+      expect(JSON.stringify(err)).not.toMatch(/Bearer|tb_session/);
+    });
+
+    it('returns empty items array when items key is missing from response', async () => {
+      const fetchFn = stubFetch(async () =>
+        jsonResponse(
+          { transfer: transferFixture({ status: 'cancelled' }) },
+          200
+        )
+      );
+
+      const result = await cancelTransfer(WS, 'trf_1', {}, { fetchFn });
+      expect(result.transfer.status).toBe('cancelled');
       expect(result.items).toEqual([]);
     });
   });
