@@ -211,6 +211,18 @@ export interface SendTransferInput {
   idempotencyKey?: string;
 }
 
+export interface ReceiveTransferItemInput {
+  itemId: string;
+  receivedQty: number;
+  damagedQty?: number;
+}
+
+export interface ReceiveTransferInput {
+  expectedVersion?: number;
+  idempotencyKey?: string;
+  items?: ReceiveTransferItemInput[];
+}
+
 export class CatalogClientError extends Error {
   readonly status: number;
   readonly errorCode: string;
@@ -703,6 +715,31 @@ export async function sendTransfer(
       ...(input.idempotencyKey !== undefined
         ? { idempotencyKey: input.idempotencyKey }
         : {}),
+    },
+    opts.lang ?? 'en'
+  );
+  return { transfer: data.transfer, items: data.items ?? [] };
+}
+
+/** Receive (accept in) a transfer (Manager/Admin). */
+export async function receiveTransfer(
+  workspaceId: string,
+  transferId: string,
+  input: ReceiveTransferInput = {},
+  opts: ClientOpts = {}
+): Promise<TransferWithItemsView> {
+  const data = await sendJson<TransferWithItemsView>(
+    opts.fetchFn ?? fetch,
+    `${base(workspaceId)}/transfers/${encodeSegment(transferId)}/receive`,
+    'POST',
+    {
+      ...(input.expectedVersion !== undefined
+        ? { expectedVersion: input.expectedVersion }
+        : {}),
+      ...(input.idempotencyKey !== undefined
+        ? { idempotencyKey: input.idempotencyKey }
+        : {}),
+      ...(input.items !== undefined ? { items: input.items } : {}),
     },
     opts.lang ?? 'en'
   );
