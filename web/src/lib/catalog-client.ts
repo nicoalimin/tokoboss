@@ -158,6 +158,30 @@ export interface AdjustStockInput {
   idempotencyKey?: string;
 }
 
+export type TransferStatus = 'draft' | 'sent' | 'received' | 'cancelled';
+
+export interface TransferView {
+  id: string;
+  workspaceId: string;
+  referenceNum: string;
+  sourceWarehouseId: string;
+  destWarehouseId: string;
+  status: TransferStatus;
+  notes: string | null;
+  expectedReceiveDate: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTransferDraftInput {
+  referenceNum: string;
+  sourceWarehouseId: string;
+  destWarehouseId: string;
+  notes?: string | null;
+  expectedReceiveDate?: string;
+}
+
 export class CatalogClientError extends Error {
   readonly status: number;
   readonly errorCode: string;
@@ -562,6 +586,43 @@ export async function listWarehouses(
     opts.lang ?? 'en'
   );
   return Array.isArray(data.warehouses) ? data.warehouses : [];
+}
+
+/** List transfers for the workspace (any active member). */
+export async function listTransfers(
+  workspaceId: string,
+  opts: ClientOpts = {}
+): Promise<TransferView[]> {
+  const data = await getJson<{ transfers?: TransferView[] }>(
+    opts.fetchFn ?? fetch,
+    `${base(workspaceId)}/transfers`,
+    opts.lang ?? 'en'
+  );
+  return Array.isArray(data.transfers) ? data.transfers : [];
+}
+
+/** Create a transfer draft (Manager/Admin). */
+export async function createTransferDraft(
+  workspaceId: string,
+  input: CreateTransferDraftInput,
+  opts: ClientOpts = {}
+): Promise<TransferView> {
+  const data = await sendJson<{ transfer: TransferView }>(
+    opts.fetchFn ?? fetch,
+    `${base(workspaceId)}/transfers`,
+    'POST',
+    {
+      referenceNum: input.referenceNum,
+      sourceWarehouseId: input.sourceWarehouseId,
+      destWarehouseId: input.destWarehouseId,
+      ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      ...(input.expectedReceiveDate !== undefined
+        ? { expectedReceiveDate: input.expectedReceiveDate }
+        : {}),
+    },
+    opts.lang ?? 'en'
+  );
+  return data.transfer;
 }
 
 /** Format integer cents as whole IDR (no floats cross this boundary). */
