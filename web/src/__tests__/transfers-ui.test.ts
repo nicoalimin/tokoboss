@@ -5,6 +5,7 @@ import {
   createTransferDraft,
   getTransfer,
   listTransfers,
+  sendTransfer,
   toCatalogClientError,
 } from '../lib/catalog-client';
 
@@ -410,6 +411,139 @@ describe('transfer-client (UTA-129)', () => {
       expect(JSON.stringify(err)).not.toMatch(
         /Bearer|tb_session|passwordHash|secret/
       );
+    });
+  });
+
+  /* ── UTA-131: sendTransfer ──────────────── */
+
+  describe('UTA-131 sendTransfer', () => {
+    it('happy path: POST URL ends with /send, method POST, same-origin credentials, returns { transfer, items } with status becoming sent', async () => {
+      const fetchFn = stubFetch(async (url: string, init?: RequestInit) => {
+        expect(url).toBe(
+          `/api/workspaces/${WS}/catalog/transfers/${encodeURIComponent(
+            'trf_1'
+          )}/send`
+        );
+        expect(init?.method).toBe('POST');
+        expect(init?.credentials).toBe('same-origin');
+        return jsonResponse(
+          {
+            transfer: transferFixture({ id: 'trf_1', status: 'sent' }),
+            items: [transferItemFixture({ variantId: 'var_a', sentQty: 10 })],
+          },
+          200
+        );
+      });
+
+      const result = await sendTransfer(WS, 'trf_1', {}, { fetchFn });
+
+      expect(result.transfer.id).toBe('trf_1');
+      expect(result.transfer.status).toBe('sent');
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]?.variantId).toBe('var_a');
+      expect(result.items[0]?.sentQty).toBe(10);
+    });
+
+    it('optional body fields omitted when undefined', async () => {
+      const fetchFn = stubFetch(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body));
+        expect(body.expectedVersion).toBeUndefined();
+        expect(body.idempotencyKey).toBeUndefined();
+        return jsonResponse(
+          {
+            transfer: transferFixture({ status: 'sent' }),
+            items: [],
+          },
+          200
+        );
+      });
+
+      await sendTransfer(WS, 'trf_1', {}, { fetchFn });
+    });
+
+    it('body includes expectedVersion and idempotencyKey when provided', async () => {
+      const fetchFn = stubFetch(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body));
+        expect(body.expectedVersion).toBe(3);
+        expect(body.idempotencyKey).toBe('key_abc123');
+        return jsonResponse(
+          {
+            transfer: transferFixture({ status: 'sent', version: 3 }),
+            items: [],
+          },
+          200
+        );
+      });
+
+      const result = await sendTransfer(
+        WS,
+        'trf_1',
+        {
+          expectedVersion: 3,
+          idempotencyKey: 'key_abc123',
+        },
+        { fetchFn }
+      );
+
+      expect(result.transfer.version).toBe(3);
+    });
+
+    it('maps 409 version conflict through CatalogClientError with no tokens in message', async () => {
+      const fetchFn = stubFetch(async () =>
+        jsonResponse(
+          {
+            error: 'Version conflict.',
+            errorCode: 'CATALOG_VERSION_CONFLICT',
+          },
+          409
+        )
+      );
+
+      const err = await sendTransfer(
+        WS,
+        'trf_1',
+        { expectedVersion: 1 },
+        { fetchFn }
+      ).catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(CatalogClientError);
+      const clientErr = err as CatalogClientError;
+      expect(clientErr.status).toBe(409);
+      expect(clientErr.errorCode).toBe('CATALOG_VERSION_CONFLICT');
+      expect(JSON.stringify(err)).not.toMatch(
+        /Bearer|tb_session|passwordHash|secret/
+      );
+    });
+
+    it('maps 400 validation error through CatalogClientError with no secrets', async () => {
+      const fetchFn = stubFetch(async () =>
+        jsonResponse(
+          {
+            error: 'Validation failed.',
+            errorCode: 'CATALOG_VALIDATION',
+          },
+          400
+        )
+      );
+
+      const err = await sendTransfer(WS, 'trf_1', {}, { fetchFn }).catch(
+        (e: unknown) => e
+      );
+
+      expect(err).toBeInstanceOf(CatalogClientError);
+      const clientErr = err as CatalogClientError;
+      expect(clientErr.status).toBe(400);
+      expect(clientErr.errorCode).toBe('CATALOG_VALIDATION');
+      expect(JSON.stringify(err)).not.toMatch(/Bearer|tb_session/);
+    });
+
+    it('returns empty items array when items key is missing from response', async () => {
+      const fetchFn = stubFetch(async () =>
+        jsonResponse({ transfer: transferFixture({ status: 'sent' }) }, 200)
+      );
+
+      const result = await sendTransfer(WS, 'trf_1', {}, { fetchFn });
+      expect(result.items).toEqual([]);
     });
   });
 });

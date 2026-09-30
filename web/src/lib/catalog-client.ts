@@ -206,6 +206,11 @@ export interface AddTransferItemsInput {
   items: Array<{ variantId: string; requestedQty: number }>;
 }
 
+export interface SendTransferInput {
+  expectedVersion?: number;
+  idempotencyKey?: string;
+}
+
 export class CatalogClientError extends Error {
   readonly status: number;
   readonly errorCode: string;
@@ -678,6 +683,30 @@ export async function createTransferDraft(
     opts.lang ?? 'en'
   );
   return data.transfer;
+}
+
+/** Send (ship out) a transfer draft (Manager/Admin). */
+export async function sendTransfer(
+  workspaceId: string,
+  transferId: string,
+  input: SendTransferInput = {},
+  opts: ClientOpts = {}
+): Promise<TransferWithItemsView> {
+  const data = await sendJson<TransferWithItemsView>(
+    opts.fetchFn ?? fetch,
+    `${base(workspaceId)}/transfers/${encodeSegment(transferId)}/send`,
+    'POST',
+    {
+      ...(input.expectedVersion !== undefined
+        ? { expectedVersion: input.expectedVersion }
+        : {}),
+      ...(input.idempotencyKey !== undefined
+        ? { idempotencyKey: input.idempotencyKey }
+        : {}),
+    },
+    opts.lang ?? 'en'
+  );
+  return { transfer: data.transfer, items: data.items ?? [] };
 }
 
 /** Format integer cents as whole IDR (no floats cross this boundary). */
