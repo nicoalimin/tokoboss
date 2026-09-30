@@ -43,6 +43,7 @@ import {
 import { GET as getTransfer } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/route';
 import { POST as addTransferItems } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/items/route';
 import { POST as sendTransfer } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/send/route';
+import { POST as receiveTransfer } from '../app/api/workspaces/[workspaceId]/catalog/transfers/[transferId]/receive/route';
 
 /**
  * Catalog Route Handler flow (UTA-75, Story 01) through the memory
@@ -1171,6 +1172,179 @@ describe('catalog routes (memory wiring)', () => {
       const unknown = await sendTransfer(
         apiRequest(
           `/api/workspaces/${workspaceId}/catalog/transfers/nonexistent/send`,
+          {},
+          bearer(managerToken)
+        ),
+        {
+          params: Promise.resolve({
+            workspaceId,
+            transferId: 'nonexistent',
+          }),
+        }
+      );
+      expect(unknown.status).toBe(404);
+      const unknownBody = (await unknown.json()) as { errorCode: string };
+      expect(unknownBody.errorCode).toBe('CATALOG_NOT_FOUND');
+    });
+  });
+
+  describe('transfers receive (UTA-127)', () => {
+    it('Manager receives transfer (200 received), Staff denied (403), invalid body (400), unknown id (404)', async () => {
+      const src = await seedWarehouse(managerToken, 'JKT-RCV-01');
+      const dst = await seedWarehouse(managerToken, 'SBY-RCV-01');
+
+      const { product } = await seedProduct(managerToken);
+      const variantId = product.variants[0]?.id ?? '';
+
+      const adjusted = await adjustStock(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/variants/${variantId}/adjustments`,
+          { warehouseId: src.warehouse.id, delta: 10, reason: 'initial stock' },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, variantId }) }
+      );
+      expect(adjusted.status).toBe(201);
+
+      const created = await createTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers`,
+          {
+            referenceNum: 'TRF-RCV-001',
+            sourceWarehouseId: src.warehouse.id,
+            destWarehouseId: dst.warehouse.id,
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId }) }
+      );
+      expect(created.status).toBe(201);
+      const createdBody = (await created.json()) as {
+        transfer: { id: string };
+      };
+      const transferId = createdBody.transfer.id;
+
+      const added = await addTransferItems(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId}/items`,
+          {
+            items: [
+              {
+                variantId,
+                requestedQty: 5,
+              },
+            ],
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId }) }
+      );
+      expect(added.status).toBe(201);
+
+      const sent = await sendTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId}/send`,
+          {},
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId }) }
+      );
+      expect(sent.status).toBe(200);
+
+      const received = await receiveTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId}/receive`,
+          {},
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId }) }
+      );
+      expect(received.status).toBe(200);
+      const receivedBody = (await received.json()) as {
+        transfer: { id: string; status: string };
+        items: Array<{ variantId: string; receivedQty: number }>;
+        storage: string;
+      };
+      expect(receivedBody.transfer.id).toBe(transferId);
+      expect(receivedBody.transfer.status).toBe('received');
+      expect(receivedBody.items).toHaveLength(1);
+      expect(receivedBody.items[0]?.variantId).toBe(variantId);
+      expect(receivedBody.items[0]?.receivedQty).toBe(5);
+      expect(receivedBody.storage).toBe('memory');
+
+      // Second sent transfer for Staff denial / validation
+      const created2 = await createTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers`,
+          {
+            referenceNum: 'TRF-RCV-002',
+            sourceWarehouseId: src.warehouse.id,
+            destWarehouseId: dst.warehouse.id,
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId }) }
+      );
+      expect(created2.status).toBe(201);
+      const created2Body = (await created2.json()) as {
+        transfer: { id: string };
+      };
+      const transferId2 = created2Body.transfer.id;
+
+      const added2 = await addTransferItems(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId2}/items`,
+          {
+            items: [
+              {
+                variantId,
+                requestedQty: 3,
+              },
+            ],
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId: transferId2 }) }
+      );
+      expect(added2.status).toBe(201);
+
+      const sent2 = await sendTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId2}/send`,
+          {},
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId: transferId2 }) }
+      );
+      expect(sent2.status).toBe(200);
+
+      const staffRecv = await receiveTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId2}/receive`,
+          {},
+          bearer(staffToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId: transferId2 }) }
+      );
+      expect(staffRecv.status).toBe(403);
+      const staffDenial = (await staffRecv.json()) as { errorCode: string };
+      expect(staffDenial.errorCode).toBe('TENANCY_FORBIDDEN');
+
+      const invalid = await receiveTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/${transferId2}/receive`,
+          { expectedVersion: 'nope' },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId, transferId: transferId2 }) }
+      );
+      expect(invalid.status).toBe(400);
+      const invalidBody = (await invalid.json()) as { errorCode: string };
+      expect(invalidBody.errorCode).toBe('CATALOG_VALIDATION');
+
+      const unknown = await receiveTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers/nonexistent/receive`,
           {},
           bearer(managerToken)
         ),
