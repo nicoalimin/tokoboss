@@ -329,3 +329,116 @@ export const StockBalanceViewSchema = z.object({
   perWarehouse: z.array(WarehouseBalanceViewSchema),
 });
 export type StockBalanceView = z.infer<typeof StockBalanceViewSchema>;
+
+// Transfers (UTA-94, Story 06)
+
+export const TransferStatusSchema = z.enum([
+  'draft',
+  'sent',
+  'received',
+  'cancelled',
+]);
+export type TransferStatusWire = z.infer<typeof TransferStatusSchema>;
+
+/** POST /api/workspaces/:workspaceId/catalog/transfers (Admin/Manager) */
+export const CreateTransferDraftBodySchema = z.object({
+  referenceNum: z.string().trim().min(1).max(120),
+  sourceWarehouseId: z.string().min(1).max(200),
+  destWarehouseId: z.string().min(1).max(200),
+  notes: z.string().trim().max(2000).nullable().optional(),
+  expectedReceiveDate: z.string().datetime().optional(),
+});
+export type CreateTransferDraftBody = z.infer<
+  typeof CreateTransferDraftBodySchema
+>;
+
+/** POST /api/.../transfers/:transferId/items (Admin/Manager) */
+export const AddTransferItemsBodySchema = z.object({
+  items: z
+    .array(
+      z.object({
+        variantId: z.string().min(1).max(200),
+        requestedQty: z.number().int().positive(),
+      })
+    )
+    .min(1),
+});
+export type AddTransferItemsBody = z.infer<typeof AddTransferItemsBodySchema>;
+
+/** POST /api/.../transfers/:transferId/send (Admin/Manager) */
+export const SendTransferBodySchema = z.object({
+  expectedVersion: z.number().int().nonnegative().optional(),
+  idempotencyKey: z
+    .string()
+    .trim()
+    .min(1)
+    .max(128)
+    .regex(/^[A-Za-z0-9\-_:.]+$/, 'Idempotency key has an unsupported format.')
+    .optional(),
+});
+export type SendTransferBody = z.infer<typeof SendTransferBodySchema>;
+
+/** POST /api/.../transfers/:transferId/cancel (Admin/Manager) */
+export const CancelTransferBodySchema = SendTransferBodySchema;
+export type CancelTransferBody = z.infer<typeof CancelTransferBodySchema>;
+
+/** POST /api/.../transfers/:transferId/receive (Admin/Manager) */
+export const ReceiveTransferBodySchema = z.object({
+  expectedVersion: z.number().int().nonnegative().optional(),
+  idempotencyKey: z
+    .string()
+    .trim()
+    .min(1)
+    .max(128)
+    .regex(/^[A-Za-z0-9\-_:.]+$/, 'Idempotency key has an unsupported format.')
+    .optional(),
+  items: z
+    .array(
+      z.object({
+        itemId: z.string().min(1),
+        receivedQty: z.number().int().nonnegative(),
+        damagedQty: z.number().int().nonnegative().optional(),
+      })
+    )
+    .optional(),
+});
+export type ReceiveTransferBody = z.infer<typeof ReceiveTransferBodySchema>;
+
+// Transfer views
+
+export const TransferItemViewSchema = z.object({
+  id: z.string().min(1),
+  transferId: z.string().min(1),
+  workspaceId: z.string().min(1),
+  variantId: z.string().min(1),
+  requestedQty: z.number().int(),
+  sentQty: z.number().int(),
+  receivedQty: z.number().int(),
+  damagedQty: z.number().int(),
+  cancellationReason: z.string().nullable(),
+  version: z.number().int(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type TransferItemView = z.infer<typeof TransferItemViewSchema>;
+
+export const TransferViewSchema = z.object({
+  id: z.string().min(1),
+  workspaceId: z.string().min(1),
+  referenceNum: z.string().min(1),
+  sourceWarehouseId: z.string().min(1),
+  destWarehouseId: z.string().min(1),
+  status: TransferStatusSchema,
+  notes: z.string().nullable(),
+  expectedReceiveDate: z.string().datetime().nullable(),
+  version: z.number().int(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type TransferView = z.infer<typeof TransferViewSchema>;
+
+export const TransferWithItemsViewSchema = z.object({
+  transfer: TransferViewSchema,
+  items: z.array(TransferItemViewSchema),
+});
+export type TransferWithItemsView = z.infer<typeof TransferWithItemsViewSchema>;
