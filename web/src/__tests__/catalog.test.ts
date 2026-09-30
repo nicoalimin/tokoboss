@@ -36,6 +36,10 @@ import {
 } from '../app/api/workspaces/[workspaceId]/catalog/warehouses/route';
 import { PATCH as updateWarehouse } from '../app/api/workspaces/[workspaceId]/catalog/warehouses/[warehouseId]/route';
 import { GET as searchCatalog } from '../app/api/workspaces/[workspaceId]/catalog/search/route';
+import {
+  GET as listTransfers,
+  POST as createTransfer,
+} from '../app/api/workspaces/[workspaceId]/catalog/transfers/route';
 
 /**
  * Catalog Route Handler flow (UTA-75, Story 01) through the memory
@@ -819,5 +823,91 @@ describe('catalog routes (memory wiring)', () => {
     };
     expect(filteredBody.entries).toHaveLength(1);
     expect(filteredBody.entries[0]?.reason).toBe('sby stock');
+  });
+
+  describe('transfers (UTA-124)', () => {
+    it('Manager can create a draft and list includes it; Staff denied; invalid body rejected', async () => {
+      // Seed two warehouses for source & dest
+      const src = await seedWarehouse(managerToken, 'JKT-01');
+      const dst = await seedWarehouse(managerToken, 'SBY-01');
+
+      // 1. Manager POST create draft → 201
+      const created = await createTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers`,
+          {
+            referenceNum: 'TRF-001',
+            sourceWarehouseId: src.warehouse.id,
+            destWarehouseId: dst.warehouse.id,
+            notes: 'initial stock move',
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId }) }
+      );
+      expect(created.status).toBe(201);
+      const createdBody = (await created.json()) as {
+        transfer: {
+          id: string;
+          status: string;
+          sourceWarehouseId: string;
+          destWarehouseId: string;
+        };
+      };
+      expect(createdBody.transfer.status).toBe('draft');
+      expect(createdBody.transfer.sourceWarehouseId).toBe(src.warehouse.id);
+      expect(createdBody.transfer.destWarehouseId).toBe(dst.warehouse.id);
+      const transferId = createdBody.transfer.id;
+
+      // 2. GET list → 200, includes the transfer
+      const listed = await listTransfers(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers`,
+          undefined,
+          bearer(managerToken),
+          'GET'
+        ),
+        { params: Promise.resolve({ workspaceId }) }
+      );
+      expect(listed.status).toBe(200);
+      const listedBody = (await listed.json()) as {
+        transfers: Array<{ id: string }>;
+      };
+      expect(listedBody.transfers.map((t) => t.id)).toContain(transferId);
+
+      // 3. Staff POST create → 403 TENANCY_FORBIDDEN
+      const staffDenied = await createTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers`,
+          {
+            referenceNum: 'TRF-BLOCKED',
+            sourceWarehouseId: src.warehouse.id,
+            destWarehouseId: dst.warehouse.id,
+          },
+          bearer(staffToken)
+        ),
+        { params: Promise.resolve({ workspaceId }) }
+      );
+      expect(staffDenied.status).toBe(403);
+      const deniedBody = (await staffDenied.json()) as { errorCode: string };
+      expect(deniedBody.errorCode).toBe('TENANCY_FORBIDDEN');
+
+      // 4. POST invalid body (empty referenceNum) → 400 CATALOG_VALIDATION
+      const invalid = await createTransfer(
+        apiRequest(
+          `/api/workspaces/${workspaceId}/catalog/transfers`,
+          {
+            referenceNum: '',
+            sourceWarehouseId: src.warehouse.id,
+            destWarehouseId: dst.warehouse.id,
+          },
+          bearer(managerToken)
+        ),
+        { params: Promise.resolve({ workspaceId }) }
+      );
+      expect(invalid.status).toBe(400);
+      const invalidBody = (await invalid.json()) as { errorCode: string };
+      expect(invalidBody.errorCode).toBe('CATALOG_VALIDATION');
+    });
   });
 });
