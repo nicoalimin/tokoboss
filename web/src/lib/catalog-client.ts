@@ -223,6 +223,11 @@ export interface ReceiveTransferInput {
   items?: ReceiveTransferItemInput[];
 }
 
+export interface CancelTransferInput {
+  expectedVersion?: number;
+  idempotencyKey?: string;
+}
+
 export class CatalogClientError extends Error {
   readonly status: number;
   readonly errorCode: string;
@@ -740,6 +745,30 @@ export async function receiveTransfer(
         ? { idempotencyKey: input.idempotencyKey }
         : {}),
       ...(input.items !== undefined ? { items: input.items } : {}),
+    },
+    opts.lang ?? 'en'
+  );
+  return { transfer: data.transfer, items: data.items ?? [] };
+}
+
+/** Cancel a transfer draft (Manager/Admin). */
+export async function cancelTransfer(
+  workspaceId: string,
+  transferId: string,
+  input: CancelTransferInput = {},
+  opts: ClientOpts = {}
+): Promise<TransferWithItemsView> {
+  const data = await sendJson<TransferWithItemsView>(
+    opts.fetchFn ?? fetch,
+    `${base(workspaceId)}/transfers/${encodeSegment(transferId)}/cancel`,
+    'POST',
+    {
+      ...(input.expectedVersion !== undefined
+        ? { expectedVersion: input.expectedVersion }
+        : {}),
+      ...(input.idempotencyKey !== undefined
+        ? { idempotencyKey: input.idempotencyKey }
+        : {}),
     },
     opts.lang ?? 'en'
   );
