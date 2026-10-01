@@ -12,6 +12,7 @@ import {
   listWarehouses,
   searchCatalog,
   sendTransfer,
+  receiveTransfer,
   type TransferItemView,
   type TransferView,
   type TransferStatus,
@@ -41,6 +42,9 @@ const addItemsValidationError =
 const sendGenericError = 'Gagal mengirim transfer. Silakan coba lagi.';
 const sendConflictError =
   'Nomor referensi bentrok atau data sudah berubah. Silakan coba lagi.';
+const receiveGenericError = 'Gagal menerima transfer. Silakan coba lagi.';
+const receiveConflictError =
+  'Data transfer sudah berubah. Muat ulang lalu coba terima lagi.';
 
 const inputClass =
   'w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-base text-neutral-900 ' +
@@ -113,6 +117,19 @@ export function canSendDraft(
   if (role !== 'admin' && role !== 'manager') return false;
   if (status !== 'draft') return false;
   if (itemCount < 1) return false;
+  return true;
+}
+
+/**
+ * Pure guard: can this role fully receive a sent transfer? (UTA-141)
+ * Returns true only when the role is admin or manager and status is 'sent'.
+ */
+export function canReceiveSent(
+  role: WorkspaceRole,
+  status: TransferStatus
+): boolean {
+  if (role !== 'admin' && role !== 'manager') return false;
+  if (status !== 'sent') return false;
   return true;
 }
 
@@ -232,6 +249,10 @@ export function TransfersPanel() {
   // Send transfer state (UTA-140)
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+
+  // Receive transfer state (UTA-141)
+  const [receiving, setReceiving] = useState(false);
+  const [receiveError, setReceiveError] = useState<string | null>(null);
 
   const canWrite = role === 'admin' || role === 'manager';
 
@@ -429,10 +450,12 @@ export function TransfersPanel() {
     setSkuQuery('');
     setSendError(null);
     setSending(false);
+    setReceiveError(null);
+    setReceiving(false);
   }
 
-  function onSelectDraft(transfer: TransferView) {
-    if (transfer.status !== 'draft') return;
+  function onSelectOpen(transfer: TransferView) {
+    if (transfer.status !== 'draft' && transfer.status !== 'sent') return;
     if (selectedTransferId === transfer.id) {
       clearDraftSelection();
       return;
@@ -444,6 +467,8 @@ export function TransfersPanel() {
     setAddError(null);
     setAddVariantId('');
     setAddQty('');
+    setSendError(null);
+    setReceiveError(null);
   }
 
   async function onCreate(e: React.FormEvent) {
@@ -579,11 +604,68 @@ export function TransfersPanel() {
     }
   }
 
+  // ── UTA-141: Receive transfer (full) ────────────────────────────────
+
+  async function onReceive(e: React.FormEvent) {
+    e.preventDefault();
+    if (
+      !workspaceId ||
+      !canWrite ||
+      !selectedTransferId ||
+      !selectedTransfer ||
+      selectedTransfer.status !== 'sent'
+    ) {
+      return;
+    }
+    if (!role || !canReceiveSent(role, selectedTransfer.status)) return;
+
+    if (!confirm('Terima transfer?')) return;
+
+    setReceiving(true);
+    setReceiveError(null);
+
+    try {
+      // Full receive: omit items (API treats empty body as full accept-in).
+      const result = await receiveTransfer(workspaceId, selectedTransferId, {
+        expectedVersion: selectedTransfer.version,
+      });
+      setTransfers((prev) =>
+        prev.map((t) => (t.id === result.transfer.id ? result.transfer : t))
+      );
+      setSelectedTransfer(result.transfer);
+      setSelectedItems(result.items);
+      setTimeout(() => {
+        clearDraftSelection();
+      }, 1500);
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      if (err instanceof CatalogClientError) {
+        if (err.status === 409) {
+          setReceiveError(receiveConflictError);
+          void loadDraftDetail(workspaceId, selectedTransferId);
+          return;
+        }
+        setReceiveError(err.message);
+        return;
+      }
+      setReceiveError(receiveGenericError);
+    } finally {
+      setReceiving(false);
+    }
+  }
+
   const draftSelected =
     selectedTransferId !== null &&
     (selectedTransfer?.status === 'draft' ||
       transfers.some(
         (t) => t.id === selectedTransferId && t.status === 'draft'
+      ));
+
+  const sentSelected =
+    selectedTransferId !== null &&
+    (selectedTransfer?.status === 'sent' ||
+      transfers.some(
+        (t) => t.id === selectedTransferId && t.status === 'sent'
       ));
 
   return (
@@ -615,8 +697,8 @@ export function TransfersPanel() {
           data-testid="transfers-readonly-note"
           className="mb-4 rounded-lg border border-info-500 bg-info-500/10 px-4 py-3 text-sm text-neutral-800"
         >
-          Anda dapat melihat daftar transfer dan isi draft. Hanya Manager/Admin
-          yang dapat membuat draft atau menambah item.
+          Anda dapat melihat daftar transfer. Hanya Manager/Admin yang dapat
+          membuat draft, menambah item, mengirim, atau menerima transfer.
         </p>
       ) : null}
 
@@ -770,6 +852,8 @@ export function TransfersPanel() {
             <tbody>
               {transfers.map((transfer) => {
                 const isDraft = transfer.status === 'draft';
+                const isSent = transfer.status === 'sent';
+                const canOpen = isDraft || isSent;
                 const isSelected = selectedTransferId === transfer.id;
                 return (
                   <tr
@@ -810,14 +894,22 @@ export function TransfersPanel() {
                       {formatDateTime(transfer.updatedAt)}
                     </td>
                     <td className="py-3">
-                      {isDraft ? (
+                      {canOpen ? (
                         <button
                           type="button"
-                          data-testid="transfer-open-draft"
-                          onClick={() => onSelectDraft(transfer)}
+                          data-testid={
+                            isDraft
+                              ? 'transfer-open-draft'
+                              : 'transfer-open-sent'
+                          }
+                          onClick={() => onSelectOpen(transfer)}
                           className={secondaryButtonClass}
                         >
-                          {isSelected ? 'Tutup' : 'Buka draft'}
+                          {isSelected
+                            ? 'Tutup'
+                            : isDraft
+                              ? 'Buka draft'
+                              : 'Buka'}
                         </button>
                       ) : (
                         <span className="text-xs text-neutral-400">—</span>
@@ -1067,6 +1159,149 @@ export function TransfersPanel() {
                   </button>
                 </div>
               ) : null}
+            </>
+          ) : null}
+        </section>
+      ) : null}
+
+      {!loading && !error && selectedTransferId && sentSelected ? (
+        <section
+          data-testid="transfer-sent-detail"
+          className="mt-6 rounded-2xl border border-neutral-200 bg-white p-4"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-neutral-900">
+                Transfer dikirim
+              </h2>
+              <p
+                data-testid="transfer-sent-selected-ref"
+                className="font-mono text-sm text-neutral-800"
+              >
+                {selectedTransfer?.referenceNum ?? selectedTransferId}
+              </p>
+              {selectedTransfer ? (
+                <p className="mt-1 text-sm text-neutral-600">
+                  {getWarehouseLabel(selectedTransfer.sourceWarehouseId)} →{' '}
+                  {getWarehouseLabel(selectedTransfer.destWarehouseId)}
+                </p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              data-testid="transfer-sent-clear"
+              onClick={clearDraftSelection}
+              className={secondaryButtonClass}
+            >
+              Tutup
+            </button>
+          </div>
+
+          {detailLoading ? (
+            <p role="status" className="mt-3 text-sm text-neutral-600">
+              Memuat item transfer…
+            </p>
+          ) : null}
+
+          {detailError ? (
+            <div
+              role="alert"
+              data-testid="transfer-sent-detail-error"
+              className="mt-3 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800"
+            >
+              <p>{detailError}</p>
+              <button
+                type="button"
+                onClick={() =>
+                  workspaceId && selectedTransferId
+                    ? void loadDraftDetail(workspaceId, selectedTransferId)
+                    : undefined
+                }
+                className="mt-2 min-h-[44px] rounded-lg border border-error-300 bg-white px-4 py-2 font-semibold hover:bg-error-100"
+              >
+                Coba lagi
+              </button>
+            </div>
+          ) : null}
+
+          {!detailLoading && !detailError ? (
+            <>
+              {selectedItems.length === 0 ? (
+                <p
+                  data-testid="transfer-sent-items-empty"
+                  className="mt-3 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-3 text-sm text-neutral-600"
+                >
+                  Transfer ini belum punya item.
+                </p>
+              ) : (
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full min-w-[28rem] text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-neutral-200">
+                        <th className="pb-2 font-semibold text-neutral-700">
+                          SKU
+                        </th>
+                        <th className="pb-2 font-semibold text-neutral-700">
+                          Jumlah
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedItems.map((item) => (
+                        <tr
+                          key={item.id}
+                          data-testid="transfer-sent-item-row"
+                          className="border-b border-neutral-100"
+                        >
+                          <td className="py-2 font-mono text-neutral-900">
+                            {getSkuLabel(item.variantId)}
+                          </td>
+                          <td className="py-2 text-neutral-800">
+                            {item.sentQty > 0
+                              ? item.sentQty
+                              : item.requestedQty}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {canWrite &&
+              selectedTransfer &&
+              canReceiveSent(role ?? 'staff', selectedTransfer.status) ? (
+                <div className="mt-4 border-t border-neutral-100 pt-4">
+                  {receiveError ? (
+                    <p
+                      role="alert"
+                      data-testid="transfer-receive-error"
+                      className="mb-2 text-sm text-error-500"
+                    >
+                      {receiveError}
+                    </p>
+                  ) : null}
+                  <p className="mb-3 text-sm text-neutral-600">
+                    Terima seluruh item transfer ini di gudang tujuan.
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="transfer-receive-button"
+                    onClick={(e) => void onReceive(e)}
+                    disabled={receiving}
+                    className={primaryButtonClass}
+                  >
+                    {receiving ? 'Menerima…' : 'Terima transfer'}
+                  </button>
+                </div>
+              ) : (
+                <p
+                  data-testid="transfer-receive-readonly"
+                  className="mt-4 rounded-lg border border-info-500 bg-info-500/10 px-4 py-3 text-sm text-neutral-800"
+                >
+                  Hanya Manager/Admin yang dapat menerima transfer dikirim.
+                </p>
+              )}
             </>
           ) : null}
         </section>
