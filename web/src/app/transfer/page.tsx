@@ -3,9 +3,9 @@ import { TransfersPanel } from '@/components/transfer/TransfersPanel';
 export const metadata = { title: 'Transfer — TokoBoss' };
 
 /**
- * Transfer antar gudang — read-only list (UTA-137).
+ * Transfer antar gudang — list + Manager/Admin create-draft (UTA-138).
  *
- * Server page that wraps the client panel. Create / send / receive /
+ * Server page that wraps the client panel. Items / send / receive /
  * cancel stay out of scope.
  */
 export default function TransferPage() {
@@ -26,7 +26,7 @@ export default function TransferPage() {
             Transfer antar gudang
           </h1>
           <p className="text-sm text-neutral-600 mb-6">
-            Lihat riwayat transfer gudang dalam workspace Anda.
+            Lihat riwayat transfer dan buat draft transfer antar gudang.
           </p>
           <TransfersPanel />
         </section>
