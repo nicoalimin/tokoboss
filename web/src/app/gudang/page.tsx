@@ -3,10 +3,10 @@ import { WarehousesPanel } from '@/components/gudang/WarehousesPanel';
 export const metadata = { title: 'Gudang — TokoBoss' };
 
 /**
- * Gudang (Warehouse) page — read-only warehouse list (UTA-135).
+ * Gudang (Warehouse) page — list + Manager/Admin write chrome (UTA-136).
  *
- * Server page that wraps a small client panel. No create/edit/transfer
- * UI in this slice.
+ * Server page that wraps the client panel. Create / rename / deactivate
+ * live in WarehousesPanel; transfer UI stays out of scope.
  */
 export default function GudangPage() {
   return (
@@ -26,7 +26,8 @@ export default function GudangPage() {
             Daftar Gudang
           </h1>
           <p className="text-sm text-neutral-600 mb-6">
-            Melihat daftar gudang untuk workspace Anda.
+            Lihat dan kelola gudang workspace Anda (tambah, ubah nama,
+            nonaktifkan/aktifkan).
           </p>
           <WarehousesPanel />
         </section>
