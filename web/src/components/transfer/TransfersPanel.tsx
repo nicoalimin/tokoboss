@@ -41,8 +41,6 @@ const addItemsValidationError =
 const sendGenericError = 'Gagal mengirim transfer. Silakan coba lagi.';
 const sendConflictError =
   'Nomor referensi bentrok atau data sudah berubah. Silakan coba lagi.';
-const sendDisabledError =
-  'Transfer tidak dapat dikirim (status bukan draft, belum ada item, atau tidak memiliki izin).';
 
 const inputClass =
   'w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-base text-neutral-900 ' +
