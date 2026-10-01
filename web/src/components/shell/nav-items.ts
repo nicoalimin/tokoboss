@@ -20,6 +20,7 @@ export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
   { href: '/produk', label: 'Produk & Stok', icon: '📦', testId: 'nav-produk' },
   { href: '/ledger', label: 'Buku stok', icon: '📒', testId: 'nav-ledger' },
   { href: '/gudang', label: 'Gudang', icon: '🏭', testId: 'nav-gudang' },
+  { href: '/transfer', label: 'Transfer', icon: '🔁', testId: 'nav-transfer' },
   {
     href: '/team',
     label: 'Tim & Akses',
