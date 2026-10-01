@@ -24,6 +24,7 @@ describe('shell nav (UTA-113)', () => {
     expect(isNavActive('/ledger/abc', '/ledger')).toBe(true);
     expect(isNavActive('/sessions', '/profil')).toBe(true);
     expect(isNavActive('/produkx', '/produk')).toBe(false);
+    expect(isNavActive('/gudang', '/gudang')).toBe(true);
   });
 
   it('gates Tim & Akses to admins once the role is known', () => {
@@ -40,6 +41,7 @@ describe('shell nav (UTA-113)', () => {
     expect(hrefs).toEqual([
       '/produk',
       '/ledger',
+      '/gudang',
       '/team',
       '/pengaturan',
       '/profil',
