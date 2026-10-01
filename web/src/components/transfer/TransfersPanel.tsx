@@ -11,6 +11,7 @@ import {
   listTransfers,
   listWarehouses,
   searchCatalog,
+  sendTransfer,
   type TransferItemView,
   type TransferView,
   type TransferStatus,
@@ -37,6 +38,11 @@ const detailGenericError =
 const addItemsGenericError = 'Item gagal ditambahkan. Silakan coba lagi.';
 const addItemsValidationError =
   'SKU dan jumlah (bilangan bulat positif) wajib diisi.';
+const sendGenericError = 'Gagal mengirim transfer. Silakan coba lagi.';
+const sendConflictError =
+  'Nomor referensi bentrok atau data sudah berubah. Silakan coba lagi.';
+const sendDisabledError =
+  'Transfer tidak dapat dikirim (status bukan draft, belum ada item, atau tidak memiliki izin).';
 
 const inputClass =
   'w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-base text-neutral-900 ' +
@@ -94,6 +100,22 @@ export function validateTransferDraftForm(
     return sameWarehouseError;
   }
   return null;
+}
+
+/**
+ * Pure guard: can this role send a draft with the given items? (UTA-140)
+ * Returns true only when the role is admin or manager, status is 'draft',
+ * and there is at least one line item.
+ */
+export function canSendDraft(
+  role: WorkspaceRole,
+  status: TransferStatus,
+  itemCount: number
+): boolean {
+  if (role !== 'admin' && role !== 'manager') return false;
+  if (status !== 'draft') return false;
+  if (itemCount < 1) return false;
+  return true;
 }
 
 export type TransferAddItemsFormValues = {
@@ -208,6 +230,10 @@ export function TransfersPanel() {
   const [addQty, setAddQty] = useState('');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+
+  // Send transfer state (UTA-140)
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const canWrite = role === 'admin' || role === 'manager';
 
@@ -403,6 +429,8 @@ export function TransfersPanel() {
     setAddQty('');
     setAddError(null);
     setSkuQuery('');
+    setSendError(null);
+    setSending(false);
   }
 
   function onSelectDraft(transfer: TransferView) {
@@ -498,6 +526,58 @@ export function TransfersPanel() {
       setAddError(mapAddItemsError(err));
     } finally {
       setAdding(false);
+    }
+  }
+
+  // ── UTA-140: Send transfer ──────────────────────────────────────────
+
+  async function onSend(e: React.FormEvent) {
+    e.preventDefault();
+    if (
+      !workspaceId ||
+      !canWrite ||
+      !selectedTransferId ||
+      !selectedTransfer ||
+      selectedTransfer.status !== 'draft'
+    ) {
+      return;
+    }
+    if (selectedItems.length === 0) return;
+
+    if (!confirm('Kirim transfer?')) return;
+
+    setSending(true);
+    setSendError(null);
+
+    try {
+      const result = await sendTransfer(workspaceId, selectedTransferId, {
+        expectedVersion: selectedTransfer.version,
+      });
+      // Update the list and selected transfer with the new status
+      setTransfers((prev) =>
+        prev.map((t) => (t.id === result.transfer.id ? result.transfer : t))
+      );
+      setSelectedTransfer(result.transfer);
+      setSelectedItems(result.items);
+      // Clear selection since status is no longer draft
+      setTimeout(() => {
+        clearDraftSelection();
+      }, 1500);
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      if (err instanceof CatalogClientError) {
+        if (err.status === 409) {
+          setSendError(sendConflictError);
+          // Reload latest state on conflict
+          void loadDraftDetail(workspaceId, selectedTransferId);
+          return;
+        }
+        setSendError(err.message);
+        return;
+      }
+      setSendError(sendGenericError);
+    } finally {
+      setSending(false);
     }
   }
 
@@ -962,6 +1042,33 @@ export function TransfersPanel() {
                   Hanya Manager/Admin yang dapat menambah item pada draft.
                 </p>
               )}
+
+              {/* UTA-140: Send transfer button (Manager/Admin only) */}
+              {canWrite && selectedItems.length > 0 ? (
+                <div className="mt-4 border-t border-neutral-100 pt-4">
+                  {sendError ? (
+                    <p
+                      role="alert"
+                      data-testid="transfer-send-error"
+                      className="mb-2 text-sm text-error-500"
+                    >
+                      {sendError}
+                    </p>
+                  ) : null}
+                  <p className="mb-3 text-sm text-neutral-600">
+                    Kirim draft transfer ini ke gudang tujuan.
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="transfer-send-button"
+                    onClick={(e) => void onSend(e)}
+                    disabled={sending}
+                    className={primaryButtonClass}
+                  >
+                    {sending ? 'Mengirim…' : 'Kirim transfer'}
+                  </button>
+                </div>
+              ) : null}
             </>
           ) : null}
         </section>
