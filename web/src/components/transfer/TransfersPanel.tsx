@@ -13,6 +13,7 @@ import {
   searchCatalog,
   sendTransfer,
   receiveTransfer,
+  cancelTransfer,
   type TransferItemView,
   type TransferView,
   type TransferStatus,
@@ -45,6 +46,9 @@ const sendConflictError =
 const receiveGenericError = 'Gagal menerima transfer. Silakan coba lagi.';
 const receiveConflictError =
   'Data transfer sudah berubah. Muat ulang lalu coba terima lagi.';
+const cancelGenericError = 'Gagal membatalkan transfer. Silakan coba lagi.';
+const cancelConflictError =
+  'Data transfer sudah berubah. Muat ulang lalu coba batalkan lagi.';
 
 const inputClass =
   'w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-base text-neutral-900 ' +
@@ -133,6 +137,20 @@ export function canReceiveSent(
   return true;
 }
 
+/**
+ * Pure guard: can this role cancel a draft or sent transfer? (UTA-142)
+ * Returns true only when the role is admin or manager and status is
+ * 'draft' or 'sent'. received/cancelled cannot cancel.
+ */
+export function canCancelTransfer(
+  role: WorkspaceRole,
+  status: TransferStatus
+): boolean {
+  if (role !== 'admin' && role !== 'manager') return false;
+  if (status !== 'draft' && status !== 'sent') return false;
+  return true;
+}
+
 export type TransferAddItemsFormValues = {
   variantId: string;
   requestedQty: string;
@@ -207,7 +225,7 @@ function productsToSkuOptions(
  *
  * Manager/Admin can open a draft, view items, and add line items via
  * `getTransfer` / `addTransferItems`. Staff is read-only for mutations.
- * Send / receive / cancel stay out of scope.
+ * Send / receive / cancel (draft|sent) for Manager/Admin.
  */
 export function TransfersPanel() {
   const router = useRouter();
@@ -253,6 +271,10 @@ export function TransfersPanel() {
   // Receive transfer state (UTA-141)
   const [receiving, setReceiving] = useState(false);
   const [receiveError, setReceiveError] = useState<string | null>(null);
+
+  // Cancel transfer state (UTA-142)
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const canWrite = role === 'admin' || role === 'manager';
 
@@ -452,6 +474,8 @@ export function TransfersPanel() {
     setSending(false);
     setReceiveError(null);
     setReceiving(false);
+    setCancelError(null);
+    setCancelling(false);
   }
 
   function onSelectOpen(transfer: TransferView) {
@@ -469,6 +493,7 @@ export function TransfersPanel() {
     setAddQty('');
     setSendError(null);
     setReceiveError(null);
+    setCancelError(null);
   }
 
   async function onCreate(e: React.FormEvent) {
@@ -651,6 +676,49 @@ export function TransfersPanel() {
       setReceiveError(receiveGenericError);
     } finally {
       setReceiving(false);
+    }
+  }
+
+  // ── UTA-142: Cancel transfer (draft | sent) ─────────────────────────
+
+  async function onCancel(e: React.FormEvent) {
+    e.preventDefault();
+    if (!workspaceId || !canWrite || !selectedTransferId || !selectedTransfer) {
+      return;
+    }
+    if (!role || !canCancelTransfer(role, selectedTransfer.status)) return;
+
+    if (!confirm('Batalkan transfer?')) return;
+
+    setCancelling(true);
+    setCancelError(null);
+
+    try {
+      const result = await cancelTransfer(workspaceId, selectedTransferId, {
+        expectedVersion: selectedTransfer.version,
+      });
+      setTransfers((prev) =>
+        prev.map((t) => (t.id === result.transfer.id ? result.transfer : t))
+      );
+      setSelectedTransfer(result.transfer);
+      setSelectedItems(result.items);
+      setTimeout(() => {
+        clearDraftSelection();
+      }, 1500);
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      if (err instanceof CatalogClientError) {
+        if (err.status === 409) {
+          setCancelError(cancelConflictError);
+          void loadDraftDetail(workspaceId, selectedTransferId);
+          return;
+        }
+        setCancelError(err.message);
+        return;
+      }
+      setCancelError(cancelGenericError);
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -1159,6 +1227,35 @@ export function TransfersPanel() {
                   </button>
                 </div>
               ) : null}
+
+              {/* UTA-142: Cancel transfer (Manager/Admin, draft|sent) */}
+              {canWrite &&
+              selectedTransfer &&
+              canCancelTransfer(role ?? 'staff', selectedTransfer.status) ? (
+                <div className="mt-4 border-t border-neutral-100 pt-4">
+                  {cancelError ? (
+                    <p
+                      role="alert"
+                      data-testid="transfer-cancel-error"
+                      className="mb-2 text-sm text-error-500"
+                    >
+                      {cancelError}
+                    </p>
+                  ) : null}
+                  <p className="mb-3 text-sm text-neutral-600">
+                    Batalkan draft transfer ini. Status akan menjadi Dibatalkan.
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="transfer-cancel-button"
+                    onClick={(e) => void onCancel(e)}
+                    disabled={cancelling || sending}
+                    className={secondaryButtonClass}
+                  >
+                    {cancelling ? 'Membatalkan…' : 'Batalkan transfer'}
+                  </button>
+                </div>
+              ) : null}
             </>
           ) : null}
         </section>
@@ -1302,6 +1399,36 @@ export function TransfersPanel() {
                   Hanya Manager/Admin yang dapat menerima transfer dikirim.
                 </p>
               )}
+
+              {/* UTA-142: Cancel sent transfer (Manager/Admin) */}
+              {canWrite &&
+              selectedTransfer &&
+              canCancelTransfer(role ?? 'staff', selectedTransfer.status) ? (
+                <div className="mt-4 border-t border-neutral-100 pt-4">
+                  {cancelError ? (
+                    <p
+                      role="alert"
+                      data-testid="transfer-cancel-error"
+                      className="mb-2 text-sm text-error-500"
+                    >
+                      {cancelError}
+                    </p>
+                  ) : null}
+                  <p className="mb-3 text-sm text-neutral-600">
+                    Batalkan transfer dikirim ini. Status akan menjadi
+                    Dibatalkan.
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="transfer-cancel-button"
+                    onClick={(e) => void onCancel(e)}
+                    disabled={cancelling || receiving}
+                    className={secondaryButtonClass}
+                  >
+                    {cancelling ? 'Membatalkan…' : 'Batalkan transfer'}
+                  </button>
+                </div>
+              ) : null}
             </>
           ) : null}
         </section>
