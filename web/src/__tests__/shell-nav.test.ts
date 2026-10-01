@@ -25,6 +25,7 @@ describe('shell nav (UTA-113)', () => {
     expect(isNavActive('/sessions', '/profil')).toBe(true);
     expect(isNavActive('/produkx', '/produk')).toBe(false);
     expect(isNavActive('/gudang', '/gudang')).toBe(true);
+    expect(isNavActive('/transfer', '/transfer')).toBe(true);
   });
 
   it('gates Tim & Akses to admins once the role is known', () => {
@@ -42,6 +43,7 @@ describe('shell nav (UTA-113)', () => {
       '/produk',
       '/ledger',
       '/gudang',
+      '/transfer',
       '/team',
       '/pengaturan',
       '/profil',
