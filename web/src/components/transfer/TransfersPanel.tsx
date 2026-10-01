@@ -4,11 +4,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   CatalogClientError,
+  addTransferItems,
   createTransferDraft,
+  getTransfer,
+  listProducts,
   listTransfers,
   listWarehouses,
+  searchCatalog,
+  type TransferItemView,
   type TransferView,
   type TransferStatus,
+  type VariantView,
   type WarehouseView,
 } from '@/lib/catalog-client';
 import {
@@ -26,6 +32,11 @@ const validationError =
 const sameWarehouseError = 'Gudang asal dan tujuan harus berbeda.';
 const noWarehousesMessage =
   'Belum ada gudang aktif. Buat gudang di menu Gudang terlebih dahulu sebelum membuat draft transfer.';
+const detailGenericError =
+  'Detail draft transfer tidak dapat dimuat. Silakan coba lagi.';
+const addItemsGenericError = 'Item gagal ditambahkan. Silakan coba lagi.';
+const addItemsValidationError =
+  'SKU dan jumlah (bilangan bulat positif) wajib diisi.';
 
 const inputClass =
   'w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-base text-neutral-900 ' +
@@ -37,6 +48,10 @@ const labelClass = 'block text-sm font-medium text-neutral-700 mb-1';
 const primaryButtonClass =
   'rounded-lg bg-primary-500 px-6 py-3 min-h-[44px] inline-flex items-center justify-center ' +
   'font-semibold text-white hover:bg-primary-600 disabled:opacity-50';
+
+const secondaryButtonClass =
+  'rounded-lg border border-neutral-300 bg-white px-4 py-2 min-h-[44px] inline-flex items-center ' +
+  'justify-center font-semibold text-neutral-800 hover:bg-neutral-50 disabled:opacity-50';
 
 /** Human-readable labels for transfer status (Bahasa Indonesia). */
 const STATUS_LABELS: Record<TransferStatus, string> = {
@@ -81,12 +96,81 @@ export function validateTransferDraftForm(
   return null;
 }
 
+export type TransferAddItemsFormValues = {
+  variantId: string;
+  requestedQty: string;
+};
+
 /**
- * Transfer list + Manager/Admin create-draft chrome (UTA-138).
+ * Pure validator for draft add-items form (UTA-139).
+ * Returns null when valid, otherwise a Bahasa Indonesia error message.
+ */
+export function validateTransferAddItemsForm(
+  values: TransferAddItemsFormValues
+): string | null {
+  const variantId = values.variantId.trim();
+  const raw = values.requestedQty.trim();
+  if (!variantId || !raw) {
+    return addItemsValidationError;
+  }
+  if (!/^\d+$/.test(raw)) {
+    return addItemsValidationError;
+  }
+  const qty = Number.parseInt(raw, 10);
+  if (!Number.isFinite(qty) || qty < 1) {
+    return addItemsValidationError;
+  }
+  return null;
+}
+
+type SkuOption = {
+  variantId: string;
+  skuCode: string;
+  label: string;
+};
+
+function variantsToSkuOptions(variants: VariantView[]): SkuOption[] {
+  const options: SkuOption[] = [];
+  for (const v of variants) {
+    if (v.status !== 'active') continue;
+    const namePart = v.name?.trim() ? ` — ${v.name.trim()}` : '';
+    options.push({
+      variantId: v.id,
+      skuCode: v.skuCode,
+      label: `${v.skuCode}${namePart}`,
+    });
+  }
+  return options;
+}
+
+function productsToSkuOptions(
+  products: Array<{ name: string; variants?: VariantView[] }>
+): SkuOption[] {
+  const options: SkuOption[] = [];
+  for (const p of products) {
+    for (const v of p.variants ?? []) {
+      if (v.status !== 'active') continue;
+      const namePart = v.name?.trim()
+        ? ` — ${v.name.trim()}`
+        : p.name.trim()
+          ? ` — ${p.name.trim()}`
+          : '';
+      options.push({
+        variantId: v.id,
+        skuCode: v.skuCode,
+        label: `${v.skuCode}${namePart}`,
+      });
+    }
+  }
+  return options;
+}
+
+/**
+ * Transfer list + create-draft (UTA-138) + draft add-items (UTA-139).
  *
- * Keeps the UTA-137 read-only list and adds create-draft wired to
- * `createTransferDraft`. Staff sees the list only (chrome RBAC; server
- * remains authority). Items / send / receive / cancel stay out of scope.
+ * Manager/Admin can open a draft, view items, and add line items via
+ * `getTransfer` / `addTransferItems`. Staff is read-only for mutations.
+ * Send / receive / cancel stay out of scope.
  */
 export function TransfersPanel() {
   const router = useRouter();
@@ -103,6 +187,27 @@ export function TransfersPanel() {
   const [notes, setNotes] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  const [selectedTransferId, setSelectedTransferId] = useState<string | null>(
+    null
+  );
+  const [selectedTransfer, setSelectedTransfer] = useState<TransferView | null>(
+    null
+  );
+  const [selectedItems, setSelectedItems] = useState<TransferItemView[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  const [skuOptions, setSkuOptions] = useState<SkuOption[]>([]);
+  const [skuCodeByVariantId, setSkuCodeByVariantId] = useState<
+    Map<string, string>
+  >(() => new Map());
+  const [skuQuery, setSkuQuery] = useState('');
+  const [skuSearching, setSkuSearching] = useState(false);
+  const [addVariantId, setAddVariantId] = useState('');
+  const [addQty, setAddQty] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   const canWrite = role === 'admin' || role === 'manager';
 
@@ -133,6 +238,59 @@ export function TransfersPanel() {
     [router]
   );
 
+  const mergeSkuLookup = useCallback((options: SkuOption[]) => {
+    setSkuOptions((prev) => {
+      const byId = new Map(prev.map((o) => [o.variantId, o]));
+      for (const o of options) byId.set(o.variantId, o);
+      return Array.from(byId.values()).sort((a, b) =>
+        a.skuCode.localeCompare(b.skuCode)
+      );
+    });
+    setSkuCodeByVariantId((prev) => {
+      const next = new Map(prev);
+      for (const o of options) next.set(o.variantId, o.skuCode);
+      return next;
+    });
+  }, []);
+
+  const loadSkuCatalog = useCallback(
+    async (ws: string) => {
+      try {
+        const products = await listProducts(ws, { status: 'active' });
+        mergeSkuLookup(productsToSkuOptions(products));
+      } catch (err) {
+        if (handleAuthError(err)) return;
+        // Catalog lookup is best-effort for skuCode labels; detail still works.
+      }
+    },
+    [handleAuthError, mergeSkuLookup]
+  );
+
+  const loadDraftDetail = useCallback(
+    async (ws: string, transferId: string) => {
+      setDetailLoading(true);
+      setDetailError(null);
+      try {
+        const detail = await getTransfer(ws, transferId);
+        setSelectedTransfer(detail.transfer);
+        setSelectedItems(detail.items);
+        setTransfers((prev) =>
+          prev.map((t) => (t.id === detail.transfer.id ? detail.transfer : t))
+        );
+      } catch (err) {
+        if (handleAuthError(err)) return;
+        setSelectedTransfer(null);
+        setSelectedItems([]);
+        setDetailError(
+          err instanceof CatalogClientError ? err.message : detailGenericError
+        );
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [handleAuthError]
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -147,6 +305,7 @@ export function TransfersPanel() {
       ]);
       setTransfers(transfersList);
       setWarehouses(warehousesList);
+      void loadSkuCatalog(membership.workspaceId);
     } catch (err) {
       if (handleAuthError(err)) return;
 
@@ -162,11 +321,51 @@ export function TransfersPanel() {
     } finally {
       setLoading(false);
     }
-  }, [handleAuthError]);
+  }, [handleAuthError, loadSkuCatalog]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!workspaceId || !selectedTransferId) return;
+    void loadDraftDetail(workspaceId, selectedTransferId);
+  }, [workspaceId, selectedTransferId, loadDraftDetail]);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    const needle = skuQuery.trim();
+    if (!needle) return;
+
+    const timer = setTimeout(() => {
+      void (async () => {
+        setSkuSearching(true);
+        try {
+          const { products, variants } = await searchCatalog(
+            workspaceId,
+            needle
+          );
+          const fromProducts = productsToSkuOptions(products);
+          const fromVariants = variantsToSkuOptions(variants);
+          mergeSkuLookup([...fromProducts, ...fromVariants]);
+          if (fromProducts.length === 0 && fromVariants.length > 0) {
+            // Variant-only hits: also pull parent products for richer labels.
+            const listed = await listProducts(workspaceId, {
+              q: needle,
+              status: 'active',
+            });
+            mergeSkuLookup(productsToSkuOptions(listed));
+          }
+        } catch (err) {
+          if (handleAuthError(err)) return;
+        } finally {
+          setSkuSearching(false);
+        }
+      })();
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [skuQuery, workspaceId, mergeSkuLookup, handleAuthError]);
 
   function getStatusLabel(status: TransferStatus): string {
     return STATUS_LABELS[status] ?? status;
@@ -176,12 +375,49 @@ export function TransfersPanel() {
     return warehouseMap.get(warehouseId) ?? warehouseId;
   }
 
+  function getSkuLabel(variantId: string): string {
+    return skuCodeByVariantId.get(variantId) ?? variantId;
+  }
+
   function mapMutationError(err: unknown): string {
     if (err instanceof CatalogClientError) {
       if (err.status === 409) return conflictError;
       return err.message;
     }
     return mutationGenericError;
+  }
+
+  function mapAddItemsError(err: unknown): string {
+    if (err instanceof CatalogClientError) {
+      return err.message;
+    }
+    return addItemsGenericError;
+  }
+
+  function clearDraftSelection() {
+    setSelectedTransferId(null);
+    setSelectedTransfer(null);
+    setSelectedItems([]);
+    setDetailError(null);
+    setAddVariantId('');
+    setAddQty('');
+    setAddError(null);
+    setSkuQuery('');
+  }
+
+  function onSelectDraft(transfer: TransferView) {
+    if (transfer.status !== 'draft') return;
+    if (selectedTransferId === transfer.id) {
+      clearDraftSelection();
+      return;
+    }
+    setSelectedTransferId(transfer.id);
+    setSelectedTransfer(transfer);
+    setSelectedItems([]);
+    setDetailError(null);
+    setAddError(null);
+    setAddVariantId('');
+    setAddQty('');
   }
 
   async function onCreate(e: React.FormEvent) {
@@ -215,6 +451,10 @@ export function TransfersPanel() {
       setSourceWarehouseId('');
       setDestWarehouseId('');
       setNotes('');
+      setSelectedTransferId(created.id);
+      setSelectedTransfer(created);
+      setSelectedItems([]);
+      setDetailError(null);
     } catch (err) {
       if (handleAuthError(err)) return;
       if (err instanceof CatalogClientError && err.status === 409) {
@@ -227,6 +467,46 @@ export function TransfersPanel() {
       setCreating(false);
     }
   }
+
+  async function onAddItems(e: React.FormEvent) {
+    e.preventDefault();
+    if (!workspaceId || !canWrite || !selectedTransferId) return;
+    if (selectedTransfer && selectedTransfer.status !== 'draft') return;
+
+    const validation = validateTransferAddItemsForm({
+      variantId: addVariantId,
+      requestedQty: addQty,
+    });
+    if (validation) {
+      setAddError(validation);
+      return;
+    }
+
+    const requestedQty = Number.parseInt(addQty.trim(), 10);
+    setAdding(true);
+    setAddError(null);
+
+    try {
+      await addTransferItems(workspaceId, selectedTransferId, {
+        items: [{ variantId: addVariantId.trim(), requestedQty }],
+      });
+      setAddVariantId('');
+      setAddQty('');
+      await loadDraftDetail(workspaceId, selectedTransferId);
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      setAddError(mapAddItemsError(err));
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  const draftSelected =
+    selectedTransferId !== null &&
+    (selectedTransfer?.status === 'draft' ||
+      transfers.some(
+        (t) => t.id === selectedTransferId && t.status === 'draft'
+      ));
 
   return (
     <div data-testid="transfers-panel">
@@ -257,8 +537,8 @@ export function TransfersPanel() {
           data-testid="transfers-readonly-note"
           className="mb-4 rounded-lg border border-info-500 bg-info-500/10 px-4 py-3 text-sm text-neutral-800"
         >
-          Anda dapat melihat daftar transfer. Hanya Manager/Admin yang dapat
-          membuat draft transfer.
+          Anda dapat melihat daftar transfer dan isi draft. Hanya Manager/Admin
+          yang dapat membuat draft atau menambah item.
         </p>
       ) : null}
 
@@ -272,8 +552,8 @@ export function TransfersPanel() {
             Buat draft transfer
           </h2>
           <p className="text-sm text-neutral-600">
-            Buat draft transfer antar gudang. Baris item, kirim, dan terima
-            ditambahkan nanti.
+            Buat draft transfer antar gudang. Setelah dibuat, pilih draft untuk
+            menambah baris item.
           </p>
 
           {activeWarehouses.length === 0 ? (
@@ -406,48 +686,285 @@ export function TransfersPanel() {
                 <th className="pb-2 font-semibold text-neutral-700">
                   Diperbarui
                 </th>
+                <th className="pb-2 font-semibold text-neutral-700">Aksi</th>
               </tr>
             </thead>
             <tbody>
-              {transfers.map((transfer) => (
-                <tr
-                  key={transfer.id}
-                  data-testid="transfer-row"
-                  className="border-b border-neutral-100"
-                >
-                  <td className="py-3 font-mono text-neutral-900">
-                    {transfer.referenceNum}
-                  </td>
-                  <td className="py-3 text-neutral-700">
-                    {getWarehouseLabel(transfer.sourceWarehouseId)}
-                  </td>
-                  <td className="py-3 text-neutral-700">
-                    {getWarehouseLabel(transfer.destWarehouseId)}
-                  </td>
-                  <td className="py-3">
-                    <span
-                      data-testid="transfer-status"
-                      className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
-                        transfer.status === 'draft'
-                          ? 'bg-neutral-200 text-neutral-700'
-                          : transfer.status === 'sent'
-                            ? 'bg-warning-100 text-warning-800'
-                            : transfer.status === 'received'
-                              ? 'bg-success-100 text-success-800'
-                              : 'bg-error-100 text-error-800'
-                      }`}
-                    >
-                      {getStatusLabel(transfer.status)}
-                    </span>
-                  </td>
-                  <td className="py-3 text-neutral-600">
-                    {formatDateTime(transfer.updatedAt)}
-                  </td>
-                </tr>
-              ))}
+              {transfers.map((transfer) => {
+                const isDraft = transfer.status === 'draft';
+                const isSelected = selectedTransferId === transfer.id;
+                return (
+                  <tr
+                    key={transfer.id}
+                    data-testid="transfer-row"
+                    data-transfer-id={transfer.id}
+                    data-selected={isSelected ? 'true' : 'false'}
+                    className={`border-b border-neutral-100 ${
+                      isSelected ? 'bg-primary-50' : ''
+                    }`}
+                  >
+                    <td className="py-3 font-mono text-neutral-900">
+                      {transfer.referenceNum}
+                    </td>
+                    <td className="py-3 text-neutral-700">
+                      {getWarehouseLabel(transfer.sourceWarehouseId)}
+                    </td>
+                    <td className="py-3 text-neutral-700">
+                      {getWarehouseLabel(transfer.destWarehouseId)}
+                    </td>
+                    <td className="py-3">
+                      <span
+                        data-testid="transfer-status"
+                        className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
+                          transfer.status === 'draft'
+                            ? 'bg-neutral-200 text-neutral-700'
+                            : transfer.status === 'sent'
+                              ? 'bg-warning-100 text-warning-800'
+                              : transfer.status === 'received'
+                                ? 'bg-success-100 text-success-800'
+                                : 'bg-error-100 text-error-800'
+                        }`}
+                      >
+                        {getStatusLabel(transfer.status)}
+                      </span>
+                    </td>
+                    <td className="py-3 text-neutral-600">
+                      {formatDateTime(transfer.updatedAt)}
+                    </td>
+                    <td className="py-3">
+                      {isDraft ? (
+                        <button
+                          type="button"
+                          data-testid="transfer-open-draft"
+                          onClick={() => onSelectDraft(transfer)}
+                          className={secondaryButtonClass}
+                        >
+                          {isSelected ? 'Tutup' : 'Buka draft'}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-neutral-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
+      ) : null}
+
+      {!loading && !error && selectedTransferId && draftSelected ? (
+        <section
+          data-testid="transfer-draft-detail"
+          className="mt-6 rounded-2xl border border-neutral-200 bg-white p-4"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-neutral-900">
+                Draft terpilih
+              </h2>
+              <p
+                data-testid="transfer-draft-selected-ref"
+                className="font-mono text-sm text-neutral-800"
+              >
+                {selectedTransfer?.referenceNum ?? selectedTransferId}
+              </p>
+              {selectedTransfer ? (
+                <p className="mt-1 text-sm text-neutral-600">
+                  {getWarehouseLabel(selectedTransfer.sourceWarehouseId)} →{' '}
+                  {getWarehouseLabel(selectedTransfer.destWarehouseId)}
+                </p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              data-testid="transfer-draft-clear"
+              onClick={clearDraftSelection}
+              className={secondaryButtonClass}
+            >
+              Tutup
+            </button>
+          </div>
+
+          {detailLoading ? (
+            <p role="status" className="mt-3 text-sm text-neutral-600">
+              Memuat item draft…
+            </p>
+          ) : null}
+
+          {detailError ? (
+            <div
+              role="alert"
+              data-testid="transfer-draft-detail-error"
+              className="mt-3 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800"
+            >
+              <p>{detailError}</p>
+              <button
+                type="button"
+                onClick={() =>
+                  workspaceId && selectedTransferId
+                    ? void loadDraftDetail(workspaceId, selectedTransferId)
+                    : undefined
+                }
+                className="mt-2 min-h-[44px] rounded-lg border border-error-300 bg-white px-4 py-2 font-semibold hover:bg-error-100"
+              >
+                Coba lagi
+              </button>
+            </div>
+          ) : null}
+
+          {!detailLoading && !detailError ? (
+            <>
+              {selectedItems.length === 0 ? (
+                <p
+                  data-testid="transfer-draft-items-empty"
+                  className="mt-3 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-3 text-sm text-neutral-600"
+                >
+                  Belum ada item pada draft ini.
+                </p>
+              ) : (
+                <div className="mt-3 overflow-x-auto">
+                  <table
+                    data-testid="transfer-draft-items"
+                    className="w-full text-left text-sm"
+                  >
+                    <thead>
+                      <tr className="border-b border-neutral-200">
+                        <th className="pb-2 font-semibold text-neutral-700">
+                          SKU
+                        </th>
+                        <th className="pb-2 font-semibold text-neutral-700">
+                          Jumlah
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedItems.map((item) => (
+                        <tr
+                          key={item.id}
+                          data-testid="transfer-draft-item-row"
+                          className="border-b border-neutral-100"
+                        >
+                          <td className="py-2 font-mono text-neutral-900">
+                            {getSkuLabel(item.variantId)}
+                          </td>
+                          <td className="py-2 text-neutral-800">
+                            {item.requestedQty}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {canWrite ? (
+                <form
+                  data-testid="transfer-add-items-form"
+                  onSubmit={(e) => void onAddItems(e)}
+                  className="mt-4 border-t border-neutral-100 pt-4"
+                >
+                  <h3 className="text-base font-semibold text-neutral-900">
+                    Tambah item
+                  </h3>
+                  <p className="text-sm text-neutral-600">
+                    Pilih SKU aktif dan jumlah yang diminta untuk draft ini.
+                  </p>
+
+                  {addError ? (
+                    <p
+                      role="alert"
+                      data-testid="transfer-add-items-error"
+                      className="mt-2 text-sm text-error-500"
+                    >
+                      {addError}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label
+                        htmlFor="transfer-add-sku-search"
+                        className={labelClass}
+                      >
+                        Cari SKU
+                      </label>
+                      <input
+                        id="transfer-add-sku-search"
+                        data-testid="transfer-add-sku-search"
+                        className={inputClass}
+                        placeholder="Cari nama / SKU / barcode"
+                        value={skuQuery}
+                        onChange={(e) => setSkuQuery(e.target.value)}
+                        disabled={adding}
+                        autoComplete="off"
+                      />
+                      <p className="mt-1 text-xs text-neutral-500">
+                        {skuSearching
+                          ? 'Mencari…'
+                          : 'Kosongkan untuk memakai daftar produk aktif.'}
+                      </p>
+                    </div>
+                    <div>
+                      <label htmlFor="transfer-add-sku" className={labelClass}>
+                        SKU
+                      </label>
+                      <select
+                        id="transfer-add-sku"
+                        data-testid="transfer-add-sku"
+                        className={inputClass}
+                        value={addVariantId}
+                        onChange={(e) => setAddVariantId(e.target.value)}
+                        disabled={adding || skuOptions.length === 0}
+                      >
+                        <option value="">Pilih SKU</option>
+                        {skuOptions.map((o) => (
+                          <option key={o.variantId} value={o.variantId}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="transfer-add-qty" className={labelClass}>
+                        Jumlah
+                      </label>
+                      <input
+                        id="transfer-add-qty"
+                        data-testid="transfer-add-qty"
+                        className={inputClass}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="1"
+                        value={addQty}
+                        onChange={(e) => setAddQty(e.target.value)}
+                        disabled={adding}
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <button
+                      type="submit"
+                      data-testid="transfer-add-items-submit"
+                      disabled={adding || skuOptions.length === 0}
+                      className={primaryButtonClass}
+                    >
+                      {adding ? 'Menyimpan…' : 'Tambah item'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <p
+                  data-testid="transfer-add-items-readonly"
+                  className="mt-4 rounded-lg border border-info-500 bg-info-500/10 px-4 py-3 text-sm text-neutral-800"
+                >
+                  Hanya Manager/Admin yang dapat menambah item pada draft.
+                </p>
+              )}
+            </>
+          ) : null}
+        </section>
       ) : null}
     </div>
   );
