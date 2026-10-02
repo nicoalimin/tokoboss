@@ -63,6 +63,8 @@ export interface CatalogVariantRecord {
   costSource: string | null;
   /** Min stock qty for replenish (Story 11). Optional until store slices land. */
   minStockQty?: number | null;
+  /** Lead time days for replenish (Story 11). Optional until store slices land. */
+  leadTimeDays?: number | null;
   /** Marketplace listing-name hint (searchable). */
   listingName: string | null;
   status: CatalogStatus;
