@@ -131,6 +131,8 @@ export interface CatalogStore {
       costSource?: string | null;
       listingName?: string | null;
       status?: CatalogStatus;
+      minStockQty?: number | null;
+      leadTimeDays?: number | null;
     },
     expectedVersion: number
   ): Promise<CatalogVariantRecord>;
