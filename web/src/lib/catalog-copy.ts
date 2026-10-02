@@ -28,6 +28,8 @@ export interface CatalogCopy {
   searchLabel: string;
   searchPlaceholder: string;
   searchHint: string;
+  warehouseFilterLabel: string;
+  warehouseFilterAll: string;
   searching: string;
   emptyTitle: string;
   emptyBody: string;
@@ -128,6 +130,8 @@ const en: CatalogCopy = {
   searchPlaceholder: 'Name, SKU TokoBoss, barcode, Store SKU…',
   searchHint:
     'One query across name, SKU TokoBoss, barcode, Store SKU hint, and listing name.',
+  warehouseFilterLabel: 'Warehouse filter',
+  warehouseFilterAll: 'All warehouses',
   searching: 'Searching…',
   emptyTitle: 'No products yet',
   emptyBody:
@@ -240,6 +244,8 @@ const id: CatalogCopy = {
   searchPlaceholder: 'Nama, SKU TokoBoss, barcode, SKU Toko…',
   searchHint:
     'Satu kueri untuk nama, SKU TokoBoss, barcode, petunjuk SKU Toko, dan nama listing.',
+  warehouseFilterLabel: 'Filter gudang',
+  warehouseFilterAll: 'Semua gudang',
   searching: 'Mencari…',
   emptyTitle: 'Belum ada produk',
   emptyBody:
