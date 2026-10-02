@@ -92,6 +92,13 @@
       "when": 1789566500000,
       "tag": "0013_transfer_management",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789600000000,
+      "tag": "0014_variant_replenish_settings",
+      "breakpoints": true
     }
   ]
 }
