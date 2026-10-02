@@ -494,6 +494,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
           currency: (input.currency ?? 'IDR').toUpperCase(),
           hppCents: input.hppCents ?? null,
           costSource: input.costSource ?? null,
+          minStockQty: null,
           listingName: input.listingName ?? null,
         })
         .returning();
