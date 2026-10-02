@@ -9,12 +9,18 @@ import {
   createProduct,
   formatIdr,
   listProducts,
+  listWarehouses,
   primarySku,
   productTotalQty,
   searchCatalog,
   type ProductView,
+  type WarehouseView,
 } from '@/lib/catalog-client';
 import { getCatalogCopy } from '@/lib/catalog-copy';
+import {
+  productHasWarehouseLevel,
+  productQtyForWarehouse,
+} from '@/lib/product-warehouse-filter';
 import { getMyMembership, type MyMembershipView } from '@/lib/team-client';
 import { SkuDrawer } from './SkuDrawer';
 
@@ -75,6 +81,9 @@ export function ProductsPanel() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [warehouses, setWarehouses] = useState<WarehouseView[]>([]);
+  /** Empty string = Semua gudang (total across WH). */
+  const [warehouseFilterId, setWarehouseFilterId] = useState('');
 
   const reauth = useCallback(() => {
     router.replace('/sign-in?expired=1');
@@ -178,6 +187,30 @@ export function ProductsPanel() {
     return () => clearTimeout(timer);
   }, [query, loadedWorkspace, loadList]);
 
+  // Active warehouses for the Produk filter (UTA-143). Soft-fail: keep filter
+  // empty if the list call fails so the product list still works.
+  useEffect(() => {
+    if (!loadedWorkspace) {
+      setWarehouses([]);
+      setWarehouseFilterId('');
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const wh = await listWarehouses(loadedWorkspace);
+        if (cancelled) return;
+        setWarehouses(wh.filter((w) => w.status === 'active'));
+      } catch {
+        if (cancelled) return;
+        setWarehouses([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadedWorkspace]);
+
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!loadedWorkspace) return;
@@ -257,6 +290,18 @@ export function ProductsPanel() {
 
   const role = membership?.role ?? null;
   const canWrite = role === null || role === 'admin' || role === 'manager';
+
+  const visibleProducts = warehouseFilterId
+    ? products.filter((prod) =>
+        productHasWarehouseLevel(prod, warehouseFilterId)
+      )
+    : products;
+
+  function rowQty(prod: ProductView): number {
+    return warehouseFilterId
+      ? productQtyForWarehouse(prod, warehouseFilterId)
+      : productTotalQty(prod);
+  }
 
   return (
     <div data-testid="products-panel">
@@ -347,14 +392,34 @@ export function ProductsPanel() {
             </p>
           ) : null}
 
+          <div className="mt-4" data-testid="warehouse-filter">
+            <label htmlFor="products-warehouse-filter" className={labelClass}>
+              {copy.warehouseFilterLabel}
+            </label>
+            <select
+              id="products-warehouse-filter"
+              data-testid="products-warehouse-filter"
+              className={inputClass}
+              value={warehouseFilterId}
+              onChange={(e) => setWarehouseFilterId(e.target.value)}
+            >
+              <option value="">{copy.warehouseFilterAll}</option>
+              {warehouses.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name} ({w.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
           <section aria-labelledby="products-list-title" className="mt-4">
             <h2
               id="products-list-title"
               className="text-lg font-semibold text-neutral-900"
             >
-              {copy.listTitle} ({products.length})
+              {copy.listTitle} ({visibleProducts.length})
             </h2>
-            {products.length === 0 && !loading ? (
+            {visibleProducts.length === 0 && !loading ? (
               <div
                 data-testid="products-empty"
                 className="mt-2 rounded-2xl border border-dashed border-neutral-300 bg-white p-6 text-center"
@@ -368,7 +433,7 @@ export function ProductsPanel() {
               </div>
             ) : (
               <ul data-testid="products-list" className="mt-2 grid gap-3">
-                {products.map((p) => (
+                {visibleProducts.map((p) => (
                   <li
                     key={p.id}
                     data-testid="product-row"
@@ -404,7 +469,7 @@ export function ProductsPanel() {
                           data-testid="product-total-qty"
                           className="font-mono text-lg font-bold text-neutral-900"
                         >
-                          {productTotalQty(p)}
+                          {rowQty(p)}
                         </p>
                         <p className="text-neutral-500">
                           {p.status === 'archived'
