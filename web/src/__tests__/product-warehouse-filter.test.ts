@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { ProductView } from '../lib/catalog-client';
+import type { ProductView, WarehouseView } from '../lib/catalog-client';
 import {
   productHasWarehouseLevel,
   productQtyForWarehouse,
+  summarizeWarehouseQtys,
 } from '../lib/product-warehouse-filter';
 
 function productWithLevels(
@@ -46,6 +47,24 @@ function productWithLevels(
   };
 }
 
+function warehouse(
+  id: string,
+  name: string,
+  code: string,
+  status: 'active' | 'deactivated' = 'active'
+): WarehouseView {
+  return {
+    id,
+    workspaceId: 'ws_1',
+    name,
+    code,
+    status,
+    version: 1,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
 describe('product-warehouse-filter (UTA-143)', () => {
   it('productHasWarehouseLevel is true when a level row exists even at qty 0', () => {
     const p = productWithLevels([[{ warehouseId: 'wh_a', qty: 0 }]]);
@@ -64,5 +83,48 @@ describe('product-warehouse-filter (UTA-143)', () => {
     expect(productQtyForWarehouse(p, 'wh_a')).toBe(5);
     expect(productQtyForWarehouse(p, 'wh_b')).toBe(9);
     expect(productQtyForWarehouse(p, 'wh_missing')).toBe(0);
+  });
+
+  it('summarizeWarehouseQtys aggregates qty per warehouse across products', () => {
+    const products: ProductView[] = [
+      productWithLevels([
+        [
+          { warehouseId: 'wh_a', qty: 10 },
+          { warehouseId: 'wh_b', qty: 5 },
+        ],
+      ]),
+      productWithLevels([[{ warehouseId: 'wh_a', qty: 3 }]]),
+    ];
+    const warehouses: WarehouseView[] = [
+      warehouse('wh_a', 'Main WH', 'MAIN'),
+      warehouse('wh_b', 'Secondary WH', 'SEC'),
+    ];
+    const summary = summarizeWarehouseQtys(products, warehouses);
+    expect(summary).toEqual([
+      { warehouseId: 'wh_a', name: 'Main WH', code: 'MAIN', totalQty: 13 },
+      { warehouseId: 'wh_b', name: 'Secondary WH', code: 'SEC', totalQty: 5 },
+    ]);
+  });
+
+  it('summarizeWarehouseQtys shows 0 for warehouses with no product levels', () => {
+    const products: ProductView[] = [
+      productWithLevels([[{ warehouseId: 'wh_a', qty: 2 }]]),
+    ];
+    const warehouses: WarehouseView[] = [
+      warehouse('wh_a', 'Main WH', 'MAIN'),
+      warehouse('wh_b', 'Empty WH', 'EMP'),
+    ];
+    const summary = summarizeWarehouseQtys(products, warehouses);
+    expect(summary[1]!.totalQty).toBe(0);
+  });
+
+  it('summarizeWarehouseQtys preserves warehouse ordering', () => {
+    const products: ProductView[] = [];
+    const warehouses: WarehouseView[] = [
+      warehouse('wh_c', 'C', 'C'),
+      warehouse('wh_a', 'A', 'A'),
+    ];
+    const summary = summarizeWarehouseQtys(products, warehouses);
+    expect(summary.map((s) => s.warehouseId)).toEqual(['wh_c', 'wh_a']);
   });
 });
