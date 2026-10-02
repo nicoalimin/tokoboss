@@ -49,6 +49,7 @@ const CHAIN = [
   '0010_product_imports.sql',
   '0011_bundle_bom.sql',
   '0012_stock_ledger_hardening.sql',
+  '0014_variant_replenish_settings.sql',
 ];
 
 async function createMigratedDb() {

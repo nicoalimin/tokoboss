@@ -39,6 +39,7 @@ const CHAIN = [
   '0008_user_profiles.sql',
   '0009_catalog_skus.sql',
   '0010_product_imports.sql',
+  '0014_variant_replenish_settings.sql',
 ];
 
 async function createMigratedDb() {
