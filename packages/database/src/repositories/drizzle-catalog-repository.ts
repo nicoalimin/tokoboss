@@ -96,6 +96,7 @@ function toVariant(row: CatalogVariantRow): CatalogVariantRecord {
     currency: row.currency,
     hppCents: row.hppCents,
     costSource: row.costSource,
+    minStockQty: row.minStockQty,
     listingName: row.listingName,
     status: row.status,
     version: row.version,
@@ -303,6 +304,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
             currency: (v.currency ?? 'IDR').toUpperCase(),
             hppCents: v.hppCents ?? null,
             costSource: v.costSource ?? null,
+            minStockQty: null,
             listingName: v.listingName ?? null,
           })
           .returning();
@@ -492,6 +494,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
           currency: (input.currency ?? 'IDR').toUpperCase(),
           hppCents: input.hppCents ?? null,
           costSource: input.costSource ?? null,
+          minStockQty: null,
           listingName: input.listingName ?? null,
         })
         .returning();
