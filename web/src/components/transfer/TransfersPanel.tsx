@@ -14,6 +14,7 @@ import {
   sendTransfer,
   receiveTransfer,
   cancelTransfer,
+  type ReceiveTransferItemInput,
   type TransferItemView,
   type TransferView,
   type TransferStatus,
@@ -46,6 +47,8 @@ const sendConflictError =
 const receiveGenericError = 'Gagal menerima transfer. Silakan coba lagi.';
 const receiveConflictError =
   'Data transfer sudah berubah. Muat ulang lalu coba terima lagi.';
+const receiveQtyValidationError =
+  'Jumlah diterima dan rusak harus bilangan bulat non-negatif.';
 const cancelGenericError = 'Gagal membatalkan transfer. Silakan coba lagi.';
 const cancelConflictError =
   'Data transfer sudah berubah. Muat ulang lalu coba batalkan lagi.';
@@ -135,6 +138,67 @@ export function canReceiveSent(
   if (role !== 'admin' && role !== 'manager') return false;
   if (status !== 'sent') return false;
   return true;
+}
+
+export type ReceiveLineQtyValues = {
+  receivedQty: string;
+  damagedQty: string;
+};
+
+/** Sent qty for a line: prefer sentQty, else requestedQty. */
+export function sentQtyForReceiveLine(
+  item: Pick<TransferItemView, 'sentQty' | 'requestedQty'>
+): number {
+  return item.sentQty > 0 ? item.sentQty : item.requestedQty;
+}
+
+/** Defaults when selection/items load: received = sent, damaged = 0. */
+export function defaultReceiveLineQtys(
+  item: Pick<TransferItemView, 'sentQty' | 'requestedQty'>
+): ReceiveLineQtyValues {
+  return {
+    receivedQty: String(sentQtyForReceiveLine(item)),
+    damagedQty: '0',
+  };
+}
+
+/**
+ * Pure builder + validator for partial/damaged receive payload (UTA-145).
+ * Returns items[] or a Bahasa Indonesia error for NaN/negatives.
+ */
+export function buildReceiveTransferItems(
+  items: Array<Pick<TransferItemView, 'id' | 'sentQty' | 'requestedQty'>>,
+  qtysByItemId: Record<string, ReceiveLineQtyValues>
+): { items: ReceiveTransferItemInput[] } | { error: string } {
+  const out: ReceiveTransferItemInput[] = [];
+  for (const item of items) {
+    const draft = qtysByItemId[item.id] ?? defaultReceiveLineQtys(item);
+    const receivedRaw = draft.receivedQty.trim();
+    const damagedRaw =
+      draft.damagedQty.trim() === '' ? '0' : draft.damagedQty.trim();
+    if (!/^\d+$/.test(receivedRaw) || !/^\d+$/.test(damagedRaw)) {
+      return { error: receiveQtyValidationError };
+    }
+    const receivedQty = Number.parseInt(receivedRaw, 10);
+    const damagedQty = Number.parseInt(damagedRaw, 10);
+    if (
+      !Number.isFinite(receivedQty) ||
+      !Number.isFinite(damagedQty) ||
+      receivedQty < 0 ||
+      damagedQty < 0
+    ) {
+      return { error: receiveQtyValidationError };
+    }
+    const entry: ReceiveTransferItemInput = {
+      itemId: item.id,
+      receivedQty,
+    };
+    if (damagedQty > 0) {
+      entry.damagedQty = damagedQty;
+    }
+    out.push(entry);
+  }
+  return { items: out };
 }
 
 /**
@@ -271,6 +335,11 @@ export function TransfersPanel() {
   // Receive transfer state (UTA-141)
   const [receiving, setReceiving] = useState(false);
   const [receiveError, setReceiveError] = useState<string | null>(null);
+
+  // Partial/damaged receive line editor (UTA-145)
+  const [receiveLineQtys, setReceiveLineQtys] = useState<
+    Record<string, ReceiveLineQtyValues>
+  >({});
 
   // Cancel transfer state (UTA-142)
   const [cancelling, setCancelling] = useState(false);
@@ -679,6 +748,63 @@ export function TransfersPanel() {
     }
   }
 
+  // ── UTA-145: Partial / damaged receive (per-line items[]) ───────────
+
+  async function onPartialReceive(e: React.FormEvent) {
+    e.preventDefault();
+    if (
+      !workspaceId ||
+      !canWrite ||
+      !selectedTransferId ||
+      !selectedTransfer ||
+      selectedTransfer.status !== 'sent'
+    ) {
+      return;
+    }
+    if (!role || !canReceiveSent(role, selectedTransfer.status)) return;
+    if (selectedItems.length === 0) return;
+
+    const built = buildReceiveTransferItems(selectedItems, receiveLineQtys);
+    if ('error' in built) {
+      setReceiveError(built.error);
+      return;
+    }
+
+    if (!confirm('Terima transfer sebagian?')) return;
+
+    setReceiving(true);
+    setReceiveError(null);
+
+    try {
+      const result = await receiveTransfer(workspaceId, selectedTransferId, {
+        expectedVersion: selectedTransfer.version,
+        items: built.items,
+      });
+      setTransfers((prev) =>
+        prev.map((t) => (t.id === result.transfer.id ? result.transfer : t))
+      );
+      setSelectedTransfer(result.transfer);
+      setSelectedItems(result.items);
+      setTimeout(() => {
+        clearDraftSelection();
+      }, 1500);
+    } catch (err) {
+      if (handleAuthError(err)) return;
+      if (err instanceof CatalogClientError) {
+        if (err.status === 409) {
+          setReceiveError(receiveConflictError);
+          void loadDraftDetail(workspaceId, selectedTransferId);
+          return;
+        }
+        setReceiveError(err.message);
+        return;
+      }
+      setReceiveError(receiveGenericError);
+    } finally {
+      setReceiving(false);
+    }
+  }
+
   // ── UTA-142: Cancel transfer (draft | sent) ─────────────────────────
 
   async function onCancel(e: React.FormEvent) {
@@ -735,6 +861,19 @@ export function TransfersPanel() {
       transfers.some(
         (t) => t.id === selectedTransferId && t.status === 'sent'
       ));
+
+  // Defaults for partial receive line editor when sent selection/items load.
+  useEffect(() => {
+    if (!sentSelected || selectedItems.length === 0) {
+      setReceiveLineQtys({});
+      return;
+    }
+    const next: Record<string, ReceiveLineQtyValues> = {};
+    for (const item of selectedItems) {
+      next[item.id] = defaultReceiveLineQtys(item);
+    }
+    setReceiveLineQtys(next);
+  }, [selectedTransferId, selectedItems, sentSelected]);
 
   return (
     <div data-testid="transfers-panel">
@@ -1378,15 +1517,120 @@ export function TransfersPanel() {
                       {receiveError}
                     </p>
                   ) : null}
+
+                  {selectedItems.length > 0 ? (
+                    <div data-testid="transfer-receive-lines" className="mb-4">
+                      <p className="mb-3 text-sm text-neutral-600">
+                        Terima per baris: isi jumlah diterima dan rusak
+                        (opsional), lalu kirim.
+                      </p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[32rem] text-left text-sm">
+                          <thead>
+                            <tr className="border-b border-neutral-200">
+                              <th className="pb-2 font-semibold text-neutral-700">
+                                SKU
+                              </th>
+                              <th className="pb-2 font-semibold text-neutral-700">
+                                Dikirim
+                              </th>
+                              <th className="pb-2 font-semibold text-neutral-700">
+                                Diterima
+                              </th>
+                              <th className="pb-2 font-semibold text-neutral-700">
+                                Rusak
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedItems.map((item) => {
+                              const sentQty = sentQtyForReceiveLine(item);
+                              const line =
+                                receiveLineQtys[item.id] ??
+                                defaultReceiveLineQtys(item);
+                              return (
+                                <tr
+                                  key={item.id}
+                                  data-testid="transfer-receive-line-row"
+                                  className="border-b border-neutral-100"
+                                >
+                                  <td className="py-2 pr-2 font-mono text-neutral-900">
+                                    {getSkuLabel(item.variantId)}
+                                  </td>
+                                  <td className="py-2 pr-2 text-neutral-800">
+                                    {sentQty}
+                                  </td>
+                                  <td className="py-2 pr-2">
+                                    <input
+                                      type="number"
+                                      inputMode="numeric"
+                                      min={0}
+                                      step={1}
+                                      aria-label={`Jumlah diterima ${getSkuLabel(item.variantId)}`}
+                                      data-testid={`transfer-receive-qty-${item.id}`}
+                                      value={line.receivedQty}
+                                      onChange={(ev) =>
+                                        setReceiveLineQtys((prev) => ({
+                                          ...prev,
+                                          [item.id]: {
+                                            ...line,
+                                            receivedQty: ev.target.value,
+                                          },
+                                        }))
+                                      }
+                                      disabled={receiving}
+                                      className={inputClass}
+                                    />
+                                  </td>
+                                  <td className="py-2">
+                                    <input
+                                      type="number"
+                                      inputMode="numeric"
+                                      min={0}
+                                      step={1}
+                                      aria-label={`Jumlah rusak ${getSkuLabel(item.variantId)}`}
+                                      data-testid={`transfer-damaged-qty-${item.id}`}
+                                      value={line.damagedQty}
+                                      onChange={(ev) =>
+                                        setReceiveLineQtys((prev) => ({
+                                          ...prev,
+                                          [item.id]: {
+                                            ...line,
+                                            damagedQty: ev.target.value,
+                                          },
+                                        }))
+                                      }
+                                      disabled={receiving}
+                                      className={inputClass}
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <button
+                        type="button"
+                        data-testid="transfer-partial-receive-button"
+                        onClick={(e) => void onPartialReceive(e)}
+                        disabled={receiving || cancelling}
+                        className={`${primaryButtonClass} mt-3`}
+                      >
+                        {receiving ? 'Menerima…' : 'Terima sebagian / rusak'}
+                      </button>
+                    </div>
+                  ) : null}
+
                   <p className="mb-3 text-sm text-neutral-600">
-                    Terima seluruh item transfer ini di gudang tujuan.
+                    Atau terima seluruh item transfer ini di gudang tujuan.
                   </p>
                   <button
                     type="button"
                     data-testid="transfer-receive-button"
                     onClick={(e) => void onReceive(e)}
-                    disabled={receiving}
-                    className={primaryButtonClass}
+                    disabled={receiving || cancelling}
+                    className={secondaryButtonClass}
                   >
                     {receiving ? 'Menerima…' : 'Terima transfer'}
                   </button>
