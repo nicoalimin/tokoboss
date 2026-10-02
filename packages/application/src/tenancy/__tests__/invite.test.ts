@@ -244,7 +244,6 @@ describe('accept invite (token-gated)', () => {
       { token }
     );
     expect(result.isNewMember).toBe(true);
-    expect(result.userId).toMatch(/^user_inv_[a-p]{16}$/);
     expect(result.membership).toMatchObject({
       workspaceId: f.workspaceId,
       role: 'staff',

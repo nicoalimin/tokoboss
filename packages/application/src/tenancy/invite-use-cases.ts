@@ -344,15 +344,7 @@ export interface AcceptInviteResult {
 }
 
 function generateInviteUserId(): string {
-  // Keep generated opaque ids out of the numeric alphabet. A hexadecimal
-  // suffix can randomly contain a phone- or NIK-shaped run, which the audit
-  // PII guard correctly rejects even though the value is only an identifier.
-  // Encoding each nibble as a letter preserves the full 64 bits of entropy.
-  const alphabet = 'abcdefghijklmnop';
-  const suffix = Array.from(randomBytes(8), (byte) => {
-    return `${alphabet[byte >> 4]}${alphabet[byte & 0x0f]}`;
-  }).join('');
-  return `user_inv_${suffix}`;
+  return `user_inv_${randomBytes(8).toString('hex')}`;
 }
 
 function assertAcceptablePassword(
