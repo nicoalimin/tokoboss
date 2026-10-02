@@ -20,6 +20,7 @@ import { getCatalogCopy } from '@/lib/catalog-copy';
 import {
   productHasWarehouseLevel,
   productQtyForWarehouse,
+  summarizeWarehouseQtys,
 } from '@/lib/product-warehouse-filter';
 import { getMyMembership, type MyMembershipView } from '@/lib/team-client';
 import { SkuDrawer } from './SkuDrawer';
@@ -411,6 +412,71 @@ export function ProductsPanel() {
               ))}
             </select>
           </div>
+
+          {/* Warehouse summary strip (UTA-144) — derived from full loaded products */}
+          {warehouses.length > 0 && products.length > 0 ? (
+            <div
+              data-testid="warehouse-summary"
+              className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4"
+            >
+              <p className="text-sm font-medium text-neutral-700 mb-2">
+                {copy.warehouseSummaryTitle}
+              </p>
+              <div
+                className="flex flex-wrap gap-2"
+                role="group"
+                aria-label={copy.warehouseSummaryTitle}
+              >
+                {summarizeWarehouseQtys(products, warehouses).map((s) => (
+                  <button
+                    key={s.warehouseId}
+                    type="button"
+                    data-selected={
+                      s.warehouseId === warehouseFilterId ? 'true' : 'false'
+                    }
+                    aria-pressed={s.warehouseId === warehouseFilterId}
+                    onClick={() => setWarehouseFilterId(s.warehouseId)}
+                    className={`
+                      inline-flex flex-col items-center rounded-lg border px-3 py-2 text-sm
+                      min-h-[44px] transition-colors
+                      ${
+                        s.warehouseId === warehouseFilterId
+                          ? 'border-primary-500 bg-primary-500/10 text-primary-700 font-semibold'
+                          : 'border-neutral-200 bg-neutral-50 text-neutral-700 hover:bg-neutral-100'
+                      }
+                    `}
+                  >
+                    <span className="text-xs font-medium">{s.name}</span>
+                    <span className="text-xs text-neutral-500">
+                      ( {s.code} )
+                    </span>
+                    <span className="font-mono font-bold text-base">
+                      {s.totalQty}
+                    </span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  data-selected={warehouseFilterId === '' ? 'true' : 'false'}
+                  aria-pressed={warehouseFilterId === ''}
+                  onClick={() => setWarehouseFilterId('')}
+                  className={`
+                    inline-flex flex-col items-center rounded-lg border px-3 py-2 text-sm
+                    min-h-[44px] transition-colors
+                    ${
+                      warehouseFilterId === ''
+                        ? 'border-neutral-400 bg-neutral-100 text-neutral-900 font-semibold'
+                        : 'border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50'
+                    }
+                  `}
+                >
+                  <span className="text-xs font-medium">
+                    {copy.warehouseFilterAll}
+                  </span>
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <section aria-labelledby="products-list-title" className="mt-4">
             <h2
