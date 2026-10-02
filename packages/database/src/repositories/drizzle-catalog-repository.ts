@@ -97,6 +97,7 @@ function toVariant(row: CatalogVariantRow): CatalogVariantRecord {
     hppCents: row.hppCents,
     costSource: row.costSource,
     minStockQty: row.minStockQty,
+    leadTimeDays: row.leadTimeDays,
     listingName: row.listingName,
     status: row.status,
     version: row.version,
@@ -305,6 +306,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
             hppCents: v.hppCents ?? null,
             costSource: v.costSource ?? null,
             minStockQty: null,
+            leadTimeDays: null,
             listingName: v.listingName ?? null,
           })
           .returning();
@@ -495,6 +497,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
           hppCents: input.hppCents ?? null,
           costSource: input.costSource ?? null,
           minStockQty: null,
+          leadTimeDays: null,
           listingName: input.listingName ?? null,
         })
         .returning();
