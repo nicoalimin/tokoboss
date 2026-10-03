@@ -602,6 +602,8 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       sellingPriceCents?: number;
       hppCents?: number | null;
       costSource?: string | null;
+      minStockQty?: number | null;
+      leadTimeDays?: number | null;
       listingName?: string | null;
       status?: CatalogStatus;
     },
@@ -643,6 +645,12 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       ...(patch.hppCents !== undefined ? { hppCents: patch.hppCents } : {}),
       ...(patch.costSource !== undefined
         ? { costSource: patch.costSource }
+        : {}),
+      ...(patch.minStockQty !== undefined
+        ? { minStockQty: patch.minStockQty }
+        : {}),
+      ...(patch.leadTimeDays !== undefined
+        ? { leadTimeDays: patch.leadTimeDays }
         : {}),
       ...(patch.listingName !== undefined
         ? { listingName: patch.listingName }
