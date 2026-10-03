@@ -201,6 +201,42 @@ export type UpdateStockSettingsBody = z.infer<
   typeof UpdateStockSettingsBodySchema
 >;
 
+/** PATCH /api/.../variants/:variantId/replenish-settings (Manager/Admin) */
+export const UpdateReplenishSettingsBodySchema = z
+  .object({
+    minStockQty: z.number().int().nonnegative().nullable().optional(),
+    leadTimeDays: z.number().int().nonnegative().nullable().optional(),
+    expectedVersion: z.number().int().positive(),
+  })
+  .refine((v) => v.minStockQty !== undefined || v.leadTimeDays !== undefined, {
+    message: 'Nothing to update.',
+  });
+export type UpdateReplenishSettingsBody = z.infer<
+  typeof UpdateReplenishSettingsBodySchema
+>;
+
+/** POST /api/.../replenish-settings/bulk (Manager/Admin) */
+export const BulkUpdateReplenishSettingsBodySchema = z.object({
+  items: z
+    .array(
+      z
+        .object({
+          variantId: z.string().min(1),
+          minStockQty: z.number().int().nonnegative().nullable().optional(),
+          leadTimeDays: z.number().int().nonnegative().nullable().optional(),
+          expectedVersion: z.number().int().positive(),
+        })
+        .refine(
+          (v) => v.minStockQty !== undefined || v.leadTimeDays !== undefined,
+          { message: 'Nothing to update.' }
+        )
+    )
+    .min(1),
+});
+export type BulkUpdateReplenishSettingsBody = z.infer<
+  typeof BulkUpdateReplenishSettingsBodySchema
+>;
+
 // Channel mappings (stub-ready, no live marketplace calls)
 
 /** POST /api/.../variants/:variantId/mappings (Admin/Manager) */
@@ -254,6 +290,8 @@ export const VariantViewSchema = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   levels: z.array(InventoryLevelViewSchema).optional(),
+  minStockQty: z.number().int().nonnegative().nullable().optional(),
+  leadTimeDays: z.number().int().nonnegative().nullable().optional(),
 });
 export type VariantView = z.infer<typeof VariantViewSchema>;
 
