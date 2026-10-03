@@ -597,6 +597,8 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       sellingPriceCents?: number;
       hppCents?: number | null;
       costSource?: string | null;
+      minStockQty?: number | null;
+      leadTimeDays?: number | null;
       listingName?: string | null;
       status?: CatalogStatus;
     },
