@@ -72,8 +72,7 @@ describe('updateVariant minStockQty and leadTimeDays (Story 11 / UTA-146)', () =
         },
       ],
     });
-    const variant = created.variants[0];
-    expect(variant).toBeDefined();
+    const variant = created.variants[0]!;
 
     const updated = await store.updateVariant(
       WS,
@@ -119,8 +118,7 @@ describe('updateVariant minStockQty and leadTimeDays (Story 11 / UTA-146)', () =
         },
       ],
     });
-    const variant = created.variants[0];
-    expect(variant).toBeDefined();
+    const variant = created.variants[0]!;
 
     await expect(
       store.updateVariant(
