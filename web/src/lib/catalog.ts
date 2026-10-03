@@ -289,6 +289,8 @@ export function toVariantView(
     createdAt: iso(v.createdAt),
     updatedAt: iso(v.updatedAt),
     ...(levels !== undefined ? { levels: levels.map(toLevelView) } : {}),
+    minStockQty: v.minStockQty ?? null,
+    leadTimeDays: v.leadTimeDays ?? null,
   };
 }
 
