@@ -611,6 +611,113 @@ export async function updateVariant(
   );
 }
 
+/**
+ * Replenish-settings update helpers (UTA-176, Story 11).
+ *
+ * Private cleaner mirroring `cleanPriceCents` — nullable non-negative
+ * integer, matching the `hppCents` / `minStockQty` / `leadTimeDays`
+ * shape already used by stores.
+ */
+function cleanNonNegativeIntNullable(
+  value: unknown,
+  field: string
+): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw catalogValidation(`${field} must be a non-negative integer`);
+  }
+  return value;
+}
+
+export async function updateVariantReplenishSettings(
+  store: CatalogStore,
+  input: {
+    ctx: WorkspaceContext;
+    workspaceId: string;
+    variantId: string;
+    minStockQty?: unknown;
+    leadTimeDays?: unknown;
+    expectedVersion: number;
+  }
+): Promise<CatalogVariantRecord> {
+  assertSameWorkspace(input.ctx, input.workspaceId);
+  assertManagerOrAdmin(input.ctx);
+
+  const variant = await store.findVariantById(
+    input.workspaceId,
+    input.variantId
+  );
+  if (!variant) throw catalogNotFound('Variant');
+
+  const patch: {
+    minStockQty?: number | null;
+    leadTimeDays?: number | null;
+  } = {};
+
+  const cleanedMinStockQty = cleanNonNegativeIntNullable(
+    input.minStockQty,
+    'Min stock qty'
+  );
+  if (cleanedMinStockQty !== undefined) {
+    patch.minStockQty = cleanedMinStockQty;
+  }
+
+  const cleanedLeadTimeDays = cleanNonNegativeIntNullable(
+    input.leadTimeDays,
+    'Lead time days'
+  );
+  if (cleanedLeadTimeDays !== undefined) {
+    patch.leadTimeDays = cleanedLeadTimeDays;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    throw catalogValidation('Nothing to update.');
+  }
+
+  return store.updateVariant(
+    input.workspaceId,
+    input.variantId,
+    patch,
+    input.expectedVersion
+  );
+}
+
+export async function bulkUpdateVariantReplenishSettings(
+  store: CatalogStore,
+  input: {
+    ctx: WorkspaceContext;
+    workspaceId: string;
+    items: Array<{
+      variantId: string;
+      minStockQty?: unknown;
+      leadTimeDays?: unknown;
+      expectedVersion: number;
+    }>;
+  }
+): Promise<CatalogVariantRecord[]> {
+  assertSameWorkspace(input.ctx, input.workspaceId);
+  assertManagerOrAdmin(input.ctx);
+
+  if (input.items.length === 0) {
+    throw catalogValidation('Items list must not be empty');
+  }
+
+  const results: CatalogVariantRecord[] = [];
+  for (const item of input.items) {
+    const result = await updateVariantReplenishSettings(store, {
+      ctx: input.ctx,
+      workspaceId: input.workspaceId,
+      variantId: item.variantId,
+      minStockQty: item.minStockQty,
+      leadTimeDays: item.leadTimeDays,
+      expectedVersion: item.expectedVersion,
+    });
+    results.push(result);
+  }
+  return results;
+}
+
 /** Archive a variant (idempotent soft-delete). */
 export async function archiveVariant(
   store: CatalogStore,
