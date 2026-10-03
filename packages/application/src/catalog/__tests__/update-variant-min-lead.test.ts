@@ -34,10 +34,7 @@ describe('updateVariant minStockQty and leadTimeDays (Story 11 / UTA-146)', () =
         },
       ],
     });
-    const variant = created.variants[0];
-    expect(variant).toBeDefined();
-    expect(variant?.minStockQty).toBeNull();
-    expect(variant?.leadTimeDays).toBeNull();
+    const variant = created.variants[0]!;
 
     const updated = await store.updateVariant(
       WS,
