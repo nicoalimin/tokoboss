@@ -7,6 +7,7 @@ import type {
   InventoryLevelRecord,
   NewVariantInput,
   ProductPicture,
+  RecommendationStateStatus,
   StockLedgerRecord,
   StockSettingsRecord,
   TransferItemRecord,
@@ -271,6 +272,23 @@ export interface CatalogStore {
     workspaceId: string,
     variantId: string
   ): Promise<CatalogRecommendationStateRecord | null>;
+
+  /**
+   * Create or CAS-update the per-variant recommendation state.
+   * `expectedVersion` null = create (conflict if a row exists);
+   * number = update only when it matches the stored version.
+   * Throws catalogNotFound('Variant') / catalogVersionConflict.
+   */
+  upsertRecommendationState(
+    workspaceId: string,
+    variantId: string,
+    input: {
+      status: RecommendationStateStatus;
+      snoozedUntil: Date | null;
+      suggestedReorderQtyOverride: number | null;
+    },
+    expectedVersion: number | null
+  ): Promise<CatalogRecommendationStateRecord>;
 
   // Bundle BOM (UTA-79, Story 13)
   //
