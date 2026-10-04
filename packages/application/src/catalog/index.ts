@@ -4,3 +4,4 @@ export * from './catalog-ports';
 export * from './in-memory-catalog-store';
 export * from './catalog-use-cases';
 export * from './low-stock-recommendation';
+export * from './list-low-stock-recommendations';
