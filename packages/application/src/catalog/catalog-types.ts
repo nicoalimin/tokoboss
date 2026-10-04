@@ -173,6 +173,44 @@ export interface ChannelMappingRecord {
   createdAt: Date;
 }
 
+/** Recommendation UI state statuses (UTA-146 Slice 1c / Story 11). */
+export const RECOMMENDATION_STATE_STATUSES = [
+  'active',
+  'dismissed',
+  'snoozed',
+] as const;
+export type RecommendationStateStatus =
+  (typeof RECOMMENDATION_STATE_STATUSES)[number];
+
+export function isRecommendationStateStatus(
+  value: unknown
+): value is RecommendationStateStatus {
+  return (
+    typeof value === 'string' &&
+    (RECOMMENDATION_STATE_STATUSES as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * Per-variant recommendation UI state (UTA-146 Slice 1c / Story 11).
+ *
+ * One row per (workspace, variant). Absent row means default active
+ * (no snooze / no qty override). `snoozedUntil` is set only when status
+ * is `snoozed`. `suggestedReorderQtyOverride` holds a seller edit of
+ * suggested qty.
+ */
+export interface CatalogRecommendationStateRecord {
+  id: string;
+  workspaceId: string;
+  variantId: string;
+  status: RecommendationStateStatus;
+  snoozedUntil: Date | null;
+  suggestedReorderQtyOverride: number | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface NewVariantInput {
   skuCode: string;
   name?: string | null;
