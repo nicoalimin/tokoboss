@@ -21,6 +21,7 @@ import type {
   InventoryLevelRecord,
   NewVariantInput,
   ProductPicture,
+  RecommendationStateStatus,
   StockLedgerRecord,
   StockSettingsRecord,
   TransferItemRecord,
@@ -29,6 +30,7 @@ import type {
   WarehouseRecord,
   WarehouseStatus,
 } from './catalog-types';
+import { isRecommendationStateStatus } from './catalog-types';
 
 function clone<T>(value: T): T {
   if (value instanceof Date) return new Date(value.getTime()) as T;
@@ -1047,6 +1049,87 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     const key = `${workspaceId}:${variantId}`;
     const existing = this.recommendationStates.get(key);
     return existing ? clone(existing) : null;
+  }
+
+  async upsertRecommendationState(
+    workspaceId: string,
+    variantId: string,
+    input: {
+      status: RecommendationStateStatus;
+      snoozedUntil: Date | null;
+      suggestedReorderQtyOverride: number | null;
+    },
+    expectedVersion: number | null
+  ): Promise<CatalogRecommendationStateRecord> {
+    const variant = this.variants.get(variantId);
+    if (!variant || variant.workspaceId !== workspaceId) {
+      throw catalogNotFound('Variant');
+    }
+    if (!isRecommendationStateStatus(input.status)) {
+      throw catalogValidation(
+        `Invalid recommendation status: ${String(input.status)}`
+      );
+    }
+    if (input.status === 'snoozed') {
+      if (
+        !(input.snoozedUntil instanceof Date) ||
+        Number.isNaN(input.snoozedUntil.getTime())
+      ) {
+        throw catalogValidation(
+          'snoozedUntil is required when status is snoozed'
+        );
+      }
+    } else if (input.snoozedUntil !== null) {
+      throw catalogValidation(
+        'snoozedUntil must be null unless status is snoozed'
+      );
+    }
+    if (input.suggestedReorderQtyOverride !== null) {
+      const qty = input.suggestedReorderQtyOverride;
+      if (!Number.isInteger(qty) || qty < 1) {
+        throw catalogValidation(
+          'suggestedReorderQtyOverride must be an integer >= 1'
+        );
+      }
+    }
+
+    const key = `${workspaceId}:${variantId}`;
+    const existing = this.recommendationStates.get(key);
+    const now = new Date();
+
+    if (!existing) {
+      if (expectedVersion !== null) {
+        throw catalogVersionConflict(0);
+      }
+      const created: CatalogRecommendationStateRecord = {
+        id: this.nextId('rec'),
+        workspaceId,
+        variantId,
+        status: input.status,
+        snoozedUntil: input.snoozedUntil,
+        suggestedReorderQtyOverride: input.suggestedReorderQtyOverride,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.recommendationStates.set(key, created);
+      return clone(created);
+    }
+
+    if (expectedVersion !== existing.version) {
+      throw catalogVersionConflict(existing.version);
+    }
+
+    const updated: CatalogRecommendationStateRecord = {
+      ...existing,
+      status: input.status,
+      snoozedUntil: input.snoozedUntil,
+      suggestedReorderQtyOverride: input.suggestedReorderQtyOverride,
+      version: existing.version + 1,
+      updatedAt: now,
+    };
+    this.recommendationStates.set(key, updated);
+    return clone(updated);
   }
 
   // Bundle BOM (UTA-79, Story 13)
