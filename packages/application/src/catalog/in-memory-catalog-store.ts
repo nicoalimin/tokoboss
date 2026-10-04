@@ -14,6 +14,7 @@ import type {
 } from '../bundles/bundle-types';
 import type {
   CatalogProductRecord,
+  CatalogRecommendationStateRecord,
   CatalogStatus,
   CatalogVariantRecord,
   ChannelMappingRecord,
@@ -56,6 +57,10 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
   private levels = new Map<string, InventoryLevelRecord>();
   private ledger: StockLedgerRecord[] = [];
   private mappings = new Map<string, ChannelMappingRecord>();
+  private recommendationStates = new Map<
+    string,
+    CatalogRecommendationStateRecord
+  >();
   // UTA-79: BOM lines keyed by line id; `(bundle, component)` uniqueness
   // is enforced on write (single-threaded memory semantics = atomic).
   private bundleLines = new Map<string, BundleLineRecord>();
@@ -1033,6 +1038,15 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     this.mappingKeyIndex.delete(
       `${record.workspaceId}::${record.channel}::${record.shopExtId}::${record.platformSkuId}`
     );
+  }
+
+  async findRecommendationState(
+    workspaceId: string,
+    variantId: string
+  ): Promise<CatalogRecommendationStateRecord | null> {
+    const key = `${workspaceId}:${variantId}`;
+    const existing = this.recommendationStates.get(key);
+    return existing ? clone(existing) : null;
   }
 
   // Bundle BOM (UTA-79, Story 13)
