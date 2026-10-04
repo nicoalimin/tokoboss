@@ -6,7 +6,6 @@ import {
   catalogValidation,
   catalogVersionConflict,
   isCatalogStatus,
-  isRecommendationStateStatus,
   isWarehouseStatus,
 } from '@tokoboss/application';
 import type {
