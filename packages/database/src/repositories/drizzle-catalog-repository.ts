@@ -17,6 +17,7 @@ import { bundleConflict, bundleVersionConflict } from '@tokoboss/application';
 import type {
   CatalogProductRecord,
   CatalogRecommendationStateRecord,
+  RecommendationStateStatus,
   CatalogStatus,
   CatalogStore,
   CatalogVariantRecord,
@@ -1215,6 +1216,88 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       .limit(1);
     const row = rows[0];
     return row ? toRecommendationState(row) : null;
+  }
+
+  async upsertRecommendationState(
+    workspaceId: string,
+    variantId: string,
+    input: {
+      status: RecommendationStateStatus;
+      snoozedUntil: Date | null;
+      suggestedReorderQtyOverride: number | null;
+    },
+    expectedVersion: number | null
+  ): Promise<CatalogRecommendationStateRecord> {
+    const variant = await this.findVariantById(workspaceId, variantId);
+    if (!variant) {
+      throw catalogNotFound('Variant');
+    }
+    if (!isRecommendationStateStatus(input.status)) {
+      throw catalogValidation(
+        `Invalid recommendation status: ${String(input.status)}`
+      );
+    }
+    if (input.status === 'snoozed') {
+      if (
+        !(input.snoozedUntil instanceof Date) ||
+        Number.isNaN(input.snoozedUntil.getTime())
+      ) {
+        throw catalogValidation(
+          'snoozedUntil is required when status is snoozed'
+        );
+      }
+    } else if (input.snoozedUntil !== null) {
+      throw catalogValidation(
+        'snoozedUntil must be null unless status is snoozed'
+      );
+    }
+    if (input.suggestedReorderQtyOverride !== null) {
+      const qty = input.suggestedReorderQtyOverride;
+      if (!Number.isInteger(qty) || qty < 1) {
+        throw catalogValidation(
+          'suggestedReorderQtyOverride must be an integer >= 1'
+        );
+      }
+    }
+
+    const existingRows = await this.db
+      .select()
+      .from(catalogRecommendationStates)
+      .where(
+        and(
+          eq(catalogRecommendationStates.workspaceId, workspaceId),
+          eq(catalogRecommendationStates.variantId, variantId)
+        )
+      )
+      .limit(1);
+    const existing = existingRows[0];
+
+    if (existing) {
+      // Update/CAS deferred to slice 1c-iv-b2
+      throw catalogVersionConflict(existing.version);
+    }
+
+    if (expectedVersion !== null) {
+      throw catalogVersionConflict(0);
+    }
+
+    const now = new Date();
+    const inserted = await this.db
+      .insert(catalogRecommendationStates)
+      .values({
+        workspaceId,
+        variantId,
+        status: input.status,
+        snoozedUntil: input.snoozedUntil,
+        suggestedReorderQtyOverride: input.suggestedReorderQtyOverride,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    const row = inserted[0];
+    if (!row) throw new Error('Failed to insert recommendation state');
+    return toRecommendationState(row);
   }
 
   // Bundle BOM (UTA-79, Story 13)
