@@ -1272,32 +1272,64 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       .limit(1);
     const existing = existingRows[0];
 
-    if (existing) {
-      // Update/CAS deferred to slice 1c-iv-b2
+    const now = new Date();
+
+    if (!existing) {
+      if (expectedVersion !== null) {
+        throw catalogVersionConflict(0);
+      }
+      const inserted = await this.db
+        .insert(catalogRecommendationStates)
+        .values({
+          workspaceId,
+          variantId,
+          status: input.status,
+          snoozedUntil: input.snoozedUntil,
+          suggestedReorderQtyOverride: input.suggestedReorderQtyOverride,
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
+      const row = inserted[0];
+      if (!row) throw new Error('Failed to insert recommendation state');
+      return toRecommendationState(row);
+    }
+
+    if (expectedVersion !== existing.version) {
       throw catalogVersionConflict(existing.version);
     }
 
-    if (expectedVersion !== null) {
-      throw catalogVersionConflict(0);
-    }
-
-    const now = new Date();
-    const inserted = await this.db
-      .insert(catalogRecommendationStates)
-      .values({
-        workspaceId,
-        variantId,
+    const updated = await this.db
+      .update(catalogRecommendationStates)
+      .set({
         status: input.status,
         snoozedUntil: input.snoozedUntil,
         suggestedReorderQtyOverride: input.suggestedReorderQtyOverride,
-        version: 1,
-        createdAt: now,
+        version: existing.version + 1,
         updatedAt: now,
       })
+      .where(
+        and(
+          eq(catalogRecommendationStates.id, existing.id),
+          eq(catalogRecommendationStates.workspaceId, workspaceId),
+          eq(catalogRecommendationStates.version, existing.version)
+        )
+      )
       .returning();
-    const row = inserted[0];
-    if (!row) throw new Error('Failed to insert recommendation state');
-    return toRecommendationState(row);
+    const row = updated[0];
+    if (row) return toRecommendationState(row);
+    const reread = await this.db
+      .select()
+      .from(catalogRecommendationStates)
+      .where(
+        and(
+          eq(catalogRecommendationStates.workspaceId, workspaceId),
+          eq(catalogRecommendationStates.variantId, variantId)
+        )
+      )
+      .limit(1);
+    throw catalogVersionConflict(reread[0]?.version ?? existing.version);
   }
 
   // Bundle BOM (UTA-79, Story 13)
