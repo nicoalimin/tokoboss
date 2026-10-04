@@ -6,6 +6,7 @@ import {
   jsonb,
   pgTable,
   text,
+  timestamp,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
@@ -234,6 +235,45 @@ export const catalogChannelMappings = pgTable(
   ]
 );
 
+/**
+ * Per-variant recommendation UI state (UTA-146 Slice 1c / Story 11).
+ *
+ * One row per (workspace, variant). `status` is `active` | `dismissed` |
+ * `snoozed`. `snoozedUntil` is set only when status is snoozed.
+ * `suggestedReorderQtyOverride` holds a seller edit of suggested qty.
+ * Absent row means default active (no override).
+ */
+export const catalogRecommendationStates = pgTable(
+  'catalog_recommendation_states',
+  {
+    id: uuidPk(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => catalogVariants.id, { onDelete: 'cascade' }),
+    status: text('status').notNull().default('active'),
+    snoozedUntil: timestamp('snoozed_until', {
+      withTimezone: true,
+      mode: 'date',
+    }),
+    suggestedReorderQtyOverride: integer('suggested_reorder_qty_override'),
+    version: integer('version').notNull().default(1),
+    ...utcTimestamps(),
+  },
+  (t) => [
+    uniqueIndex('catalog_recommendation_states_workspace_variant_unique').on(
+      t.workspaceId,
+      t.variantId
+    ),
+    index('catalog_recommendation_states_workspace_status_idx').on(
+      t.workspaceId,
+      t.status
+    ),
+  ]
+);
+
 export type CatalogProductRow = typeof catalogProducts.$inferSelect;
 export type NewCatalogProductRow = typeof catalogProducts.$inferInsert;
 export type CatalogVariantRow = typeof catalogVariants.$inferSelect;
@@ -246,3 +286,7 @@ export type CatalogStockLedgerRow = typeof catalogStockLedger.$inferSelect;
 export type CatalogStockSettingsRow = typeof catalogStockSettings.$inferSelect;
 export type CatalogChannelMappingRow =
   typeof catalogChannelMappings.$inferSelect;
+export type CatalogRecommendationStateRow =
+  typeof catalogRecommendationStates.$inferSelect;
+export type NewCatalogRecommendationStateRow =
+  typeof catalogRecommendationStates.$inferInsert;
