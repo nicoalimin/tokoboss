@@ -6,6 +6,7 @@ import {
   catalogValidation,
   catalogVersionConflict,
   isCatalogStatus,
+  isRecommendationStateStatus,
   isWarehouseStatus,
 } from '@tokoboss/application';
 import type {
@@ -15,13 +16,14 @@ import type {
 import { bundleConflict, bundleVersionConflict } from '@tokoboss/application';
 import type {
   CatalogProductRecord,
+  CatalogRecommendationStateRecord,
   CatalogStatus,
   CatalogStore,
   CatalogVariantRecord,
   ChannelMappingRecord,
   InventoryLevelRecord,
   NewVariantInput,
-  ProductPicture,
+  RecommendationStateRecord,
   StockLedgerRecord,
   StockSettingsRecord,
   TransferItemRecord,
@@ -38,6 +40,7 @@ import {
   catalogChannelMappings,
   catalogInventoryLevels,
   catalogProducts,
+  catalogRecommendationStates,
   catalogStockLedger,
   catalogStockSettings,
   catalogTransferItems,
@@ -50,6 +53,7 @@ import type {
   CatalogChannelMappingRow,
   CatalogInventoryLevelRow,
   CatalogProductRow,
+  CatalogRecommendationStateRow,
   CatalogStockLedgerRow,
   CatalogStockSettingsRow,
   CatalogTransferItemRow,
@@ -183,6 +187,26 @@ function toBundleLine(row: CatalogBundleLineRow): BundleLineRecord {
     bundleVariantId: row.bundleVariantId,
     componentVariantId: row.componentVariantId,
     qty: row.qty,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function toRecommendationState(
+  row: CatalogRecommendationStateRow
+): CatalogRecommendationStateRecord {
+  if (!isRecommendationStateStatus(row.status)) {
+    throw new Error(
+      `CATALOG_CORRUPT: unknown recommendation state status ${row.status}`
+    );
+  }
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    variantId: row.variantId,
+    status: row.status,
+    note: row.note ?? null,
+    version: row.version,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
