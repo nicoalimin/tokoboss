@@ -1,5 +1,6 @@
 import type {
   CatalogProductRecord,
+  CatalogRecommendationStateRecord,
   CatalogStatus,
   CatalogVariantRecord,
   ChannelMappingRecord,
@@ -259,6 +260,17 @@ export interface CatalogStore {
   countMappings(workspaceId: string, variantId: string): Promise<number>;
 
   deleteMapping(workspaceId: string, mappingId: string): Promise<void>;
+
+  // Recommendation UI state (UTA-146 Slice 1c / Story 11)
+
+  /**
+   * Per-variant recommendation dismiss/snooze/edit row, or null when absent
+   * (absent = default active / no override).
+   */
+  findRecommendationState(
+    workspaceId: string,
+    variantId: string
+  ): Promise<CatalogRecommendationStateRecord | null>;
 
   // Bundle BOM (UTA-79, Story 13)
   //
