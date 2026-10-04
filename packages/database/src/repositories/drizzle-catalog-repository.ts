@@ -6,6 +6,7 @@ import {
   catalogValidation,
   catalogVersionConflict,
   isCatalogStatus,
+  isRecommendationStateStatus,
   isWarehouseStatus,
 } from '@tokoboss/application';
 import type {
@@ -15,6 +16,7 @@ import type {
 import { bundleConflict, bundleVersionConflict } from '@tokoboss/application';
 import type {
   CatalogProductRecord,
+  CatalogRecommendationStateRecord,
   CatalogStatus,
   CatalogStore,
   CatalogVariantRecord,
@@ -38,6 +40,7 @@ import {
   catalogChannelMappings,
   catalogInventoryLevels,
   catalogProducts,
+  catalogRecommendationStates,
   catalogStockLedger,
   catalogStockSettings,
   catalogTransferItems,
@@ -50,6 +53,7 @@ import type {
   CatalogChannelMappingRow,
   CatalogInventoryLevelRow,
   CatalogProductRow,
+  CatalogRecommendationStateRow,
   CatalogStockLedgerRow,
   CatalogStockSettingsRow,
   CatalogTransferItemRow,
@@ -183,6 +187,27 @@ function toBundleLine(row: CatalogBundleLineRow): BundleLineRecord {
     bundleVariantId: row.bundleVariantId,
     componentVariantId: row.componentVariantId,
     qty: row.qty,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function toRecommendationState(
+  row: CatalogRecommendationStateRow
+): CatalogRecommendationStateRecord {
+  if (!isRecommendationStateStatus(row.status)) {
+    throw new Error(
+      `CATALOG_CORRUPT: unknown recommendation state status ${row.status}`
+    );
+  }
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    variantId: row.variantId,
+    status: row.status,
+    snoozedUntil: row.snoozedUntil,
+    suggestedReorderQtyOverride: row.suggestedReorderQtyOverride,
+    version: row.version,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -1172,6 +1197,24 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       )
       .returning({ id: catalogChannelMappings.id });
     if (!rows[0]) throw catalogNotFound('Mapping');
+  }
+
+  async findRecommendationState(
+    workspaceId: string,
+    variantId: string
+  ): Promise<CatalogRecommendationStateRecord | null> {
+    const rows = await this.db
+      .select()
+      .from(catalogRecommendationStates)
+      .where(
+        and(
+          eq(catalogRecommendationStates.workspaceId, workspaceId),
+          eq(catalogRecommendationStates.variantId, variantId)
+        )
+      )
+      .limit(1);
+    const row = rows[0];
+    return row ? toRecommendationState(row) : null;
   }
 
   // Bundle BOM (UTA-79, Story 13)
