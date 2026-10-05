@@ -276,3 +276,57 @@ export interface TransferWithItems {
   transfer: TransferRecord;
   items: TransferItemRecord[];
 }
+
+/**
+ * Draft purchase-order statuses (UTA-146 Slice 1d / Story 11).
+ * Only `draft` exists in Story 11; send/receive belongs to Story 10 / WS6.
+ */
+export const PURCHASE_ORDER_STATUSES = ['draft'] as const;
+export type PurchaseOrderStatus = (typeof PURCHASE_ORDER_STATUSES)[number];
+
+export function isPurchaseOrderStatus(
+  value: unknown
+): value is PurchaseOrderStatus {
+  return (
+    typeof value === 'string' &&
+    (PURCHASE_ORDER_STATUSES as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * Draft purchase-order header (mirrors `catalog_purchase_orders`).
+ * `supplierName` is a nullable stub — never invent a supplier.
+ */
+export interface PurchaseOrderRecord {
+  id: string;
+  workspaceId: string;
+  referenceNum: string;
+  status: PurchaseOrderStatus;
+  supplierName: string | null;
+  notes: string | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Draft purchase-order line (mirrors `catalog_purchase_order_items`).
+ * `unitCostCents` null means missing HPP — flag it, never invent a price.
+ */
+export interface PurchaseOrderItemRecord {
+  id: string;
+  purchaseOrderId: string;
+  workspaceId: string;
+  variantId: string;
+  quantity: number;
+  unitCostCents: number | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Draft purchase-order header plus its line items. */
+export interface PurchaseOrderWithItems {
+  purchaseOrder: PurchaseOrderRecord;
+  items: PurchaseOrderItemRecord[];
+}
