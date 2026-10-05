@@ -25,6 +25,9 @@ import type {
   InventoryLevelRecord,
   NewVariantInput,
   ProductPicture,
+  PurchaseOrderItemRecord,
+  PurchaseOrderRecord,
+  PurchaseOrderWithItems,
   StockLedgerRecord,
   StockSettingsRecord,
   TransferItemRecord,
@@ -40,6 +43,8 @@ import {
   catalogBundleLines,
   catalogChannelMappings,
   catalogInventoryLevels,
+  catalogPurchaseOrderItems,
+  catalogPurchaseOrders,
   catalogProducts,
   catalogRecommendationStates,
   catalogStockLedger,
@@ -54,6 +59,8 @@ import type {
   CatalogChannelMappingRow,
   CatalogInventoryLevelRow,
   CatalogProductRow,
+  CatalogPurchaseOrderItemRow,
+  CatalogPurchaseOrderRow,
   CatalogRecommendationStateRow,
   CatalogStockLedgerRow,
   CatalogStockSettingsRow,
@@ -61,6 +68,7 @@ import type {
   CatalogVariantRow,
   CatalogWarehouseRow,
 } from '../schema/index';
+import { toPurchaseOrder, toPurchaseOrderItem } from './purchase-order-mappers';
 
 type DbOrTx = Transaction | DatabaseHandle;
 
