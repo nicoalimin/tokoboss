@@ -21,6 +21,9 @@ import type {
   InventoryLevelRecord,
   NewVariantInput,
   ProductPicture,
+  PurchaseOrderItemRecord,
+  PurchaseOrderRecord,
+  PurchaseOrderWithItems,
   RecommendationStateStatus,
   StockLedgerRecord,
   StockSettingsRecord,
@@ -71,6 +74,11 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
   private transferItems = new Map<string, TransferItemRecord>();
   // Index: (workspaceId, referenceNum) → transferId for uniqueness check
   private transferReferenceIndex = new Map<string, string>();
+  // UTA-146 Slice 1d: draft purchase orders
+  private purchaseOrders = new Map<string, PurchaseOrderRecord>();
+  private purchaseOrderItems = new Map<string, PurchaseOrderItemRecord>();
+  // Index: (workspaceId, referenceNum) → purchaseOrderId for uniqueness check
+  private purchaseOrderReferenceIndex = new Map<string, string>();
 
   // TransferStore methods
   async createTransferDraft(input: {
@@ -1590,5 +1598,80 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
 
     this.transfers.set(input.transferId, updated);
     return clone(updated);
+  }
+
+  // UTA-146 Slice 1d: draft purchase orders (Story 11 — draft only).
+  async createPurchaseOrderDraft(input: {
+    workspaceId: string;
+    referenceNum: string;
+    supplierName?: string | null;
+    notes?: string | null;
+    items: Array<{
+      variantId: string;
+      quantity: number;
+      unitCostCents?: number | null;
+    }>;
+  }): Promise<PurchaseOrderWithItems> {
+    if (input.items.length === 0) {
+      throw catalogValidation(
+        'A draft purchase order needs at least one item.'
+      );
+    }
+    for (const item of input.items) {
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+        throw catalogValidation(
+          `Quantity must be a positive integer, got ${item.quantity}`
+        );
+      }
+      const cost = item.unitCostCents ?? null;
+      if (cost !== null && (!Number.isInteger(cost) || cost < 0)) {
+        throw catalogValidation(
+          `Unit cost must be a non-negative integer, got ${cost}`
+        );
+      }
+      const variant = this.variants.get(item.variantId);
+      if (!variant || variant.workspaceId !== input.workspaceId) {
+        throw catalogNotFound('Variant');
+      }
+    }
+
+    const refKey = `${input.workspaceId}::${input.referenceNum}`;
+    if (this.purchaseOrderReferenceIndex.has(refKey)) {
+      throw catalogConflict(
+        `Reference number ${input.referenceNum} already exists.`
+      );
+    }
+
+    const now = new Date();
+    const purchaseOrder: PurchaseOrderRecord = {
+      id: this.nextId('po'),
+      workspaceId: input.workspaceId,
+      referenceNum: input.referenceNum,
+      status: 'draft',
+      supplierName: input.supplierName ?? null,
+      notes: input.notes ?? null,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const items: PurchaseOrderItemRecord[] = input.items.map((item) => ({
+      id: this.nextId('poi'),
+      purchaseOrderId: purchaseOrder.id,
+      workspaceId: input.workspaceId,
+      variantId: item.variantId,
+      quantity: item.quantity,
+      unitCostCents: item.unitCostCents ?? null,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    this.purchaseOrders.set(purchaseOrder.id, purchaseOrder);
+    this.purchaseOrderReferenceIndex.set(refKey, purchaseOrder.id);
+    for (const item of items) {
+      this.purchaseOrderItems.set(item.id, item);
+    }
+
+    return { purchaseOrder: clone(purchaseOrder), items: items.map(clone) };
   }
 }
