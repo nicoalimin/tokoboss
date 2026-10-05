@@ -34,3 +34,49 @@ export const LowStockRecommendationListViewSchema = z.object({
 export type LowStockRecommendationListView = z.infer<
   typeof LowStockRecommendationListViewSchema
 >;
+
+/** Recommendation UI states (UTA-146 Slice 1c / Story 11). */
+export const RecommendationStateStatusSchema = z.enum([
+  'active',
+  'dismissed',
+  'snoozed',
+]);
+export type RecommendationStateStatusWire = z.infer<
+  typeof RecommendationStateStatusSchema
+>;
+
+/**
+ * PUT /api/.../catalog/variants/:variantId/recommendation-state
+ * (Manager/Admin). `expectedVersion` null = first write; number = CAS.
+ * `snoozedUntil` is an ISO datetime, required in the future when snoozed
+ * (enforced by the use-case).
+ */
+export const SetRecommendationStateBodySchema = z.object({
+  status: RecommendationStateStatusSchema,
+  snoozedUntil: z.string().datetime().nullable().optional(),
+  suggestedReorderQtyOverride: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional(),
+  expectedVersion: z.number().int().positive().nullable(),
+});
+export type SetRecommendationStateBody = z.infer<
+  typeof SetRecommendationStateBodySchema
+>;
+
+export const RecommendationStateViewSchema = z.object({
+  id: z.string().min(1),
+  workspaceId: z.string().min(1),
+  variantId: z.string().min(1),
+  status: RecommendationStateStatusSchema,
+  snoozedUntil: z.string().datetime().nullable(),
+  suggestedReorderQtyOverride: z.number().int().positive().nullable(),
+  version: z.number().int().positive(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type RecommendationStateView = z.infer<
+  typeof RecommendationStateViewSchema
+>;
