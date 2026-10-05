@@ -10,13 +10,16 @@ import { PUT as putRecommendationState } from '../app/api/workspaces/[workspaceI
 
 /**
  * PUT recommendation-state route (UTA-146 slice 1c-vi-c, Story 11)
- * through the memory wiring: first write, CAS update, stale version.
+ * through the memory wiring: first write, CAS update, stale version,
+ * staff denial, and body validation at the HTTP boundary.
  */
 
 const ADMIN_EMAIL = 'owner@fixture.test';
 const ADMIN_PASSWORD = 'sari-roti-88!';
 const MANAGER_EMAIL = 'manager@fixture.test';
 const MANAGER_PASSWORD = 'manager-noodles-88';
+const STAFF_EMAIL = 'clerk@fixture.test';
+const STAFF_PASSWORD = 'clerk-noodles-99';
 
 function apiRequest(
   path: string,
@@ -51,6 +54,7 @@ describe('PUT recommendation-state route (memory wiring)', () => {
   let workspaceId: string;
   let adminToken: string;
   let managerToken: string;
+  let staffToken: string;
   let variantId: string;
 
   async function signInToken(email: string, password: string): Promise<string> {
@@ -110,7 +114,9 @@ describe('PUT recommendation-state route (memory wiring)', () => {
     }));
     adminToken = await signInToken(ADMIN_EMAIL, ADMIN_PASSWORD);
     await provisionUser(MANAGER_EMAIL, 'manager', MANAGER_PASSWORD);
+    await provisionUser(STAFF_EMAIL, 'staff', STAFF_PASSWORD);
     managerToken = await signInToken(MANAGER_EMAIL, MANAGER_PASSWORD);
+    staffToken = await signInToken(STAFF_EMAIL, STAFF_PASSWORD);
 
     const created = await createProduct(
       apiRequest(
@@ -171,5 +177,30 @@ describe('PUT recommendation-state route (memory wiring)', () => {
     expect(stale.status).toBe(409);
     const staleBody = (await stale.json()) as { errorCode: string };
     expect(staleBody.errorCode).toBe('CATALOG_VERSION_CONFLICT');
+  });
+
+  it('denies Staff (403) and rejects invalid bodies (400)', async () => {
+    const denied = await put(staffToken, {
+      status: 'dismissed',
+      expectedVersion: null,
+    });
+    expect(denied.status).toBe(403);
+
+    const badStatus = await put(managerToken, {
+      status: 'bogus',
+      expectedVersion: null,
+    });
+    expect(badStatus.status).toBe(400);
+    const badStatusBody = (await badStatus.json()) as { errorCode: string };
+    expect(badStatusBody.errorCode).toBe('CATALOG_VALIDATION');
+
+    const pastSnooze = await put(managerToken, {
+      status: 'snoozed',
+      snoozedUntil: '2020-01-01T00:00:00.000Z',
+      expectedVersion: null,
+    });
+    expect(pastSnooze.status).toBe(400);
+    const pastSnoozeBody = (await pastSnooze.json()) as { errorCode: string };
+    expect(pastSnoozeBody.errorCode).toBe('CATALOG_VALIDATION');
   });
 });
