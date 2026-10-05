@@ -14,6 +14,7 @@ export * from './bundles';
 export * from './product-imports';
 export * from './legacy-store';
 export * from './transfers';
+export * from './purchase-orders';
 
 import { auditEvents } from './audit-events';
 import { authPasswordResets, authSessions, authUsers } from './auth';
@@ -37,6 +38,10 @@ import { userProfiles } from './user-profiles';
 import { workspaceInvites } from './workspace-invites';
 import { workspaceMembers } from './workspace-members';
 import { catalogTransferItems, catalogTransfers } from './transfers';
+import {
+  catalogPurchaseOrderItems,
+  catalogPurchaseOrders,
+} from './purchase-orders';
 
 export const schema = {
   tenants,
@@ -66,4 +71,6 @@ export const schema = {
   catalogBundleLines,
   catalogTransfers,
   catalogTransferItems,
+  catalogPurchaseOrders,
+  catalogPurchaseOrderItems,
 };
