@@ -7,6 +7,7 @@ import type {
   InventoryLevelRecord,
   NewVariantInput,
   ProductPicture,
+  PurchaseOrderWithItems,
   RecommendationStateStatus,
   StockLedgerRecord,
   StockSettingsRecord,
@@ -289,6 +290,25 @@ export interface CatalogStore {
     },
     expectedVersion: number | null
   ): Promise<CatalogRecommendationStateRecord>;
+
+  // Draft purchase orders (UTA-146 Slice 1d / Story 11 — draft only)
+
+  /**
+   * Create a draft purchase order (header + lines) in one unit of work.
+   * Throws catalogValidation (empty items, bad quantity/cost),
+   * catalogNotFound('Variant'), or catalogConflict (duplicate referenceNum).
+   */
+  createPurchaseOrderDraft(input: {
+    workspaceId: string;
+    referenceNum: string;
+    supplierName?: string | null;
+    notes?: string | null;
+    items: Array<{
+      variantId: string;
+      quantity: number;
+      unitCostCents?: number | null;
+    }>;
+  }): Promise<PurchaseOrderWithItems>;
 
   // Bundle BOM (UTA-79, Story 13)
   //
