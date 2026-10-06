@@ -25,6 +25,7 @@ import type {
   InventoryLevelRecord,
   NewVariantInput,
   ProductPicture,
+  PurchaseOrderWithItems,
   StockLedgerRecord,
   StockSettingsRecord,
   TransferItemRecord,
@@ -61,6 +62,12 @@ import type {
   CatalogVariantRow,
   CatalogWarehouseRow,
 } from '../schema/index';
+
+import {
+  assertPurchaseOrderDraftItems,
+  insertPurchaseOrderDraftRows,
+} from './purchase-order-draft-writer';
+import type { PurchaseOrderDraftInput } from './purchase-order-draft-writer';
 
 type DbOrTx = Transaction | DatabaseHandle;
 
@@ -1528,6 +1535,28 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       const row = inserted[0];
       if (!row) throw new Error('Failed to insert transfer');
       return toTransfer(row);
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+      throw catalogConflict(
+        `Reference number ${input.referenceNum} already exists.`
+      );
+    }
+  }
+
+  // UTA-146 Slice 1d: draft purchase orders (Story 11 — draft only).
+  async createPurchaseOrderDraft(
+    input: PurchaseOrderDraftInput
+  ): Promise<PurchaseOrderWithItems> {
+    assertPurchaseOrderDraftItems(input.items);
+    for (const item of input.items) {
+      const variant = await this.findVariantById(
+        input.workspaceId,
+        item.variantId
+      );
+      if (!variant) throw catalogNotFound('Variant');
+    }
+    try {
+      return await this.inTx((tx) => insertPurchaseOrderDraftRows(tx, input));
     } catch (err) {
       if (!isUniqueViolation(err)) throw err;
       throw catalogConflict(
