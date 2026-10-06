@@ -1,4 +1,11 @@
 import { catalogValidation } from '@tokoboss/application';
+import type { PurchaseOrderWithItems } from '@tokoboss/application';
+import type { DatabaseHandle, Transaction } from '../db';
+import {
+  catalogPurchaseOrderItems,
+  catalogPurchaseOrders,
+} from '../schema/index';
+import { toPurchaseOrder, toPurchaseOrderItem } from './purchase-order-mappers';
 
 /**
  * Draft purchase order helpers (UTA-146 Slice 1d / Story 11 — draft only).
@@ -36,4 +43,41 @@ export function assertPurchaseOrderDraftItems(
       );
     }
   }
+}
+
+/** Inserts the draft header + lines on `tx` (caller owns the transaction). */
+export async function insertPurchaseOrderDraftRows(
+  tx: Transaction | DatabaseHandle,
+  input: PurchaseOrderDraftInput
+): Promise<PurchaseOrderWithItems> {
+  const insertedHeaders = await tx
+    .insert(catalogPurchaseOrders)
+    .values({
+      workspaceId: input.workspaceId,
+      referenceNum: input.referenceNum,
+      status: 'draft',
+      supplierName: input.supplierName ?? null,
+      notes: input.notes ?? null,
+      version: 1,
+    })
+    .returning();
+  const header = insertedHeaders[0];
+  if (!header) throw new Error('Failed to insert purchase order');
+  const insertedItems = await tx
+    .insert(catalogPurchaseOrderItems)
+    .values(
+      input.items.map((item) => ({
+        purchaseOrderId: header.id,
+        workspaceId: input.workspaceId,
+        variantId: item.variantId,
+        quantity: item.quantity,
+        unitCostCents: item.unitCostCents ?? null,
+        version: 1,
+      }))
+    )
+    .returning();
+  return {
+    purchaseOrder: toPurchaseOrder(header),
+    items: insertedItems.map(toPurchaseOrderItem),
+  };
 }
