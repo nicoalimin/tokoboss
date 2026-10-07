@@ -110,6 +110,7 @@ function toVariant(row: CatalogVariantRow): CatalogVariantRecord {
     costSource: row.costSource,
     minStockQty: row.minStockQty,
     leadTimeDays: row.leadTimeDays,
+    maxStockQty: row.maxStockQty,
     listingName: row.listingName,
     status: row.status,
     version: row.version,
@@ -632,6 +633,7 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
       costSource?: string | null;
       minStockQty?: number | null;
       leadTimeDays?: number | null;
+      maxStockQty?: number | null;
       listingName?: string | null;
       status?: CatalogStatus;
     },
