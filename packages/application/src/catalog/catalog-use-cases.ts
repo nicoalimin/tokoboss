@@ -638,6 +638,7 @@ export async function updateVariantReplenishSettings(
     variantId: string;
     minStockQty?: unknown;
     leadTimeDays?: unknown;
+    maxStockQty?: unknown;
     expectedVersion: number;
   }
 ): Promise<CatalogVariantRecord> {
@@ -653,6 +654,7 @@ export async function updateVariantReplenishSettings(
   const patch: {
     minStockQty?: number | null;
     leadTimeDays?: number | null;
+    maxStockQty?: number | null;
   } = {};
 
   const cleanedMinStockQty = cleanNonNegativeIntNullable(
@@ -669,6 +671,14 @@ export async function updateVariantReplenishSettings(
   );
   if (cleanedLeadTimeDays !== undefined) {
     patch.leadTimeDays = cleanedLeadTimeDays;
+  }
+
+  const cleanedMaxStockQty = cleanNonNegativeIntNullable(
+    input.maxStockQty,
+    'Max stock qty'
+  );
+  if (cleanedMaxStockQty !== undefined) {
+    patch.maxStockQty = cleanedMaxStockQty;
   }
 
   if (Object.keys(patch).length === 0) {
@@ -692,6 +702,7 @@ export async function bulkUpdateVariantReplenishSettings(
       variantId: string;
       minStockQty?: unknown;
       leadTimeDays?: unknown;
+      maxStockQty?: unknown;
       expectedVersion: number;
     }>;
   }
@@ -711,6 +722,7 @@ export async function bulkUpdateVariantReplenishSettings(
       variantId: item.variantId,
       minStockQty: item.minStockQty,
       leadTimeDays: item.leadTimeDays,
+      maxStockQty: item.maxStockQty,
       expectedVersion: item.expectedVersion,
     });
     results.push(result);
