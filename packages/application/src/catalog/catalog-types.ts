@@ -65,6 +65,8 @@ export interface CatalogVariantRecord {
   minStockQty?: number | null;
   /** Lead time days for replenish (Story 11). Optional until store slices land. */
   leadTimeDays?: number | null;
+  /** Max stock qty cap for replenish (Story 11). Null = no cap. */
+  maxStockQty?: number | null;
   /** Marketplace listing-name hint (searchable). */
   listingName: string | null;
   status: CatalogStatus;
