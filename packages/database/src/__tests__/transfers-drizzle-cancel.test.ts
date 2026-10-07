@@ -29,6 +29,7 @@ const CHAIN = [
   '0012_stock_ledger_hardening.sql',
   '0013_transfer_management.sql',
   '0014_variant_replenish_settings.sql',
+  '0017_variant_max_stock.sql',
 ];
 
 async function createMigratedDb() {

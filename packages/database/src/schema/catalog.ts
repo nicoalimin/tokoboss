@@ -78,6 +78,7 @@ export const catalogVariants = pgTable(
     costSource: text('cost_source'),
     minStockQty: integer('min_stock_qty'),
     leadTimeDays: integer('lead_time_days'),
+    maxStockQty: integer('max_stock_qty'),
     listingName: text('listing_name'),
     status: text('status').notNull().default('active'),
     version: integer('version').notNull().default(1),
