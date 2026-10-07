@@ -43,6 +43,7 @@ const CHAIN = [
   '0010_product_imports.sql',
   '0011_bundle_bom.sql',
   '0014_variant_replenish_settings.sql',
+  '0017_variant_max_stock.sql',
 ];
 
 async function createMigratedDb() {
