@@ -2,6 +2,7 @@
  * Pure low-stock recommendation heuristic (UTA-146 Slice 1b / Story 11).
  * No I/O — caller supplies ledger available qty + optional sales rate.
  * Sales/order domain does not exist yet; null salesRatePerDay = insufficient data.
+ * Slice 1e-i: optional in-transit qty and max-stock cap (both default off).
  */
 
 export type LowStockRecommendationInput = {
@@ -19,6 +20,10 @@ export type LowStockRecommendationInput = {
   salesRatePerDay: number | null;
   missingSupplier: boolean;
   missingHpp: boolean;
+  /** Units already on the way (e.g. open transfers); omitted/negative = 0. */
+  inTransitQty?: number;
+  /** Seller-configured max stock cap; omitted/null = no cap. */
+  maxStockQty?: number | null;
 };
 
 export type LowStockRecommendation = {
@@ -54,13 +59,16 @@ export function buildLowStockRecommendation(
   input: LowStockRecommendationInput
 ): LowStockRecommendation {
   const { availableQty, minStockQty, leadTimeDays, salesRatePerDay } = input;
+  const inTransitQty = Math.max(0, input.inTransitQty ?? 0);
+  const maxStockQty = input.maxStockQty ?? null;
+  const projectedQty = availableQty + inTransitQty;
 
   const stockCoverDays =
     salesRatePerDay !== null && salesRatePerDay > 0
       ? availableQty / salesRatePerDay
       : null;
 
-  const gapToMin = Math.max(0, minStockQty - availableQty);
+  const gapToMin = Math.max(0, minStockQty - projectedQty);
   let suggestedReorderQty = gapToMin;
   if (
     salesRatePerDay !== null &&
@@ -71,8 +79,17 @@ export function buildLowStockRecommendation(
     const leadDemand = Math.ceil(salesRatePerDay * leadTimeDays);
     suggestedReorderQty = Math.max(
       suggestedReorderQty,
-      Math.max(0, leadDemand - availableQty)
+      Math.max(0, leadDemand - projectedQty)
     );
+  }
+
+  let cappedByMax = false;
+  if (maxStockQty !== null) {
+    const room = Math.max(0, maxStockQty - projectedQty);
+    if (suggestedReorderQty > room) {
+      suggestedReorderQty = room;
+      cappedByMax = true;
+    }
   }
 
   const explainability: string[] = [
@@ -95,6 +112,14 @@ export function buildLowStockRecommendation(
   }
   if (leadTimeDays !== null) {
     explainability.push(`Lead time pengadaan: ${leadTimeDays} hari`);
+  }
+  if (inTransitQty > 0) {
+    explainability.push(
+      `Stok dalam perjalanan: ${inTransitQty} unit — sudah dikurangi dari saran`
+    );
+  }
+  if (cappedByMax) {
+    explainability.push(`Saran dibatasi stok maksimum: ${maxStockQty} unit`);
   }
   if (input.missingHpp) {
     explainability.push('HPP belum diisi — tidak dibuat-buat');
