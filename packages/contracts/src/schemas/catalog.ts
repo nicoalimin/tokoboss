@@ -206,11 +206,16 @@ export const UpdateReplenishSettingsBodySchema = z
   .object({
     minStockQty: z.number().int().nonnegative().nullable().optional(),
     leadTimeDays: z.number().int().nonnegative().nullable().optional(),
+    maxStockQty: z.number().int().nonnegative().nullable().optional(),
     expectedVersion: z.number().int().positive(),
   })
-  .refine((v) => v.minStockQty !== undefined || v.leadTimeDays !== undefined, {
-    message: 'Nothing to update.',
-  });
+  .refine(
+    (v) =>
+      v.minStockQty !== undefined ||
+      v.leadTimeDays !== undefined ||
+      v.maxStockQty !== undefined,
+    { message: 'Nothing to update.' }
+  );
 export type UpdateReplenishSettingsBody = z.infer<
   typeof UpdateReplenishSettingsBodySchema
 >;
@@ -224,10 +229,14 @@ export const BulkUpdateReplenishSettingsBodySchema = z.object({
           variantId: z.string().min(1),
           minStockQty: z.number().int().nonnegative().nullable().optional(),
           leadTimeDays: z.number().int().nonnegative().nullable().optional(),
+          maxStockQty: z.number().int().nonnegative().nullable().optional(),
           expectedVersion: z.number().int().positive(),
         })
         .refine(
-          (v) => v.minStockQty !== undefined || v.leadTimeDays !== undefined,
+          (v) =>
+            v.minStockQty !== undefined ||
+            v.leadTimeDays !== undefined ||
+            v.maxStockQty !== undefined,
           { message: 'Nothing to update.' }
         )
     )
@@ -292,6 +301,7 @@ export const VariantViewSchema = z.object({
   levels: z.array(InventoryLevelViewSchema).optional(),
   minStockQty: z.number().int().nonnegative().nullable().optional(),
   leadTimeDays: z.number().int().nonnegative().nullable().optional(),
+  maxStockQty: z.number().int().nonnegative().nullable().optional(),
 });
 export type VariantView = z.infer<typeof VariantViewSchema>;
 
