@@ -80,3 +80,64 @@ export const RecommendationStateViewSchema = z.object({
 export type RecommendationStateView = z.infer<
   typeof RecommendationStateViewSchema
 >;
+
+/** Draft purchase-order statuses (UTA-146 Slice 1d / Story 11). Draft only. */
+export const PurchaseOrderStatusSchema = z.enum(['draft']);
+export type PurchaseOrderStatusWire = z.infer<typeof PurchaseOrderStatusSchema>;
+
+/**
+ * POST /api/workspaces/:workspaceId/catalog/purchase-orders (Manager/Admin).
+ * Draft only — missing supplier / unitCost stay null (never invented).
+ * PO send/receive is Story 10.
+ */
+export const CreatePurchaseOrderDraftBodySchema = z.object({
+  referenceNum: z.string().trim().min(1).max(120),
+  supplierName: z.string().trim().max(200).nullable().optional(),
+  notes: z.string().trim().max(2000).nullable().optional(),
+  items: z
+    .array(
+      z.object({
+        variantId: z.string().min(1).max(200),
+        quantity: z.number().int().positive(),
+        unitCostCents: z.number().int().nonnegative().nullable().optional(),
+      })
+    )
+    .min(1),
+});
+export type CreatePurchaseOrderDraftBody = z.infer<
+  typeof CreatePurchaseOrderDraftBodySchema
+>;
+
+export const PurchaseOrderItemViewSchema = z.object({
+  id: z.string().min(1),
+  purchaseOrderId: z.string().min(1),
+  workspaceId: z.string().min(1),
+  variantId: z.string().min(1),
+  quantity: z.number().int(),
+  unitCostCents: z.number().int().nullable(),
+  version: z.number().int(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type PurchaseOrderItemView = z.infer<typeof PurchaseOrderItemViewSchema>;
+
+export const PurchaseOrderViewSchema = z.object({
+  id: z.string().min(1),
+  workspaceId: z.string().min(1),
+  referenceNum: z.string().min(1),
+  status: PurchaseOrderStatusSchema,
+  supplierName: z.string().nullable(),
+  notes: z.string().nullable(),
+  version: z.number().int(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type PurchaseOrderView = z.infer<typeof PurchaseOrderViewSchema>;
+
+export const PurchaseOrderWithItemsViewSchema = z.object({
+  purchaseOrder: PurchaseOrderViewSchema,
+  items: z.array(PurchaseOrderItemViewSchema),
+});
+export type PurchaseOrderWithItemsView = z.infer<
+  typeof PurchaseOrderWithItemsViewSchema
+>;
