@@ -406,6 +406,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       costSource: v.costSource ?? null,
       minStockQty: null,
       leadTimeDays: null,
+      maxStockQty: null,
       listingName: v.listingName ?? null,
       status: 'active',
       version: 1,
@@ -552,6 +553,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       costSource: input.costSource ?? null,
       minStockQty: null,
       leadTimeDays: null,
+      maxStockQty: null,
       listingName: input.listingName ?? null,
       status: 'active',
       version: 1,
@@ -619,6 +621,7 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
       costSource?: string | null;
       minStockQty?: number | null;
       leadTimeDays?: number | null;
+      maxStockQty?: number | null;
       listingName?: string | null;
       status?: CatalogStatus;
     },
@@ -666,6 +669,9 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
         : {}),
       ...(patch.leadTimeDays !== undefined
         ? { leadTimeDays: patch.leadTimeDays }
+        : {}),
+      ...(patch.maxStockQty !== undefined
+        ? { maxStockQty: patch.maxStockQty }
         : {}),
       ...(patch.listingName !== undefined
         ? { listingName: patch.listingName }
