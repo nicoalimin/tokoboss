@@ -55,6 +55,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       variantId,
       minStockQty: parsed.data.minStockQty,
       leadTimeDays: parsed.data.leadTimeDays,
+      maxStockQty: parsed.data.maxStockQty,
       expectedVersion: parsed.data.expectedVersion,
     });
     return authJson(

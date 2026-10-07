@@ -291,6 +291,7 @@ export function toVariantView(
     ...(levels !== undefined ? { levels: levels.map(toLevelView) } : {}),
     minStockQty: v.minStockQty ?? null,
     leadTimeDays: v.leadTimeDays ?? null,
+    maxStockQty: v.maxStockQty ?? null,
   };
 }
 
