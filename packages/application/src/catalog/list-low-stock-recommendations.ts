@@ -10,6 +10,9 @@
  * passed to the heuristic so the suggestion never pushes stock above it.
  * Slice 1g-i: a variant whose recommendation was dismissed, or snoozed
  * until a time still in the future, is left out of the list.
+ * Slice 1g-ii: when the seller edited the suggested qty
+ * (suggestedReorderQtyOverride), that qty replaces the computed suggestion
+ * and an explainability line says so.
  */
 
 import type { WorkspaceContext } from '../tenancy/tenancy-types';
@@ -69,23 +72,29 @@ export async function listLowStockRecommendations(
       continue;
     }
 
-    out.push(
-      buildLowStockRecommendation({
-        variantId: variant.id,
-        workspaceId: variant.workspaceId,
-        skuCode: variant.skuCode,
-        productName: productNameById.get(variant.productId) ?? '',
-        variantName: variant.name,
-        availableQty,
-        minStockQty: variant.minStockQty,
-        leadTimeDays: variant.leadTimeDays ?? null,
-        salesRatePerDay: null,
-        missingSupplier: true,
-        missingHpp: variant.hppCents == null,
-        inTransitQty: inTransitByVariant.get(variant.id) ?? 0,
-        maxStockQty: variant.maxStockQty ?? null,
-      })
-    );
+    const recommendation = buildLowStockRecommendation({
+      variantId: variant.id,
+      workspaceId: variant.workspaceId,
+      skuCode: variant.skuCode,
+      productName: productNameById.get(variant.productId) ?? '',
+      variantName: variant.name,
+      availableQty,
+      minStockQty: variant.minStockQty,
+      leadTimeDays: variant.leadTimeDays ?? null,
+      salesRatePerDay: null,
+      missingSupplier: true,
+      missingHpp: variant.hppCents == null,
+      inTransitQty: inTransitByVariant.get(variant.id) ?? 0,
+      maxStockQty: variant.maxStockQty ?? null,
+    });
+    const override = state?.suggestedReorderQtyOverride ?? null;
+    if (override !== null) {
+      recommendation.suggestedReorderQty = override;
+      recommendation.explainability.push(
+        `Jumlah saran diubah penjual: ${override} unit`
+      );
+    }
+    out.push(recommendation);
   }
 
   out.sort((a, b) => a.skuCode.localeCompare(b.skuCode));
