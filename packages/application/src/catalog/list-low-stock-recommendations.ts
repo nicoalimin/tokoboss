@@ -22,6 +22,7 @@ import type { WorkspaceContext } from '../tenancy/tenancy-types';
 import { assertSameWorkspace } from '../tenancy/workspace-context';
 import type { CatalogStore, TransferStore } from './catalog-ports';
 import { sumInTransitQtyByVariant } from './in-transit-qty';
+import { applyBudgetCap } from './low-stock-budget-cap';
 import {
   buildLowStockRecommendation,
   isBelowMinStock,
@@ -30,7 +31,12 @@ import {
 
 export async function listLowStockRecommendations(
   store: CatalogStore & Pick<TransferStore, 'listTransfersWithItems'>,
-  input: { ctx: WorkspaceContext; workspaceId: string; now?: Date }
+  input: {
+    ctx: WorkspaceContext;
+    workspaceId: string;
+    now?: Date;
+    budgetCents?: number | null;
+  }
 ): Promise<LowStockRecommendation[]> {
   assertSameWorkspace(input.ctx, input.workspaceId);
   const now = input.now ?? new Date();
@@ -102,5 +108,10 @@ export async function listLowStockRecommendations(
   }
 
   out.sort((a, b) => a.skuCode.localeCompare(b.skuCode));
-  return out;
+  if (input.budgetCents == null) return out;
+  const hppCentsByVariant = new Map(variants.map((v) => [v.id, v.hppCents]));
+  return applyBudgetCap(out, {
+    budgetCents: input.budgetCents,
+    hppCentsByVariant,
+  });
 }
