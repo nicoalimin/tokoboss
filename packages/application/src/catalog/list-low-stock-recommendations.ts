@@ -8,6 +8,8 @@
  * suggested reorder qty.
  * Slice 1f-ix: the variant's configured maxStockQty (null when unset) is
  * passed to the heuristic so the suggestion never pushes stock above it.
+ * Slice 1g-i: a variant whose recommendation was dismissed, or snoozed
+ * until a time still in the future, is left out of the list.
  */
 
 import type { WorkspaceContext } from '../tenancy/tenancy-types';
@@ -22,9 +24,10 @@ import {
 
 export async function listLowStockRecommendations(
   store: CatalogStore & Pick<TransferStore, 'listTransfersWithItems'>,
-  input: { ctx: WorkspaceContext; workspaceId: string }
+  input: { ctx: WorkspaceContext; workspaceId: string; now?: Date }
 ): Promise<LowStockRecommendation[]> {
   assertSameWorkspace(input.ctx, input.workspaceId);
+  const now = input.now ?? new Date();
 
   const [variants, products, transfers] = await Promise.all([
     store.listVariantsByWorkspace(input.workspaceId),
@@ -49,6 +52,19 @@ export async function listLowStockRecommendations(
         availableQty,
         minStockQty: variant.minStockQty,
       })
+    ) {
+      continue;
+    }
+
+    const state = await store.findRecommendationState(
+      input.workspaceId,
+      variant.id
+    );
+    if (state?.status === 'dismissed') continue;
+    if (
+      state?.status === 'snoozed' &&
+      state.snoozedUntil !== null &&
+      state.snoozedUntil.getTime() > now.getTime()
     ) {
       continue;
     }
