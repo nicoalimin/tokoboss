@@ -13,6 +13,9 @@
  * Slice 1g-ii: when the seller edited the suggested qty
  * (suggestedReorderQtyOverride), that qty replaces the computed suggestion
  * and an explainability line says so.
+ * Slice 1h-i: a bundle variant holds no direct stock (its availability is
+ * derived from its components), so it is left out of the list instead of
+ * always looking empty; its component SKUs are recommended on their own.
  */
 
 import type { WorkspaceContext } from '../tenancy/tenancy-types';
@@ -44,6 +47,7 @@ export async function listLowStockRecommendations(
   for (const variant of variants) {
     if (variant.status === 'archived') continue;
     if (variant.minStockQty == null) continue;
+    if (await store.isBundleVariant(input.workspaceId, variant.id)) continue;
 
     const levels = await store.listLevelsByVariant(
       input.workspaceId,
