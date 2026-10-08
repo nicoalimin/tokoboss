@@ -6,6 +6,8 @@
  * Slice 1e-v: units on open (sent, not yet received) transfers are passed
  * to the heuristic as inTransitQty so units already on the way reduce the
  * suggested reorder qty.
+ * Slice 1f-ix: the variant's configured maxStockQty (null when unset) is
+ * passed to the heuristic so the suggestion never pushes stock above it.
  */
 
 import type { WorkspaceContext } from '../tenancy/tenancy-types';
@@ -65,6 +67,7 @@ export async function listLowStockRecommendations(
         missingSupplier: true,
         missingHpp: variant.hppCents == null,
         inTransitQty: inTransitByVariant.get(variant.id) ?? 0,
+        maxStockQty: variant.maxStockQty ?? null,
       })
     );
   }
