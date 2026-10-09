@@ -108,6 +108,30 @@ export type CreatePurchaseOrderDraftBody = z.infer<
   typeof CreatePurchaseOrderDraftBodySchema
 >;
 
+/**
+ * PATCH /api/workspaces/:workspaceId/catalog/purchase-orders/:purchaseOrderId
+ * (Manager/Admin). Draft only — replaces header fields + full item list.
+ * CAS via expectedVersion on the purchase-order header. Missing supplier /
+ * unitCost stay null (never invented). PO send/receive is Story 10.
+ */
+export const UpdatePurchaseOrderDraftBodySchema = z.object({
+  expectedVersion: z.number().int().positive(),
+  supplierName: z.string().trim().max(200).nullable().optional(),
+  notes: z.string().trim().max(2000).nullable().optional(),
+  items: z
+    .array(
+      z.object({
+        variantId: z.string().min(1).max(200),
+        quantity: z.number().int().positive(),
+        unitCostCents: z.number().int().nonnegative().nullable().optional(),
+      })
+    )
+    .min(1),
+});
+export type UpdatePurchaseOrderDraftBody = z.infer<
+  typeof UpdatePurchaseOrderDraftBodySchema
+>;
+
 export const PurchaseOrderItemViewSchema = z.object({
   id: z.string().min(1),
   purchaseOrderId: z.string().min(1),
