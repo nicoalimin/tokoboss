@@ -34,6 +34,7 @@ import type {
   WarehouseStatus,
 } from './catalog-types';
 import { isRecommendationStateStatus } from './catalog-types';
+import { updatePurchaseOrderDraftInMem } from './update-purchase-order-draft-inmem';
 
 function clone<T>(value: T): T {
   if (value instanceof Date) return new Date(value.getTime()) as T;
@@ -1679,5 +1680,28 @@ export class InMemoryCatalogStore implements CatalogStore, TransferStore {
     }
 
     return { purchaseOrder: clone(purchaseOrder), items: items.map(clone) };
+  }
+
+  async updatePurchaseOrderDraft(input: {
+    workspaceId: string;
+    purchaseOrderId: string;
+    expectedVersion: number;
+    supplierName?: string | null;
+    notes?: string | null;
+    items: Array<{
+      variantId: string;
+      quantity: number;
+      unitCostCents?: number | null;
+    }>;
+  }): Promise<PurchaseOrderWithItems> {
+    return updatePurchaseOrderDraftInMem(
+      {
+        purchaseOrders: this.purchaseOrders,
+        purchaseOrderItems: this.purchaseOrderItems,
+        variants: this.variants,
+        nextId: (prefix) => this.nextId(prefix),
+      },
+      input
+    );
   }
 }
