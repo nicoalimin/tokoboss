@@ -184,3 +184,18 @@ export async function updateReplenishSettings(
   if (!res.ok) throw toReplenishClientError(res.status, data);
   return data['variant'] as VariantView;
 }
+
+/** GET one variant with its replenish settings (prefills the Ambang form). */
+export async function getReplenishVariant(
+  workspaceId: string,
+  variantId: string,
+  fetchFn: FetchFn = fetch
+): Promise<VariantView> {
+  const res = await fetchFn(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/catalog/variants/${encodeURIComponent(variantId)}`,
+    { credentials: 'same-origin' }
+  );
+  const data = await readBody(res);
+  if (!res.ok) throw toReplenishClientError(res.status, data);
+  return data['variant'] as VariantView;
+}
