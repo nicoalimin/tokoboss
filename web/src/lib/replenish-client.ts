@@ -10,7 +10,9 @@
  */
 
 import type {
+  CreatePurchaseOrderDraftBody,
   LowStockRecommendationView,
+  PurchaseOrderWithItemsView,
   RecommendationStateView,
   SetRecommendationStateBody,
 } from '@tokoboss/contracts';
@@ -110,4 +112,27 @@ export async function setRecommendationState(
   const data = await readBody(res);
   if (!res.ok) throw toReplenishClientError(res.status, data);
   return data['recommendationState'] as RecommendationStateView;
+}
+
+/** POST a draft purchase order built from low-stock recommendations. */
+export async function createPurchaseOrderDraft(
+  workspaceId: string,
+  body: CreatePurchaseOrderDraftBody,
+  fetchFn: FetchFn = fetch
+): Promise<PurchaseOrderWithItemsView> {
+  const res = await fetchFn(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/catalog/purchase-orders`,
+    {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+  const data = await readBody(res);
+  if (!res.ok) throw toReplenishClientError(res.status, data);
+  return {
+    purchaseOrder: data['purchaseOrder'],
+    items: Array.isArray(data['items']) ? data['items'] : [],
+  } as PurchaseOrderWithItemsView;
 }
