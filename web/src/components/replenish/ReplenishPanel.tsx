@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { LowStockRecommendationView } from '@tokoboss/contracts';
 import { AmbangPanel } from '@/components/replenish/AmbangPanel';
+import { BudgetFilter } from '@/components/replenish/BudgetFilter';
 import { LowStockRow } from '@/components/replenish/LowStockRow';
 import { ReplenishDraftSection } from '@/components/replenish/ReplenishDraftSection';
 import {
@@ -30,6 +31,7 @@ export function ReplenishPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ambangId, setAmbangId] = useState<string | null>(null);
+  const [budgetCents, setBudgetCents] = useState<number | null>(null);
 
   const fail = useCallback(
     (err: unknown) => {
@@ -47,13 +49,14 @@ export function ReplenishPanel() {
     try {
       const membership = await getMyMembership();
       setWorkspaceId(membership.workspaceId);
-      setRecs(await listLowStockRecommendations(membership.workspaceId));
+      const opts = budgetCents === null ? {} : { budgetCents };
+      setRecs(await listLowStockRecommendations(membership.workspaceId, opts));
     } catch (err) {
       fail(err);
     } finally {
       setLoading(false);
     }
-  }, [fail]);
+  }, [fail, budgetCents]);
 
   useEffect(() => {
     void load();
@@ -100,6 +103,11 @@ export function ReplenishPanel() {
           {error}
         </p>
       )}
+      <BudgetFilter
+        budgetCents={budgetCents}
+        disabled={busy}
+        onApply={setBudgetCents}
+      />
       {recs.length === 0 ? (
         <p className="text-sm text-neutral-600">Tidak ada stok tipis.</p>
       ) : (
