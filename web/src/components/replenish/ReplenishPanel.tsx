@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { LowStockRecommendationView } from '@tokoboss/contracts';
 import { LowStockRow } from '@/components/replenish/LowStockRow';
+import { ReplenishDraftSection } from '@/components/replenish/ReplenishDraftSection';
 import {
   ReplenishClientError,
   listLowStockRecommendations,
@@ -16,8 +17,8 @@ const SNOOZE_DAYS = 7;
 
 /**
  * Stok tipis panel (UTA-147 slice 3e, Story 11 web): load the low-stock
- * list, select rows, and dismiss/snooze (snooze = 7 days). Draft-PO
- * preview/create is wired in a later slice; nothing here sends a PO.
+ * list, select rows, and dismiss/snooze (snooze = 7 days). Selected rows
+ * feed the draft-PO section (slice 3g); a DRAFT PO is never sent.
  */
 export function ReplenishPanel() {
   const router = useRouter();
@@ -113,6 +114,15 @@ export function ReplenishPanel() {
             />
           ))}
         </ul>
+      )}
+      {workspaceId && (
+        <ReplenishDraftSection
+          workspaceId={workspaceId}
+          selectedRecs={recs.filter((r) => selected.has(r.variantId))}
+          disabled={busy}
+          onCreated={() => setSelected(new Set())}
+          onError={fail}
+        />
       )}
     </div>
   );
