@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { LowStockRecommendationView } from '@tokoboss/contracts';
+import { AmbangPanel } from '@/components/replenish/AmbangPanel';
 import { LowStockRow } from '@/components/replenish/LowStockRow';
 import { ReplenishDraftSection } from '@/components/replenish/ReplenishDraftSection';
 import {
@@ -28,6 +29,7 @@ export function ReplenishPanel() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ambangId, setAmbangId] = useState<string | null>(null);
 
   const fail = useCallback(
     (err: unknown) => {
@@ -111,9 +113,21 @@ export function ReplenishPanel() {
               onToggle={toggle}
               onDismiss={(id) => void hide(id, false)}
               onSnooze={(id) => void hide(id, true)}
+              onAmbang={setAmbangId}
             />
           ))}
         </ul>
+      )}
+      {workspaceId && ambangId && (
+        <AmbangPanel
+          workspaceId={workspaceId}
+          variantId={ambangId}
+          onClose={() => {
+            setAmbangId(null);
+            void load();
+          }}
+          onError={fail}
+        />
       )}
       {workspaceId && (
         <ReplenishDraftSection
