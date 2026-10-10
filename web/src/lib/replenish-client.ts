@@ -9,7 +9,11 @@
  *   `/sign-in?expired=1`.
  */
 
-import type { LowStockRecommendationView } from '@tokoboss/contracts';
+import type {
+  LowStockRecommendationView,
+  RecommendationStateView,
+  SetRecommendationStateBody,
+} from '@tokoboss/contracts';
 
 export class ReplenishClientError extends Error {
   readonly status: number;
@@ -85,4 +89,25 @@ export async function listLowStockRecommendations(
   return Array.isArray(body['recommendations'])
     ? (body['recommendations'] as LowStockRecommendationView[])
     : [];
+}
+
+/** PUT dismiss / snooze / edit-qty state for one low-stock recommendation. */
+export async function setRecommendationState(
+  workspaceId: string,
+  variantId: string,
+  body: SetRecommendationStateBody,
+  fetchFn: FetchFn = fetch
+): Promise<RecommendationStateView> {
+  const res = await fetchFn(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/catalog/variants/${encodeURIComponent(variantId)}/recommendation-state`,
+    {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+  const data = await readBody(res);
+  if (!res.ok) throw toReplenishClientError(res.status, data);
+  return data['recommendationState'] as RecommendationStateView;
 }
