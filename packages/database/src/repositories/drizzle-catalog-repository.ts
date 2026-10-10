@@ -68,6 +68,8 @@ import {
   insertPurchaseOrderDraftRows,
 } from './purchase-order-draft-writer';
 import type { PurchaseOrderDraftInput } from './purchase-order-draft-writer';
+import { updatePurchaseOrderDraftRows } from './update-purchase-order-draft-rows';
+import type { UpdatePurchaseOrderDraftInput } from './update-purchase-order-draft-rows';
 
 type DbOrTx = Transaction | DatabaseHandle;
 
@@ -1565,6 +1567,21 @@ export class DrizzleCatalogStore implements CatalogStore, TransferStore {
         `Reference number ${input.referenceNum} already exists.`
       );
     }
+  }
+
+  // UTA-146 Slice 1j-v: update a draft purchase order (full item replace + CAS).
+  async updatePurchaseOrderDraft(
+    input: UpdatePurchaseOrderDraftInput
+  ): Promise<PurchaseOrderWithItems> {
+    assertPurchaseOrderDraftItems(input.items);
+    for (const item of input.items) {
+      const variant = await this.findVariantById(
+        input.workspaceId,
+        item.variantId
+      );
+      if (!variant) throw catalogNotFound('Variant');
+    }
+    return this.inTx((tx) => updatePurchaseOrderDraftRows(tx, input));
   }
 
   async findTransferById(
