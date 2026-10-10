@@ -16,6 +16,8 @@ import type {
   RecommendationStateView,
   SetRecommendationStateBody,
   UpdatePurchaseOrderDraftBody,
+  UpdateReplenishSettingsBody,
+  VariantView,
 } from '@tokoboss/contracts';
 
 export class ReplenishClientError extends Error {
@@ -160,4 +162,25 @@ export async function updatePurchaseOrderDraft(
     purchaseOrder: data['purchaseOrder'],
     items: Array.isArray(data['items']) ? data['items'] : [],
   } as PurchaseOrderWithItemsView;
+}
+
+/** PATCH min stock / lead time / max stock for one variant (Manager/Admin; CAS). */
+export async function updateReplenishSettings(
+  workspaceId: string,
+  variantId: string,
+  body: UpdateReplenishSettingsBody,
+  fetchFn: FetchFn = fetch
+): Promise<VariantView> {
+  const res = await fetchFn(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/catalog/variants/${encodeURIComponent(variantId)}/replenish-settings`,
+    {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+  const data = await readBody(res);
+  if (!res.ok) throw toReplenishClientError(res.status, data);
+  return data['variant'] as VariantView;
 }
