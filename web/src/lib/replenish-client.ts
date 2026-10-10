@@ -15,6 +15,7 @@ import type {
   PurchaseOrderWithItemsView,
   RecommendationStateView,
   SetRecommendationStateBody,
+  UpdatePurchaseOrderDraftBody,
 } from '@tokoboss/contracts';
 
 export class ReplenishClientError extends Error {
@@ -124,6 +125,30 @@ export async function createPurchaseOrderDraft(
     `/api/workspaces/${encodeURIComponent(workspaceId)}/catalog/purchase-orders`,
     {
       method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+  const data = await readBody(res);
+  if (!res.ok) throw toReplenishClientError(res.status, data);
+  return {
+    purchaseOrder: data['purchaseOrder'],
+    items: Array.isArray(data['items']) ? data['items'] : [],
+  } as PurchaseOrderWithItemsView;
+}
+
+/** PATCH a DRAFT purchase order (supplier, notes, full item list; CAS). */
+export async function updatePurchaseOrderDraft(
+  workspaceId: string,
+  purchaseOrderId: string,
+  body: UpdatePurchaseOrderDraftBody,
+  fetchFn: FetchFn = fetch
+): Promise<PurchaseOrderWithItemsView> {
+  const res = await fetchFn(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/catalog/purchase-orders/${encodeURIComponent(purchaseOrderId)}`,
+    {
+      method: 'PATCH',
       credentials: 'same-origin',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
