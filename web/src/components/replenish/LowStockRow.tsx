@@ -15,6 +15,7 @@ export interface LowStockRowProps {
   onToggle: (variantId: string) => void;
   onDismiss: (variantId: string) => void;
   onSnooze: (variantId: string) => void;
+  onAmbang?: (variantId: string) => void;
 }
 
 const chipClass =
@@ -38,6 +39,7 @@ export function LowStockRow({
   onToggle,
   onDismiss,
   onSnooze,
+  onAmbang,
 }: LowStockRowProps) {
   const label = rec.variantName
     ? `${rec.productName} ${rec.variantName}`
@@ -98,6 +100,16 @@ export function LowStockRow({
         >
           Abaikan
         </button>
+        {onAmbang && (
+          <button
+            type="button"
+            className={actionClass}
+            disabled={busy}
+            onClick={() => onAmbang(rec.variantId)}
+          >
+            Atur ambang
+          </button>
+        )}
       </div>
     </li>
   );
