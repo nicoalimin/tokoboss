@@ -14,6 +14,8 @@ export interface DraftPoPreviewCardProps {
   creating?: boolean;
   onCreate: () => void;
   onCancel: () => void;
+  /** When set, each line shows a qty input (positive integers only). */
+  onQtyChange?: (variantId: string, quantity: number) => void;
 }
 
 const primaryButtonClass =
@@ -30,6 +32,7 @@ export function DraftPoPreviewCard({
   creating = false,
   onCreate,
   onCancel,
+  onQtyChange,
 }: DraftPoPreviewCardProps) {
   const { lines, blockedNoSupplier, missingHppCount, canCreate } = preview;
   return (
@@ -76,7 +79,29 @@ export function DraftPoPreviewCard({
                   </span>
                 )}
               </span>
-              <span className="font-semibold">{line.quantity} pcs</span>
+              {onQtyChange ? (
+                <label className="flex items-center gap-1 font-semibold">
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    inputMode="numeric"
+                    aria-label={`Jumlah ${line.skuCode}`}
+                    className="w-20 rounded-lg border border-neutral-300 px-2 py-1 min-h-[44px] text-right"
+                    value={line.quantity}
+                    disabled={creating}
+                    onChange={(e) => {
+                      const qty = Number(e.target.value);
+                      if (Number.isInteger(qty) && qty > 0) {
+                        onQtyChange(line.variantId, qty);
+                      }
+                    }}
+                  />
+                  pcs
+                </label>
+              ) : (
+                <span className="font-semibold">{line.quantity} pcs</span>
+              )}
             </li>
           ))}
         </ul>
