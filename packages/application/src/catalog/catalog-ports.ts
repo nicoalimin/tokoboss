@@ -311,6 +311,25 @@ export interface CatalogStore {
     }>;
   }): Promise<PurchaseOrderWithItems>;
 
+  /**
+   * Update a draft purchase order (header fields + full item replace) with
+   * optimistic CAS on `expectedVersion`. Throws catalogValidation (empty
+   * items, bad quantity/cost, not a draft), catalogNotFound('PurchaseOrder' |
+   * 'Variant'), or catalogVersionConflict (stale version).
+   */
+  updatePurchaseOrderDraft(input: {
+    workspaceId: string;
+    purchaseOrderId: string;
+    expectedVersion: number;
+    supplierName?: string | null;
+    notes?: string | null;
+    items: Array<{
+      variantId: string;
+      quantity: number;
+      unitCostCents?: number | null;
+    }>;
+  }): Promise<PurchaseOrderWithItems>;
+
   // Bundle BOM (UTA-79, Story 13)
   //
   // A bundle is a variant whose BOM is the set of lines where it is the
