@@ -33,7 +33,8 @@ export function ReplenishDraftSection({
   const [draftRef, setDraftRef] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const preview = buildDraftPoPreview(selectedRecs);
+  const [qtyOverrides, setQtyOverrides] = useState<Record<string, number>>({});
+  const preview = buildDraftPoPreview(selectedRecs, qtyOverrides);
 
   const create = async (ref: string) => {
     setCreating(true);
@@ -43,6 +44,7 @@ export function ReplenishDraftSection({
         toCreateDraftBody(preview, ref)
       );
       setDraftRef(null);
+      setQtyOverrides({});
       setNotice(`Draft PO ${ref} tersimpan. Belum dikirim ke supplier.`);
       onCreated();
     } catch (err) {
@@ -59,7 +61,13 @@ export function ReplenishDraftSection({
         referenceNum={draftRef}
         creating={creating}
         onCreate={() => void create(draftRef)}
-        onCancel={() => setDraftRef(null)}
+        onCancel={() => {
+          setDraftRef(null);
+          setQtyOverrides({});
+        }}
+        onQtyChange={(variantId, quantity) =>
+          setQtyOverrides((prev) => ({ ...prev, [variantId]: quantity }))
+        }
       />
     );
   }
