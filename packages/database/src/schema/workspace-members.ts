@@ -3,6 +3,7 @@ import {
   integer,
   pgTable,
   text,
+  timestamp,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
@@ -37,6 +38,11 @@ export const workspaceMembers = pgTable(
     warehouseScope: text('warehouse_scope'),
     status: text('status').notNull().default('active'),
     authVersion: integer('auth_version').notNull().default(1),
+    /** Last time this member entered the workspace (RFC 02 landing). */
+    lastActiveAt: timestamp('last_active_at', {
+      withTimezone: true,
+      mode: 'date',
+    }),
     ...utcTimestamps(),
   },
   (t) => [
@@ -47,6 +53,11 @@ export const workspaceMembers = pgTable(
     index('workspace_members_workspace_role_idx').on(t.workspaceId, t.role),
     index('workspace_members_workspace_status_idx').on(t.workspaceId, t.status),
     index('workspace_members_user_idx').on(t.userId),
+    index('workspace_members_user_status_last_active_idx').on(
+      t.userId,
+      t.status,
+      t.lastActiveAt.desc()
+    ),
   ]
 );
 
