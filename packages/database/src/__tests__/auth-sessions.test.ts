@@ -31,6 +31,7 @@ const CHAIN = [
   '0004_file_uploads.sql',
   '0005_workspace_tenancy_audit.sql',
   '0006_auth_sessions.sql',
+  '0018_account_sessions.sql',
 ];
 
 async function createMigratedDb() {

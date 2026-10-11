@@ -35,6 +35,13 @@ export const authUsers = pgTable(
     email: text('email').notNull().unique(),
     userId: text('user_id').notNull().unique(),
     passwordHash: text('password_hash').notNull(),
+    /** Account-wide session version (RFC 02); bumped on reset / deactivate. */
+    authVersion: integer('auth_version').notNull().default(1),
+    /** Set when the whole account is deactivated (RFC 02). */
+    deactivatedAt: timestamp('deactivated_at', {
+      withTimezone: true,
+      mode: 'date',
+    }),
     ...utcTimestamps(),
   },
   (t) => [index('auth_users_user_id_idx').on(t.userId)]
