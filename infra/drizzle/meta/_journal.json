@@ -120,13 +120,6 @@
       "when": 1789900000000,
       "tag": "0017_variant_max_stock",
       "breakpoints": true
-    },
-    {
-      "idx": 17,
-      "version": "7",
-      "when": 1790000000000,
-      "tag": "0018_account_sessions",
-      "breakpoints": true
     }
   ]
 }
