@@ -27,6 +27,12 @@ export interface WorkspaceMemberStore {
   ): Promise<WorkspaceMemberRecord | null>;
   listByWorkspace(workspaceId: string): Promise<WorkspaceMemberRecord[]>;
   listByUser(userId: string): Promise<WorkspaceMemberRecord[]>;
+  /** Active memberships in active workspaces, latest `lastActiveAt` first. */
+  listAccessibleByUser(
+    userId: string
+  ): Promise<Array<WorkspaceMemberRecord & { lastActiveAt: Date | null }>>;
+  /** Stamp `lastActiveAt` on one membership; no-op when it does not exist. */
+  touchLastActive(workspaceId: string, userId: string, at: Date): Promise<void>;
   update(
     id: string,
     workspaceId: string,
