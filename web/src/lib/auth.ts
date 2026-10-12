@@ -314,7 +314,9 @@ export async function requireSessionToken(
   const source = extractTokenWithSource(request);
   if (!source) return null;
   const result = await validateSession(getAuthDeps(), source.token);
-  if (!result) return null;
+  // Account (NULL-workspace) sessions are not workspace-scoped; reject them
+  // here until `/w/<id>/` routing lands (US29 / RFC 02).
+  if (!result || result.workspaceId === null) return null;
   return {
     userId: result.userId,
     workspaceId: result.workspaceId,
