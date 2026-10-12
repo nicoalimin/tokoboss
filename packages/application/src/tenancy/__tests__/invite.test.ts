@@ -636,7 +636,7 @@ describe('list / update / deactivate members', () => {
     ).rejects.toThrow(LastAdminError);
   });
 
-  it('deactivates with session revoke + forced_sign_out; last-Admin denied', async () => {
+  it('deactivates member and bumps auth_version without session revoke (US29 C2 prep)', async () => {
     const f = await newFixture();
     const ctx = adminContext(f.workspaceId, f.adminId);
     const { token } = await createInvite(
@@ -655,33 +655,19 @@ describe('list / update / deactivate members', () => {
       { invites: f.invites, members: f.tenancy, audit: f.tenancy.audit },
       { token }
     );
-    const revoked: string[] = [];
+    // No sessions revoker: membership deactivate must not require global
+    // revoke (RFC 02 C2 / task 13). Coverage of workspace_access_revoked +
+    // no-revoke with a revoker lands with the production edit + later tests.
     const updated = await deactivateMember(
       f.tenancy,
       { ctx, workspaceId: f.workspaceId, targetUserId: accepted.userId },
-      f.tenancy.audit,
-      {
-        revokeAllByUser: async (userId: string) => {
-          revoked.push(userId);
-          return 3;
-        },
-      }
+      f.tenancy.audit
     );
     expect(updated.status).toBe('deactivated');
     expect(updated.authVersion).toBe(2);
-    expect(revoked).toEqual([accepted.userId]);
-    const forced = f.tenancy.auditEvents.filter(
-      (e) => e.action === 'security.forced_sign_out'
+    expect(f.tenancy.auditEvents.map((e) => e.action)).toContain(
+      'membership.status_changed'
     );
-    expect(forced).toHaveLength(1);
-    expect(forced[0]).toMatchObject({
-      category: 'security',
-      payload: {
-        workspaceId: f.workspaceId,
-        userId: accepted.userId,
-        reason: 'admin_deactivate',
-      },
-    });
 
     await expect(
       deactivateMember(f.tenancy, {
