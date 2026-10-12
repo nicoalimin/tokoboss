@@ -166,7 +166,7 @@ export async function signIn(
 export interface ValidateSessionResult {
   session: SessionRecord;
   userId: string;
-  workspaceId: string;
+  workspaceId: string | null;
   authVersion: number;
 }
 
@@ -189,9 +189,29 @@ export async function validateSession(
     await deps.sessions.markRevoked(row.id, now);
     return null;
   }
-  // Account-level (NULL-workspace) sessions: validated via the account
-  // `auth_version` in a later task; until then they fail closed.
-  if (row.workspaceId === null) return null;
+  // Reject deactivated accounts for both account and workspace-bound sessions.
+  const accountState = await deps.credentials.getAccountState(row.userId);
+  if (accountState?.deactivatedAt != null) {
+    await deps.sessions.markRevoked(row.id, now);
+    return null;
+  }
+
+  // Account (NULL-workspace) sessions: compare against auth_users.auth_version.
+  if (row.workspaceId === null) {
+    const accountVersion = accountState?.authVersion ?? 1;
+    if (accountVersion !== row.authVersion) {
+      await deps.sessions.markRevoked(row.id, now);
+      return null;
+    }
+    await deps.sessions.touch(row.id, now);
+    return {
+      session: { ...row, lastSeenAt: now },
+      userId: row.userId,
+      workspaceId: null,
+      authVersion: accountVersion,
+    };
+  }
+
   const membership = await deps.members.findByWorkspaceAndUser(
     row.workspaceId,
     row.userId
