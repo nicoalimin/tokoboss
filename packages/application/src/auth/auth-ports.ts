@@ -20,6 +20,13 @@ export interface CredentialStore {
     passwordHash: string;
   }): Promise<CredentialRecord>;
   updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
+  getAccountState(
+    userId: string
+  ): Promise<{ authVersion: number; deactivatedAt: Date | null } | null>;
+  /** Increment the account `auth_version`; returns the new value. */
+  bumpAuthVersion(userId: string): Promise<number>;
+  /** Set (or clear with null) the account `deactivated_at`. */
+  setDeactivatedAt(userId: string, at: Date | null): Promise<void>;
 }
 
 /** Server-side session rows keyed by token hash (hashes only in DB). */
