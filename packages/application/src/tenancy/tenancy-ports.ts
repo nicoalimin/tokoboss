@@ -66,7 +66,7 @@ export interface WorkspaceStore {
 /** Audit sink for membership/workspace/security/invite events. */
 export interface TenancyAuditSink {
   append(input: {
-    workspaceId: string;
+    workspaceId: string | null;
     action: string;
     category: 'membership' | 'workspace' | 'security' | 'invite';
     actorType?: string;

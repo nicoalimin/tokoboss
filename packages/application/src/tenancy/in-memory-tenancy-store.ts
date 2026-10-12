@@ -40,7 +40,7 @@ export class InMemoryTenancyStore
   /** Test seam: workspace ids whose tenant status is deactivated. */
   readonly deactivatedWorkspaceIds = new Set<string>();
   readonly auditEvents: Array<{
-    workspaceId: string;
+    workspaceId: string | null;
     action: string;
     category: 'membership' | 'workspace' | 'security' | 'invite';
     actorType?: string;
@@ -233,7 +233,7 @@ export class InMemoryTenancyStore
   }
 
   async append(input: {
-    workspaceId: string;
+    workspaceId: string | null;
     action: string;
     category: 'membership' | 'workspace' | 'security' | 'invite';
     actorType?: string;
