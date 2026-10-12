@@ -35,6 +35,10 @@ export class InMemoryTenancyStore
   private byWorkspaceUser = new Map<string, string>();
   private seq = 0;
   private wsSeq = 0;
+  /** `workspace_members.last_active_at` by member id (RFC 02). */
+  private lastActiveAt = new Map<string, Date>();
+  /** Test seam: workspace ids whose tenant status is deactivated. */
+  readonly deactivatedWorkspaceIds = new Set<string>();
   readonly auditEvents: Array<{
     workspaceId: string;
     action: string;
@@ -154,6 +158,35 @@ export class InMemoryTenancyStore
       if (m.userId === userId) out.push(clone(m));
     }
     return out;
+  }
+
+  /** Active memberships in active workspaces, latest `lastActiveAt` first. */
+  async listAccessibleByUser(
+    userId: string
+  ): Promise<Array<WorkspaceMemberRecord & { lastActiveAt: Date | null }>> {
+    const at = (id: string) => this.lastActiveAt.get(id)?.getTime() ?? -1;
+    return [...this.members.values()]
+      .filter(
+        (m) =>
+          m.userId === userId &&
+          m.status === 'active' &&
+          !this.deactivatedWorkspaceIds.has(m.workspaceId)
+      )
+      .sort((a, b) => at(b.id) - at(a.id))
+      .map((m) => ({
+        ...clone(m),
+        lastActiveAt: clone(this.lastActiveAt.get(m.id) ?? null),
+      }));
+  }
+
+  /** Stamp `lastActiveAt` for one membership; unknown pairs are a no-op. */
+  async touchLastActive(
+    workspaceId: string,
+    userId: string,
+    at: Date
+  ): Promise<void> {
+    const id = this.byWorkspaceUser.get(`${workspaceId}::${userId}`);
+    if (id) this.lastActiveAt.set(id, new Date(at.getTime()));
   }
 
   async update(
