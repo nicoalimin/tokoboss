@@ -494,3 +494,25 @@ export async function emitSecurityEvent(
     payload,
   });
 }
+
+/**
+ * Account-level security events (US29 / RFC 02): web sign-in, account
+ * sign-out-all and account deactivation have no workspace, so the audit
+ * row is written with a NULL `tenant_id` (nullable since `0018`).
+ * Workspace-scoped events keep using `emitSecurityEvent` unchanged.
+ */
+export async function emitAccountSecurityEvent(
+  audit: TenancyAuditSink,
+  input: Omit<SecurityEventInput, 'workspaceId'>
+): Promise<void> {
+  const payload = auditPayload(input.payload ?? {}, input.action);
+  await audit.append({
+    workspaceId: null,
+    action: input.action,
+    category: 'security',
+    actorType: 'user',
+    actorId: input.actorId,
+    correlationId: input.correlationId,
+    payload,
+  });
+}
