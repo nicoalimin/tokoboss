@@ -95,6 +95,7 @@ export const SECURITY_EVENT_ACTIONS = [
   'security.password_reset',
   'security.password_change',
   'security.forced_sign_out',
+  'security.account_deactivated',
 ] as const;
 export type SecurityEventAction = (typeof SECURITY_EVENT_ACTIONS)[number];
 
