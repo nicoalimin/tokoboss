@@ -1,6 +1,6 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { DatabaseHandle, Transaction } from '../db';
-import { auditEvents, workspaceMembers } from '../schema/index';
+import { auditEvents, tenants, workspaceMembers } from '../schema/index';
 import type {
   NewWorkspaceMemberRow,
   WorkspaceMemberRow,
@@ -129,6 +129,28 @@ export class DrizzleWorkspaceMemberStore implements WorkspaceMemberStore {
       .from(workspaceMembers)
       .where(eq(workspaceMembers.userId, userId));
     return rows.map(toRecord);
+  }
+
+  /** Active memberships in active workspaces, latest `lastActiveAt` first. */
+  async listAccessibleByUser(
+    userId: string
+  ): Promise<Array<WorkspaceMemberRecord & { lastActiveAt: Date | null }>> {
+    const rows = await this.db
+      .select({ member: workspaceMembers })
+      .from(workspaceMembers)
+      .innerJoin(tenants, eq(tenants.id, workspaceMembers.workspaceId))
+      .where(
+        and(
+          eq(workspaceMembers.userId, userId),
+          eq(workspaceMembers.status, 'active'),
+          eq(tenants.status, 'active')
+        )
+      )
+      .orderBy(sql`${workspaceMembers.lastActiveAt} desc nulls last`);
+    return rows.map(({ member }: { member: WorkspaceMemberRow }) => ({
+      ...toRecord(member),
+      lastActiveAt: member.lastActiveAt,
+    }));
   }
 
   async update(
