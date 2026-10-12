@@ -153,6 +153,23 @@ export class DrizzleWorkspaceMemberStore implements WorkspaceMemberStore {
     }));
   }
 
+  /** Stamp `lastActiveAt` on one membership; no-op when it does not exist. */
+  async touchLastActive(
+    workspaceId: string,
+    userId: string,
+    at: Date
+  ): Promise<void> {
+    await this.db
+      .update(workspaceMembers)
+      .set({ lastActiveAt: at })
+      .where(
+        and(
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.userId, userId)
+        )
+      );
+  }
+
   async update(
     id: string,
     workspaceId: string,
