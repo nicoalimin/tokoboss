@@ -19,9 +19,10 @@ export const auditEvents = pgTable(
   'audit_events',
   {
     id: uuidPk(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
+    /** Nullable for account-level security events (RFC 02, migration 0018). */
+    tenantId: uuid('tenant_id').references(() => tenants.id, {
+      onDelete: 'cascade',
+    }),
     action: text('action').notNull(),
     payload: jsonb('payload').$type<Record<string, unknown>>(),
     /** Opaque actor kind, e.g. `user` / `system`. Never PII. */
