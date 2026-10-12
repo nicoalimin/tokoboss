@@ -189,6 +189,9 @@ export async function validateSession(
     await deps.sessions.markRevoked(row.id, now);
     return null;
   }
+  // Account-level (NULL-workspace) sessions: validated via the account
+  // `auth_version` in a later task; until then they fail closed.
+  if (row.workspaceId === null) return null;
   const membership = await deps.members.findByWorkspaceAndUser(
     row.workspaceId,
     row.userId
@@ -281,6 +284,7 @@ export async function listSessions(
       if (r.revokedAt || isIdleExpired(r.platform, r.lastSeenAt, nowMs)) {
         return false;
       }
+      if (r.workspaceId === null) return false;
       return liveByWorkspace.get(r.workspaceId) === r.authVersion;
     })
     .sort((a, b) => b.lastSeenAt.getTime() - a.lastSeenAt.getTime())
