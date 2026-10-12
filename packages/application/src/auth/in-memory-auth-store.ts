@@ -123,7 +123,7 @@ export class InMemorySessionStore implements SessionStore {
 
   async create(input: {
     userId: string;
-    workspaceId: string;
+    workspaceId: string | null;
     platform: 'web' | 'mobile';
     deviceLabel: string | null;
     tokenHash: string;
