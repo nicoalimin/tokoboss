@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { DatabaseHandle, Transaction } from '../db';
 import { authPasswordResets, authSessions, authUsers } from '../schema/index';
 import type {
@@ -150,6 +150,17 @@ export class DrizzleCredentialStore implements CredentialStore {
       authVersion: row.authVersion,
       deactivatedAt: row.deactivatedAt ? new Date(row.deactivatedAt) : null,
     };
+  }
+
+  /** Increment the account `auth_version`; returns the new value. */
+  async bumpAuthVersion(userId: string): Promise<number> {
+    const updated = await this.db
+      .update(authUsers)
+      .set({ authVersion: sql`${authUsers.authVersion} + 1` })
+      .where(eq(authUsers.userId, userId))
+      .returning({ authVersion: authUsers.authVersion });
+    if (!updated[0]) throw new Error('CREDENTIAL_NOT_FOUND');
+    return updated[0].authVersion;
   }
 }
 
