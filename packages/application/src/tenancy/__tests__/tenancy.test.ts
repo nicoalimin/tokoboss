@@ -307,7 +307,7 @@ describe('auth-version bump on role/scope/status change', () => {
     expect(revoked[0]?.userId).toBe('user_staff_9');
   });
 
-  it('revokes session rows + emits forced_sign_out on Admin deactivate', async () => {
+  it('deactivates member and bumps auth_version without session revoke (US29 C2 prep)', async () => {
     const store = new InMemoryTenancyStore();
     const ws = await newWorkspaceWithAdmin(store);
     const ctx = adminContext(ws, 'user_admin_1');
@@ -316,8 +316,11 @@ describe('auth-version bump on role/scope/status change', () => {
       { ctx, workspaceId: ws, userId: 'user_staff_9', role: 'staff' },
       store.audit
     );
-    const revoked: string[] = [];
-    await changeMember(
+    const before = await store.findByWorkspaceAndUser(ws, 'user_staff_9');
+    // No sessions revoker: membership deactivate must not require global revoke
+    // (RFC 02 C2 / task 13). Coverage of workspace_access_revoked + no-revoke
+    // with a revoker lands in a later task.
+    const updated = await changeMember(
       store,
       {
         ctx,
@@ -325,27 +328,13 @@ describe('auth-version bump on role/scope/status change', () => {
         targetUserId: 'user_staff_9',
         status: 'deactivated',
       },
-      store.audit,
-      {
-        revokeAllByUser: async (userId: string) => {
-          revoked.push(userId);
-          return 1;
-        },
-      }
+      store.audit
     );
-    expect(revoked).toEqual(['user_staff_9']);
-    const forced = store.auditEvents.filter(
-      (e) => e.action === 'security.forced_sign_out'
+    expect(updated.status).toBe('deactivated');
+    expect(updated.authVersion).toBe((before?.authVersion ?? 1) + 1);
+    expect(store.auditEvents.map((e) => e.action)).toContain(
+      'membership.status_changed'
     );
-    expect(forced).toHaveLength(1);
-    expect(forced[0]).toMatchObject({
-      category: 'security',
-      payload: {
-        workspaceId: ws,
-        userId: 'user_staff_9',
-        reason: 'admin_deactivate',
-      },
-    });
   });
 });
 
