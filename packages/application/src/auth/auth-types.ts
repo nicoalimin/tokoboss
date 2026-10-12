@@ -38,7 +38,7 @@ export interface CredentialRecord {
 export interface SessionRecord {
   id: string;
   userId: string;
-  workspaceId: string;
+  workspaceId: string | null;
   platform: AuthPlatform;
   deviceLabel: string | null;
   /** Hex sha256 of the opaque bearer token. Never logged. */
