@@ -162,6 +162,16 @@ export class DrizzleCredentialStore implements CredentialStore {
     if (!updated[0]) throw new Error('CREDENTIAL_NOT_FOUND');
     return updated[0].authVersion;
   }
+
+  /** Set (or clear with null) the account `deactivated_at`. */
+  async setDeactivatedAt(userId: string, at: Date | null): Promise<void> {
+    const updated = await this.db
+      .update(authUsers)
+      .set({ deactivatedAt: at })
+      .where(eq(authUsers.userId, userId))
+      .returning({ userId: authUsers.userId });
+    if (!updated[0]) throw new Error('CREDENTIAL_NOT_FOUND');
+  }
 }
 
 /**
