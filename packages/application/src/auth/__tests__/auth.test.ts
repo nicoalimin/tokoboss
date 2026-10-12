@@ -234,7 +234,7 @@ describe('revocation', () => {
     );
   });
 
-  it('revokes sessions on Admin deactivate: rows revoked, list empty, forced_sign_out emitted', async () => {
+  it('deactivates membership: session auth-stale, sign-in fails (US29 C2 prep)', async () => {
     const f = await newFixture();
     const signed = await signIn(f.deps, {
       email: f.email,
@@ -245,6 +245,9 @@ describe('revocation', () => {
     expect(await validateSession(f.deps, signed.token)).not.toBeNull();
     expect(await listSessions(f.deps, f.userId)).toHaveLength(1);
 
+    // No sessions revoker: membership deactivate must not require global
+    // revoke (RFC 02 C2 / task 13). Coverage of workspace_access_revoked +
+    // no-revoke with a revoker lands with the production edit + later tests.
     await changeMember(
       f.deps.members,
       {
@@ -253,27 +256,15 @@ describe('revocation', () => {
         targetUserId: f.userId,
         status: 'deactivated',
       },
-      f.deps.audit,
-      f.deps.sessions
+      f.deps.audit
     );
-    // Session rows are revoked (not only auth-stale): validation fails…
+    // Membership deactivated + auth_version bump → validateSession null
+    // (auth-stale / deactivated), list hides auth-stale rows.
     expect(await validateSession(f.deps, signed.token)).toBeNull();
-    // …and the list no longer shows them as active inventory…
     expect(await listSessions(f.deps, f.userId)).toHaveLength(0);
-    // …with a forced_sign_out audit event matching password-reset parity.
-    const forced = f.tenancy.auditEvents.filter(
-      (e) => e.action === 'security.forced_sign_out'
+    expect(f.tenancy.auditEvents.map((e) => e.action)).toContain(
+      'membership.status_changed'
     );
-    expect(forced).toHaveLength(1);
-    expect(forced[0]).toMatchObject({
-      category: 'security',
-      actorId: 'user_admin_seed',
-      payload: {
-        workspaceId: f.workspaceId,
-        userId: f.userId,
-        reason: 'admin_deactivate',
-      },
-    });
     // Sign-in after deactivate fails generically.
     await expect(
       signIn(f.deps, {
