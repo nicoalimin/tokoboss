@@ -30,6 +30,10 @@ function clone<T>(value: T): T {
 export class InMemoryCredentialStore implements CredentialStore {
   private readonly byId = new Map<string, CredentialRecord>();
   private readonly byEmail = new Map<string, string>();
+  private readonly accountState = new Map<
+    string,
+    { authVersion: number; deactivatedAt: Date | null }
+  >();
   private seq = 0;
 
   async findByEmail(normalizedEmail: string): Promise<CredentialRecord | null> {
@@ -80,6 +84,35 @@ export class InMemoryCredentialStore implements CredentialStore {
       }
     }
     throw new Error('CREDENTIAL_NOT_FOUND');
+  }
+
+  /** Account `auth_version` (default 1) + `deactivated_at`; null if no user. */
+  async getAccountState(
+    userId: string
+  ): Promise<{ authVersion: number; deactivatedAt: Date | null } | null> {
+    if (!(await this.findByUserId(userId))) return null;
+    const s = this.accountState.get(userId);
+    return {
+      authVersion: s?.authVersion ?? 1,
+      deactivatedAt: s?.deactivatedAt ? new Date(s.deactivatedAt) : null,
+    };
+  }
+
+  /** Increment the account `auth_version`; returns the new value. */
+  async bumpAuthVersion(userId: string): Promise<number> {
+    const s = await this.getAccountState(userId);
+    if (!s) throw new Error('CREDENTIAL_NOT_FOUND');
+    s.authVersion += 1;
+    this.accountState.set(userId, s);
+    return s.authVersion;
+  }
+
+  /** Set (or clear with null) the account `deactivated_at`. */
+  async setDeactivatedAt(userId: string, at: Date | null): Promise<void> {
+    const s = await this.getAccountState(userId);
+    if (!s) throw new Error('CREDENTIAL_NOT_FOUND');
+    s.deactivatedAt = at ? new Date(at) : null;
+    this.accountState.set(userId, s);
   }
 }
 
