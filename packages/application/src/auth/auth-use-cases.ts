@@ -120,6 +120,10 @@ export async function signIn(
   if (!credential) return fail();
   const ok = await deps.hasher.verify(credential.passwordHash, input.password);
   if (!ok) return fail();
+  const accountState = await deps.credentials.getAccountState(
+    credential.userId
+  );
+  if (accountState?.deactivatedAt != null) return fail();
 
   const membership = await deps.members.findByWorkspaceAndUser(
     workspaceId,
@@ -264,6 +268,7 @@ export async function signOutAll(
   input: SignOutAllInput,
   now = new Date()
 ): Promise<{ revokedCount: number }> {
+  await deps.credentials.bumpAuthVersion(input.userId);
   const revokedCount = await deps.sessions.revokeAllByUser(input.userId, now);
   await emitSecurityEvent(deps.audit, {
     workspaceId: input.workspaceId,
@@ -374,6 +379,7 @@ export async function confirmPasswordReset(
   await deps.credentials.updatePasswordHash(ticket.userId, passwordHash);
   await deps.resets.markUsed(ticket.id, now);
   await deps.sessions.revokeAllByUser(ticket.userId, now);
+  await deps.credentials.bumpAuthVersion(ticket.userId);
 
   // Bump auth_version on every membership so all pre-reset sessions are
   // auth-stale even if a session row was missed.
