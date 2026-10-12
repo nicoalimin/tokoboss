@@ -33,7 +33,7 @@ export interface CredentialStore {
 export interface SessionStore {
   create(input: {
     userId: string;
-    workspaceId: string;
+    workspaceId: string | null;
     platform: 'web' | 'mobile';
     deviceLabel: string | null;
     tokenHash: string;
