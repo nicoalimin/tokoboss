@@ -76,6 +76,9 @@ const SAFE_TENANCY_KEY = new Set([
   'expires_at',
   'acceptedAt',
   'accepted_at',
+  'sessionId',
+  'fromWorkspaceId',
+  'toWorkspaceId',
 ]);
 
 function scanValue(path: string, value: unknown): void {
