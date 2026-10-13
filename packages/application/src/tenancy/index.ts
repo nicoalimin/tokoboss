@@ -11,3 +11,5 @@ export * from './invite-ports';
 export * from './invite-crypto';
 export * from './invite-use-cases';
 export * from './in-memory-invite-store';
+export * from './workspace-landing';
+export * from './workspace-access';
