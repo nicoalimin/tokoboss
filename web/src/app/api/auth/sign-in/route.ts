@@ -2,6 +2,7 @@ import {
   InvalidCredentialsError,
   RateLimitedError,
   signIn,
+  signInAccount,
 } from '@tokoboss/application';
 import { AuthSignInBodySchema } from '@tokoboss/contracts';
 import {
@@ -47,13 +48,49 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await signIn(getAuthDeps(), {
-      email: parsed.data.email,
-      password: parsed.data.password,
-      workspaceId: parsed.data.workspaceId,
-      platform: parsed.data.platform,
-      deviceLabel: parsed.data.deviceLabel,
-      ip: callerIp(request),
+    const deps = getAuthDeps();
+    const { email, password, platform, deviceLabel } = parsed.data;
+    const workspaceId = parsed.data.workspaceId;
+    const ip = callerIp(request);
+    const isWeb = platform === 'web';
+
+    // US29 / RFC 02 row 32: no workspaceId → account session + landing.
+    if (!workspaceId) {
+      const result = await signInAccount(deps, {
+        email,
+        password,
+        platform,
+        deviceLabel,
+        ip,
+        correlationId,
+      });
+      log.info('sign-in succeeded', {
+        route: '/api/auth/sign-in',
+        sessionId: result.session.id,
+      });
+      return authJson(
+        {
+          session: result.session,
+          userId: result.userId,
+          workspaceId: null,
+          landing: result.landing,
+          ...(isWeb ? {} : { token: result.token }),
+          storage: storageKind(),
+        },
+        200,
+        requestId,
+        correlationId,
+        isWeb ? buildSessionCookie(result.token) : undefined
+      );
+    }
+
+    const result = await signIn(deps, {
+      email,
+      password,
+      workspaceId,
+      platform,
+      deviceLabel,
+      ip,
       correlationId,
     });
     // Log references only — never the token, email, or password.
@@ -61,7 +98,6 @@ export async function POST(request: Request) {
       route: '/api/auth/sign-in',
       sessionId: result.session.id,
     });
-    const isWeb = parsed.data.platform === 'web';
     return authJson(
       {
         session: result.session,
