@@ -27,6 +27,11 @@ export interface WorkspaceInviteStore {
     normalizedEmail: string,
     now: Date
   ): Promise<WorkspaceInviteRecord | null>;
+  /** Pending non-expired tickets for this email across workspaces (picker). */
+  listPendingByEmail(
+    normalizedEmail: string,
+    now: Date
+  ): Promise<WorkspaceInviteRecord[]>;
   update(
     id: string,
     workspaceId: string,
