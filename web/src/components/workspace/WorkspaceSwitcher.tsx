@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type {
   AccessibleWorkspaceView,
@@ -27,6 +27,14 @@ export function WorkspaceSwitcher({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<AccessibleWorkspaceView[] | null>(null);
+  const [q, setQ] = useState('');
+
+  const shown = useMemo(() => {
+    if (!list) return [];
+    const needle = q.trim().toLowerCase();
+    if (!needle) return list;
+    return list.filter((w) => w.name.toLowerCase().includes(needle));
+  }, [list, q]);
 
   useEffect(() => {
     if (!open) return;
@@ -81,11 +89,21 @@ export function WorkspaceSwitcher({
           <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">
             Workspace
           </p>
+          {(list?.length ?? 0) > 5 ? (
+            <input
+              type="search"
+              aria-label="Cari workspace"
+              placeholder="Ketik nama toko…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="mb-1 min-h-[44px] w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+            />
+          ) : null}
           <div className="max-h-64 space-y-1 overflow-y-auto">
             {list === null ? (
               <p className="px-2 py-2 text-sm text-neutral-500">Memuat…</p>
             ) : (
-              list.map((w) => (
+              shown.map((w) => (
                 <WorkspaceCard
                   key={w.workspaceId}
                   workspace={w}
