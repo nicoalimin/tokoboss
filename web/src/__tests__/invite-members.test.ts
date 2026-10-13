@@ -412,7 +412,7 @@ describe('invite + membership routes (memory wiring)', () => {
       password: 'other-noodles-11',
     });
 
-    // Admin of A acting on B: generic 403 everywhere.
+    // Admin of A acting on B: denied (403 today; neutral 404 after US29 row 31).
     const crossList = await listMembers(
       apiRequest(
         `/api/workspaces/${otherWs}/members`,
@@ -421,7 +421,7 @@ describe('invite + membership routes (memory wiring)', () => {
       ),
       { params: Promise.resolve({ workspaceId: otherWs }) }
     );
-    expect(crossList.status).toBe(403);
+    expect([403, 404]).toContain(crossList.status);
     const crossCreate = await createInvite(
       apiRequest(
         `/api/workspaces/${otherWs}/invites`,
@@ -430,7 +430,7 @@ describe('invite + membership routes (memory wiring)', () => {
       ),
       { params: Promise.resolve({ workspaceId: otherWs }) }
     );
-    expect(crossCreate.status).toBe(403);
+    expect([403, 404]).toContain(crossCreate.status);
 
     // Staff member of A cannot manage.
     const { token } = await createStaffInvite();
