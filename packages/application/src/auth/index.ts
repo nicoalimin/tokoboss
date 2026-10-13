@@ -6,3 +6,5 @@ export * from './crypto';
 export * from './rate-limit';
 export * from './auth-use-cases';
 export * from './in-memory-auth-store';
+export * from './account-sign-in';
+export * from './account-deactivation';
