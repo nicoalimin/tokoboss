@@ -10,7 +10,7 @@ import type {
 import { WorkspaceCard } from '@/components/workspace/WorkspaceCard';
 import { PilihWorkspaceEmpty } from '@/components/workspace/PilihWorkspaceEmpty';
 
-/** US29 / RFC 02 row 39 — picker client (empty/Keluar/invites = slice 3b). */
+/** US29 / RFC 02 row 39 — picker client (empty + single-workspace auto-enter). */
 
 function enterHref(workspaceId: string, next: string | null): string {
   const base = `/w/${encodeURIComponent(workspaceId)}`;
@@ -68,6 +68,18 @@ export function PilihWorkspaceClient({
     };
   }, [highlight, next, router]);
 
+  // One accessible workspace → auto-enter (RFC empty/boundary). Skip when
+  // `highlight` is set (invite acceptance lands on picker with no auto-enter).
+  const sole =
+    list !== null && list.length === 1 && err === null && highlight === null
+      ? list[0]!
+      : null;
+
+  useEffect(() => {
+    if (!sole) return;
+    router.replace(enterHref(sole.workspaceId, next));
+  }, [sole, next, router]);
+
   const shown = useMemo(() => {
     if (!list) return [];
     const needle = q.trim().toLowerCase();
@@ -75,7 +87,7 @@ export function PilihWorkspaceClient({
     return list.filter((w) => w.name.toLowerCase().includes(needle));
   }, [list, q]);
 
-  if (list === null && err === null) {
+  if ((list === null && err === null) || sole !== null) {
     return <p className="text-sm text-neutral-600">Memuat…</p>;
   }
 
