@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type {
   AccessibleWorkspaceView,
+  InviteView,
   MeWorkspacesResponse,
 } from '@tokoboss/contracts';
 import { WorkspaceCard } from '@/components/workspace/WorkspaceCard';
+import { PilihWorkspaceEmpty } from '@/components/workspace/PilihWorkspaceEmpty';
 
-/** US29 / RFC 02 row 39 slice 1 — picker client (empty/Keluar/invites = later). */
+/** US29 / RFC 02 row 39 — picker client (empty/Keluar/invites = slice 3b). */
 
 function enterHref(workspaceId: string, next: string | null): string {
   const base = `/w/${encodeURIComponent(workspaceId)}`;
@@ -33,6 +35,7 @@ export function PilihWorkspaceClient({
 }: Readonly<{ highlight: string | null; next: string | null }>) {
   const router = useRouter();
   const [list, setList] = useState<AccessibleWorkspaceView[] | null>(null);
+  const [invites, setInvites] = useState<InviteView[]>([]);
   const [q, setQ] = useState('');
   const [err, setErr] = useState<string | null>(null);
 
@@ -55,7 +58,10 @@ export function PilihWorkspaceClient({
         return;
       }
       const body = (await res.json()) as MeWorkspacesResponse;
-      if (!gone) setList(body.workspaces);
+      if (!gone) {
+        setList(body.workspaces);
+        setInvites(body.pendingInvites);
+      }
     })();
     return () => {
       gone = true;
@@ -71,6 +77,10 @@ export function PilihWorkspaceClient({
 
   if (list === null && err === null) {
     return <p className="text-sm text-neutral-600">Memuat…</p>;
+  }
+
+  if (list !== null && list.length === 0 && err === null) {
+    return <PilihWorkspaceEmpty invites={invites} />;
   }
 
   return (
