@@ -3,6 +3,7 @@ export * from './api-response';
 export * from './session';
 export * from './auth';
 export * from './invites';
+export * from './workspaces';
 export * from './profile';
 export * from './catalog';
 export * from './replenish';
