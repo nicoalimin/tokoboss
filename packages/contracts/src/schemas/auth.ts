@@ -39,6 +39,27 @@ export const AuthSessionViewSchema = z.object({
 });
 export type AuthSessionView = z.infer<typeof AuthSessionViewSchema>;
 
+/** Post-sign-in landing (US29 / RFC 02 row 27). */
+export const AuthLandingSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('workspace'),
+    workspaceId: z.string().min(1),
+  }),
+  z.object({ kind: z.literal('picker') }),
+]);
+export type AuthLanding = z.infer<typeof AuthLandingSchema>;
+
+/** Sign-in success JSON; landing present on account (no-workspaceId) path. */
+export const AuthSignInResponseSchema = z.object({
+  session: AuthSessionViewSchema,
+  userId: z.string().min(1),
+  workspaceId: z.string().nullable(),
+  token: z.string().min(1).optional(),
+  storage: z.string().min(1),
+  landing: AuthLandingSchema.optional(),
+});
+export type AuthSignInResponse = z.infer<typeof AuthSignInResponseSchema>;
+
 /** POST /api/auth/password-reset/request */
 export const PasswordResetRequestBodySchema = z.object({
   email: z.string().email(),
