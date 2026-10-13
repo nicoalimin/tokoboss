@@ -7,10 +7,11 @@ import type {
   MeWorkspacesResponse,
 } from '@tokoboss/contracts';
 import { WorkspaceCard } from '@/components/workspace/WorkspaceCard';
+import { WorkspaceSwitcherAccountFooter } from '@/components/workspace/WorkspaceSwitcherAccountFooter';
 
 /**
- * Desktop identity switcher — workspace list (US29 / RFC 02 row 40 slice a).
- * Account footer / Keluar / invites / section-preserving switch = later slices.
+ * Desktop identity switcher — workspace list + account footer (US29 / RFC 02 row 40).
+ * Invites count / section-preserving switch = later slices.
  * AppShell mount = row 41. Draft-dirty confirm = out of scope.
  */
 
@@ -94,6 +95,10 @@ export function WorkspaceSwitcher({
               ))
             )}
           </div>
+          <WorkspaceSwitcherAccountFooter
+            currentWorkspaceId={currentWorkspaceId}
+            onNavigate={() => setOpen(false)}
+          />
         </div>
       ) : null}
     </div>
