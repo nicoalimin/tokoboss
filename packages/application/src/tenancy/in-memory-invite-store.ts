@@ -110,6 +110,24 @@ export class InMemoryInviteStore implements WorkspaceInviteStore {
     return null;
   }
 
+  /** Pending non-expired tickets for this email across workspaces (picker). */
+  async listPendingByEmail(
+    normalizedEmail: string,
+    now: Date
+  ): Promise<WorkspaceInviteRecord[]> {
+    const out: WorkspaceInviteRecord[] = [];
+    for (const row of this.byId.values()) {
+      if (
+        row.email === normalizedEmail &&
+        row.status === 'pending' &&
+        row.expiresAt.getTime() > now.getTime()
+      ) {
+        out.push(clone(checked(row)));
+      }
+    }
+    return out;
+  }
+
   async update(
     id: string,
     workspaceId: string,
