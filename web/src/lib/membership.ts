@@ -26,12 +26,14 @@ import {
 } from '@tokoboss/application';
 import type { MemberView } from '@tokoboss/contracts';
 import {
-  getMemberStore,
-  requireSessionToken,
   slideSessionCookie,
   storageKind,
   type ValidatedRequest,
 } from '@/lib/auth';
+import {
+  requireWorkspaceMember,
+  type WorkspaceMemberDenial,
+} from '@/lib/workspace-access';
 
 let dbHandle: DbHandle | null = null;
 let memoryInvites: InMemoryInviteStore | null = null;
@@ -73,15 +75,14 @@ export interface AdminRequest {
 }
 
 export type AdminDenial =
-  | { status: 401; error: string; errorCode: 'INVALID_SESSION' }
+  | WorkspaceMemberDenial
   | { status: 403; error: string; errorCode: 'TENANCY_FORBIDDEN' };
 
 /**
- * Authenticate the request and resolve the caller's membership in the
- * TARGET workspace (path param). Returns the Admin `WorkspaceContext`;
- * non-members get a generic 403 (indistinguishable from not-found),
- * non-Admin members a 403 as well — callers learn nothing about other
- * workspaces. Missing/invalid sessions are 401.
+ * Authenticate the request and admit the caller to the TARGET workspace
+ * (path param) via `requireWorkspaceMember`: missing/invalid session 401,
+ * any no-access case the neutral 404 `WORKSPACE_NOT_AVAILABLE`. An active
+ * member whose role is not Admin gets 403 `TENANCY_FORBIDDEN`.
  */
 export async function requireWorkspaceAdmin(
   request: Request,
@@ -89,43 +90,9 @@ export async function requireWorkspaceAdmin(
 ): Promise<
   { ok: true; value: AdminRequest } | { ok: false; denial: AdminDenial }
 > {
-  const validated = await requireSessionToken(request);
-  if (!validated) {
-    return {
-      ok: false,
-      denial: {
-        status: 401,
-        error: 'Session is expired. Sign in again.',
-        errorCode: 'INVALID_SESSION',
-      },
-    };
-  }
-  const target = (workspaceId ?? '').trim();
-  if (target.length === 0) {
-    return {
-      ok: false,
-      denial: {
-        status: 403,
-        error: 'Cross-workspace access denied',
-        errorCode: 'TENANCY_FORBIDDEN',
-      },
-    };
-  }
-  const member = await getMemberStore().findByWorkspaceAndUser(
-    target,
-    validated.userId
-  );
-  if (!member || member.status !== 'active' || member.workspaceId !== target) {
-    return {
-      ok: false,
-      denial: {
-        status: 403,
-        error: 'Cross-workspace access denied',
-        errorCode: 'TENANCY_FORBIDDEN',
-      },
-    };
-  }
-  const ctx = toContext(member);
+  const member = await requireWorkspaceMember(request, workspaceId);
+  if (!member.ok) return { ok: false, denial: member.denial };
+  const ctx = toContext(member.value.membership);
   if (ctx.role !== 'admin') {
     return {
       ok: false,
@@ -136,7 +103,7 @@ export async function requireWorkspaceAdmin(
       },
     };
   }
-  return { ok: true, value: { ctx, validated } };
+  return { ok: true, value: { ctx, validated: member.value.validated } };
 }
 
 /** Refreshed `Set-Cookie` for cookie-authenticated web Admins (may be `undefined`). */
