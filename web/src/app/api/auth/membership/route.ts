@@ -5,6 +5,7 @@ import {
   storageKind,
 } from '@/lib/auth';
 import { authJson, routeContext } from '@/lib/auth-routes';
+import { requireWorkspaceMember } from '@/lib/workspace-access';
 
 /**
  * Read the caller's own workspace membership (UTA-74).
@@ -17,9 +18,38 @@ import { authJson, routeContext } from '@/lib/auth-routes';
  * `requireWorkspaceAdmin`. Missing/invalid sessions are 401; a session
  * without a live membership is a generic 403. Validating slides the server
  * idle clock; cookie web sessions also get a refreshed `Set-Cookie`.
+ * US29 row 34: optional `?workspaceId=` → requireWorkspaceMember (404).
  */
 export async function GET(request: Request) {
   const { requestId, correlationId, log } = routeContext(request);
+  const queryWorkspaceId = new URL(request.url).searchParams.get('workspaceId');
+  if (queryWorkspaceId !== null) {
+    const gate = await requireWorkspaceMember(request, queryWorkspaceId, {
+      correlationId,
+    });
+    if (!gate.ok) {
+      const { status, ...denial } = gate.denial;
+      return authJson(denial, status, requestId, correlationId);
+    }
+    const m = gate.value.membership;
+    log.info('membership read', { route: '/api/auth/membership' });
+    return authJson(
+      {
+        membership: {
+          workspaceId: m.workspaceId,
+          userId: m.userId,
+          role: m.role,
+          warehouseScope: m.warehouseScope,
+          status: m.status,
+        },
+        storage: storageKind(),
+      },
+      200,
+      requestId,
+      correlationId,
+      slideSessionCookie(gate.value.validated)
+    );
+  }
   const validated = await requireSessionToken(request);
   if (!validated) {
     return authJson(
