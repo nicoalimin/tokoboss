@@ -143,6 +143,24 @@ export class DrizzleInviteStore implements WorkspaceInviteStore {
     return row ? toRecord(row) : null;
   }
 
+  /** Pending non-expired tickets for this email across workspaces (picker). */
+  async listPendingByEmail(
+    normalizedEmail: string,
+    now: Date
+  ): Promise<WorkspaceInviteRecord[]> {
+    const rows = await this.db
+      .select()
+      .from(workspaceInvites)
+      .where(
+        and(
+          eq(workspaceInvites.email, normalizedEmail),
+          eq(workspaceInvites.status, 'pending'),
+          gt(workspaceInvites.expiresAt, now)
+        )
+      );
+    return rows.map(toRecord);
+  }
+
   async update(
     id: string,
     workspaceId: string,
