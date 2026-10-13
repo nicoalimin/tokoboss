@@ -10,11 +10,11 @@ import { z } from 'zod';
 export const AuthPlatformSchema = z.enum(['web', 'mobile']);
 export type AuthPlatformWire = z.infer<typeof AuthPlatformSchema>;
 
-/** POST /api/auth/sign-in */
+/** POST /api/auth/sign-in — workspaceId optional (US29 account path). */
 export const AuthSignInBodySchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
-  workspaceId: z.string().min(1),
+  workspaceId: z.string().min(1).optional(),
   platform: AuthPlatformSchema.default('web'),
   deviceLabel: z.string().max(120).optional(),
 });
