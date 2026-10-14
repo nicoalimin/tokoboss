@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMembership } from '@/lib/use-membership';
+import { ShellIdentity } from './ShellIdentity';
 import {
   ROLE_LABELS,
   isAuthRoute,
@@ -141,13 +142,11 @@ function SidebarContent({ pathname }: { pathname: string | null }) {
         })}
       </ul>
       <div className="mt-auto border-t border-neutral-100 pt-3">
-        {signedIn ? (
-          <Link
-            href="/sessions"
-            className="block rounded-lg px-3 py-2 text-xs text-neutral-500 hover:bg-neutral-100"
-          >
-            Sesi aktif
-          </Link>
+        {membership ? (
+          <ShellIdentity
+            workspaceId={membership.workspaceId}
+            roleLabel={roleLabel}
+          />
         ) : (
           <Link
             href="/sign-in"
