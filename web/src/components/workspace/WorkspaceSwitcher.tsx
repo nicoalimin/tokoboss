@@ -11,7 +11,7 @@ import { WorkspaceSwitcherAccountFooter } from '@/components/workspace/Workspace
 
 /**
  * Desktop identity switcher — workspace list + account footer (US29 / RFC 02 row 40).
- * Invites count / section-preserving switch = later slices.
+ * Section-preserving switch = later slices.
  * AppShell mount = row 41. Draft-dirty confirm = out of scope.
  */
 
@@ -28,6 +28,7 @@ export function WorkspaceSwitcher({
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<AccessibleWorkspaceView[] | null>(null);
   const [q, setQ] = useState('');
+  const [invites, setInvites] = useState(0);
 
   const shown = useMemo(() => {
     if (!list) return [];
@@ -45,7 +46,9 @@ export function WorkspaceSwitcher({
       });
       if (!res.ok || gone) return;
       const body = (await res.json()) as MeWorkspacesResponse;
-      if (!gone) setList(body.workspaces);
+      if (gone) return;
+      setList(body.workspaces);
+      setInvites(body.pendingInvites.length);
     })();
     return () => {
       gone = true;
@@ -113,6 +116,14 @@ export function WorkspaceSwitcher({
               ))
             )}
           </div>
+          {invites > 0 ? (
+            <p
+              data-testid="workspace-switcher-invites"
+              className="px-2 pt-2 text-xs text-neutral-600"
+            >
+              {invites} undangan tertunda
+            </p>
+          ) : null}
           <WorkspaceSwitcherAccountFooter
             currentWorkspaceId={currentWorkspaceId}
             onNavigate={() => setOpen(false)}
