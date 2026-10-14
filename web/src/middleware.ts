@@ -5,16 +5,28 @@ import {
   newCorrelationId,
   newRequestId,
 } from '@tokoboss/observability';
+import { legacyRedirectTarget } from '@/lib/legacy-redirect';
 
 /**
- * Propagate correlation vocabulary on every response.
- * Generates `x-request-id` when absent; preserves caller `x-correlation-id`
- * so web -> job -> integration traces stay joined.
+ * Correlation headers + US29 / RFC 02 row 60 legacy redirects (308).
+ * Membership stays in `/w/` layout.
  */
 export function middleware(request: NextRequest) {
   const requestId = request.headers.get(REQUEST_ID_HEADER) ?? newRequestId();
   const correlationId =
     request.headers.get(CORRELATION_ID_HEADER) ?? newCorrelationId();
+
+  const target = legacyRedirectTarget(
+    request.nextUrl.pathname,
+    request.nextUrl.searchParams
+  );
+  if (target) {
+    const res = NextResponse.redirect(new URL(target, request.url), 308);
+    res.headers.set(REQUEST_ID_HEADER, requestId);
+    res.headers.set(CORRELATION_ID_HEADER, correlationId);
+    return res;
+  }
+
   const res = NextResponse.next();
   res.headers.set(REQUEST_ID_HEADER, requestId);
   res.headers.set(CORRELATION_ID_HEADER, correlationId);
@@ -22,5 +34,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)'],
 };
