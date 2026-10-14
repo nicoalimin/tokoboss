@@ -23,24 +23,19 @@ export function SignInForm({
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [workspaceId, setWorkspaceId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!email.trim() || !password || !workspaceId.trim()) {
+    if (!email.trim() || !password) {
       setError(copy.validationError);
       return;
     }
     setPending(true);
     try {
-      await signIn({
-        email: email.trim(),
-        password,
-        workspaceId: workspaceId.trim(),
-      });
+      await signIn({ email: email.trim(), password });
       router.push('/sessions');
       router.refresh();
     } catch (err) {
@@ -106,33 +101,6 @@ export function SignInForm({
             aria-invalid={error ? true : undefined}
             className={inputClass}
           />
-        </div>
-        <div>
-          <label
-            htmlFor="signin-workspace"
-            className="block text-sm font-medium text-neutral-700 mb-1"
-          >
-            {copy.workspaceLabel}
-          </label>
-          <input
-            id="signin-workspace"
-            name="workspaceId"
-            type="text"
-            autoComplete="off"
-            required
-            placeholder={copy.workspacePlaceholder}
-            value={workspaceId}
-            onChange={(e) => setWorkspaceId(e.target.value)}
-            aria-describedby="signin-workspace-hint"
-            aria-invalid={error ? true : undefined}
-            className={inputClass}
-          />
-          <p
-            id="signin-workspace-hint"
-            className="mt-1 text-xs text-neutral-500"
-          >
-            {copy.workspaceHint}
-          </p>
         </div>
       </div>
 
