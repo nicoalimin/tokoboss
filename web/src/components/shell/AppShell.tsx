@@ -10,6 +10,7 @@ import {
   isAuthRoute,
   isNavActive,
   visibleNavItems,
+  visibleNavItemsForWorkspace,
 } from './nav-items';
 
 /**
@@ -86,9 +87,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Row 42: workspace id from `/w/<id>/…`; legacy unscoped routes → null. */
+function pathWorkspaceId(pathname: string | null): string | null {
+  const raw = /^\/w\/([^/?#]+)/.exec(pathname ?? '')?.[1];
+  if (!raw) return null;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+}
+
 function SidebarContent({ pathname }: { pathname: string | null }) {
   const { membership, signedIn, loading } = useMembership();
-  const items = visibleNavItems(membership?.role ?? null);
+  const role = membership?.role ?? null;
+  const workspaceId = pathWorkspaceId(pathname);
+  const items = workspaceId
+    ? visibleNavItemsForWorkspace(workspaceId, role)
+    : visibleNavItems(role);
   const roleLabel = membership
     ? (ROLE_LABELS[membership.role] ?? membership.role)
     : null;
