@@ -56,6 +56,14 @@ export function isAuthRoute(pathname: string | null | undefined): boolean {
   return AUTH_ROUTE_PREFIXES.some((p) => matchesPrefix(pathname, p));
 }
 
+/** RFC 02 row 42: `/` → `/w/<id>/dashboard`; `/profil` → `/akun/profil`; else `/w/<id><href>`. */
+export function workspaceNavHref(workspaceId: string, href: string): string {
+  const id = encodeURIComponent(workspaceId);
+  if (href === '/') return `/w/${id}/dashboard`;
+  if (href === '/profil') return '/akun/profil';
+  return `/w/${id}${href}`;
+}
+
 /** True when the sidebar item for `href` should be highlighted. */
 export function isNavActive(
   pathname: string | null | undefined,
@@ -63,11 +71,18 @@ export function isNavActive(
 ): boolean {
   if (!pathname) return false;
   if (href === '/') return pathname === '/';
-  if (href === '/profil') {
+  if (href.endsWith('/dashboard')) {
+    return (
+      pathname === href || pathname === href.slice(0, -'/dashboard'.length)
+    );
+  }
+  if (href === '/profil' || href === '/akun/profil') {
     return (
       matchesPrefix(pathname, '/profil') ||
       matchesPrefix(pathname, '/profile') ||
-      matchesPrefix(pathname, '/sessions')
+      matchesPrefix(pathname, '/sessions') ||
+      matchesPrefix(pathname, '/akun/profil') ||
+      matchesPrefix(pathname, '/akun/sesi')
     );
   }
   return matchesPrefix(pathname, href);
@@ -84,6 +99,17 @@ export function visibleNavItems(
   return SHELL_NAV_ITEMS.filter(
     (item) => !item.adminOnly || !known || canManageTeam(role)
   );
+}
+
+/** Workspace-scoped nav hrefs (`/w/<id>/…`; Profil → `/akun/profil`). */
+export function visibleNavItemsForWorkspace(
+  workspaceId: string,
+  role: string | null | undefined
+): ShellNavItem[] {
+  return visibleNavItems(role).map((item) => ({
+    ...item,
+    href: workspaceNavHref(workspaceId, item.href),
+  }));
 }
 
 /** Home cards: every module except Beranda itself. */
