@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { getMyMembership, type MyMembershipView } from '@/lib/team-client';
 
 export interface MembershipState {
@@ -19,13 +20,15 @@ export interface MembershipState {
  * deny-by-default and gates every deep link).
  */
 export function useMembership(): MembershipState {
+  // US29 row 43: on `/w/<id>/…` ask for that workspace's membership.
+  const workspaceId = pathWorkspaceId(usePathname());
   const [membership, setMembership] = useState<MyMembershipView | null>(null);
   const [loading, setLoading] = useState(true);
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    getMyMembership()
+    getMyMembership({ workspaceId: workspaceId ?? undefined })
       .then((m) => {
         if (cancelled) return;
         setMembership(m);
@@ -41,7 +44,18 @@ export function useMembership(): MembershipState {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [workspaceId]);
 
   return { membership, loading, signedIn };
+}
+
+/** Workspace id from `/w/<id>/…`; legacy unscoped routes → null. */
+function pathWorkspaceId(pathname: string | null): string | null {
+  const raw = /^\/w\/([^/?#]+)/.exec(pathname ?? '')?.[1];
+  if (!raw) return null;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
 }
