@@ -15,9 +15,9 @@ const inputClass =
  * Invite-accept form (UTA-71).
  *
  * Token-gated: no session required. Posts `{ token, newPassword? }` to
- * `POST /api/invites/accept`. The ticket itself is never logged or echoed
- * back — success shows opaque ids only. Expired sessions cannot happen here
- * (no cookie needed), but invalid/expired tickets map to dedicated copy.
+ * `POST /api/invites/accept`. The ticket itself is never logged. On success
+ * navigates to `/pilih-workspace?highlight=<workspaceId>` (US29 / RFC 02
+ * row 66). Invalid/expired tickets map to dedicated copy.
  */
 export function AcceptInviteForm({
   initialToken = '',
@@ -29,7 +29,6 @@ export function AcceptInviteForm({
   const [token, setToken] = useState(initialToken);
   const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
@@ -39,7 +38,6 @@ export function AcceptInviteForm({
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setDone(null);
     if (!token.trim()) {
       setError(copy.validationError);
       return;
@@ -50,10 +48,11 @@ export function AcceptInviteForm({
         token: token.trim(),
         ...(newPassword ? { newPassword } : {}),
       });
-      // Keep the ticket out of the success message — opaque ids only.
-      setDone(`${copy.acceptDone} (${result.workspaceId})`);
-      setToken('');
-      setNewPassword('');
+      // US29 / RFC 02 row 66: land on picker with the new workspace highlighted.
+      router.push(
+        `/pilih-workspace?highlight=${encodeURIComponent(result.workspaceId)}`
+      );
+      router.refresh();
     } catch (err) {
       setError(
         err instanceof TeamClientError ? err.message : copy.genericError
@@ -66,12 +65,6 @@ export function AcceptInviteForm({
   return (
     <form onSubmit={onSubmit} noValidate data-testid="accept-invite-form">
       {error ? <AuthAlert testId="accept-error">{error}</AuthAlert> : null}
-      {done ? (
-        <AuthAlert tone="success" testId="accept-done">
-          {done}
-        </AuthAlert>
-      ) : null}
-
       <div className="space-y-4">
         <div>
           <label
