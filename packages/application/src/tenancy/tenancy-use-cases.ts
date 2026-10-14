@@ -488,16 +488,10 @@ export async function emitSecurityEvent(
 }
 
 /**
-<<<<<<< Updated upstream
  * Account-level security events (US29 / RFC 02): web sign-in, account
  * sign-out-all and account deactivation have no workspace, so the audit
  * row is written with a NULL `tenant_id` (nullable since `0018`).
  * Workspace-scoped events keep using `emitSecurityEvent` unchanged.
-=======
- * Account-level security event (RFC 02): web sign-in, account
- * sign-out-all, account deactivation. There is no workspace, so the
- * audit row has a NULL `tenant_id`. Payloads stay identifier-free.
->>>>>>> Stashed changes
  */
 export async function emitAccountSecurityEvent(
   audit: TenancyAuditSink,
