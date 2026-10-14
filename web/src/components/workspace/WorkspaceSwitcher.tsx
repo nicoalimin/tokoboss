@@ -1,18 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import type {
   AccessibleWorkspaceView,
   MeWorkspacesResponse,
 } from '@tokoboss/contracts';
 import { WorkspaceCard } from '@/components/workspace/WorkspaceCard';
 import { WorkspaceSwitcherAccountFooter } from '@/components/workspace/WorkspaceSwitcherAccountFooter';
+import { switchTarget } from '@/components/workspace/switch-target';
 
 /**
  * Desktop identity switcher — workspace list + account footer (US29 / RFC 02 row 40).
- * Section-preserving switch = later slices.
- * AppShell mount = row 41. Draft-dirty confirm = out of scope.
+ * Section-preserving switch via switchTarget. AppShell mount = row 41.
+ * Draft-dirty confirm = out of scope.
  */
 
 export function WorkspaceSwitcher({
@@ -25,6 +26,7 @@ export function WorkspaceSwitcher({
   roleLabel?: string | null;
 }>) {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<AccessibleWorkspaceView[] | null>(null);
   const [q, setQ] = useState('');
@@ -58,7 +60,8 @@ export function WorkspaceSwitcher({
   function onSelect(id: string) {
     setOpen(false);
     if (id === currentWorkspaceId) return;
-    router.push(`/w/${encodeURIComponent(id)}/dashboard`);
+    const nextRole = list?.find((w) => w.workspaceId === id)?.role ?? 'staff';
+    router.push(switchTarget(pathname, id, nextRole));
   }
 
   return (
