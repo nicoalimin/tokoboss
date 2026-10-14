@@ -366,11 +366,15 @@ export async function deactivateMember(
  * to the generic access copy. Responses carry opaque ids only.
  */
 export async function getMyMembership(
-  opts: { fetchFn?: FetchFn; lang?: TeamLang } = {}
+  opts: { fetchFn?: FetchFn; lang?: TeamLang; workspaceId?: string } = {}
 ): Promise<MyMembershipView> {
+  // US29 row 43: path workspace → `?workspaceId=` (server 404s non-members).
+  const query = opts.workspaceId
+    ? `?workspaceId=${encodeURIComponent(opts.workspaceId)}`
+    : '';
   const data = await getJson<{ membership: MyMembershipView }>(
     opts.fetchFn ?? fetch,
-    '/api/auth/membership',
+    `/api/auth/membership${query}`,
     opts.lang ?? 'en'
   );
   return data.membership;
