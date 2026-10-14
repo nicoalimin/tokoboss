@@ -12,6 +12,7 @@
  *   `/sign-in?expired=1` (30m web idle re-auth; no absolute-expiry copy).
  */
 
+import type { AuthLanding } from '@tokoboss/contracts';
 import { getAuthCopy, type AuthLang } from './auth-copy';
 
 export interface SessionView {
@@ -26,13 +27,16 @@ export interface SessionView {
 export interface SignInInput {
   email: string;
   password: string;
-  workspaceId: string;
+  /** Legacy workspace-bound sign-in; web omits it (US29 / RFC 02 row 65). */
+  workspaceId?: string;
 }
 
 export interface SignInResult {
   session: SessionView;
   userId: string;
-  workspaceId: string;
+  workspaceId: string | null;
+  /** Post-sign-in landing; set on the account (no-workspaceId) path. */
+  landing: AuthLanding | null;
 }
 
 export class AuthClientError extends Error {
@@ -149,7 +153,8 @@ export async function signIn(
   const data = await postJson<{
     session: SessionView;
     userId: string;
-    workspaceId: string;
+    workspaceId: string | null;
+    landing?: AuthLanding;
   }>(
     opts.fetchFn ?? fetch,
     '/api/auth/sign-in',
@@ -159,7 +164,8 @@ export async function signIn(
   return {
     session: data.session,
     userId: data.userId,
-    workspaceId: data.workspaceId,
+    workspaceId: data.workspaceId ?? null,
+    landing: data.landing ?? null,
   };
 }
 
