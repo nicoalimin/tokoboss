@@ -38,3 +38,8 @@ export function enterHref(workspaceId: string, next: string | null): string {
   if (m) return `${base}${m[1] && m[1].length > 1 ? m[1] : '/dashboard'}`;
   return `${base}${next}`;
 }
+
+/** Row 66: after an invite is accepted, land on the picker with it highlighted. */
+export function inviteLandingHref(workspaceId: string): string {
+  return `/pilih-workspace?highlight=${encodeURIComponent(workspaceId)}`;
+}
