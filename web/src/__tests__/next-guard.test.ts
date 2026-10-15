@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { enterHref, postSignInHref } from '../lib/next-guard';
+import {
+  enterHref,
+  inviteLandingHref,
+  postSignInHref,
+} from '../lib/next-guard';
 
 /**
  * US29 / RFC 02 row 67 — pure `next` guards (rows 64 + 39). No DOM.
@@ -55,5 +59,14 @@ describe('enterHref (row 39)', () => {
     expect(enterHref('ws1', '/w/other/')).toBe('/w/ws1/dashboard');
     expect(enterHref('ws1', '/produk')).toBe('/w/ws1/produk');
     expect(enterHref('a/b', '/transfer')).toBe('/w/a%2Fb/transfer');
+  });
+});
+
+describe('inviteLandingHref (row 66)', () => {
+  it('lands on the picker with the workspace highlighted and encoded', () => {
+    expect(inviteLandingHref('ws1')).toBe('/pilih-workspace?highlight=ws1');
+    expect(inviteLandingHref('a/b c&d')).toBe(
+      '/pilih-workspace?highlight=a%2Fb%20c%26d'
+    );
   });
 });
