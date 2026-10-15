@@ -167,6 +167,22 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     }
 
     const json = (await res.json().catch(() => null)) as unknown;
+
+    // US29 / RFC 02 row 68 (C5): flat 404 WORKSPACE_NOT_AVAILABLE → no-access.
+    if (
+      res.status === 404 &&
+      json !== null &&
+      typeof json === 'object' &&
+      (json as { errorCode?: unknown }).errorCode === 'WORKSPACE_NOT_AVAILABLE'
+    ) {
+      throw new ApiError(
+        'WORKSPACE_NOT_AVAILABLE',
+        'Akses kamu ke workspace ini tidak aktif',
+        404,
+        requestId
+      );
+    }
+
     if (res.status < 200 || res.status >= 300) {
       const envelope = ErrorEnvelopeSchema.safeParse(json);
       throw new ApiError(
