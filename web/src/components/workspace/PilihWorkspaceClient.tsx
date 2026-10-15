@@ -9,25 +9,9 @@ import type {
 } from '@tokoboss/contracts';
 import { WorkspaceCard } from '@/components/workspace/WorkspaceCard';
 import { PilihWorkspaceEmpty } from '@/components/workspace/PilihWorkspaceEmpty';
+import { enterHref } from '@/lib/next-guard';
 
 /** US29 / RFC 02 row 39 — picker client (empty + single-workspace auto-enter). */
-
-function enterHref(workspaceId: string, next: string | null): string {
-  const base = `/w/${encodeURIComponent(workspaceId)}`;
-  const bad =
-    !next ||
-    !next.startsWith('/') ||
-    next.startsWith('//') ||
-    next.startsWith('/akun/') ||
-    next.startsWith('/accept-invite') ||
-    next.startsWith('/sign-in') ||
-    next.startsWith('/pilih-workspace') ||
-    next.startsWith('/go/');
-  if (bad) return `${base}/dashboard`;
-  const m = /^\/w\/[^/]+(\/.*)?$/.exec(next);
-  if (m) return `${base}${m[1] && m[1].length > 1 ? m[1] : '/dashboard'}`;
-  return `${base}${next}`;
-}
 
 export function PilihWorkspaceClient({
   highlight,
