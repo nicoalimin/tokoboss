@@ -3,31 +3,15 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { AuthLanding } from '@tokoboss/contracts';
 import { AuthClientError, signIn } from '@/lib/auth-client';
 import { getAuthCopy } from '@/lib/auth-copy';
+import { postSignInHref } from '@/lib/next-guard';
 import { AuthAlert } from './AuthAlert';
 
 const inputClass =
   'w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-base text-neutral-900 ' +
   'placeholder:text-neutral-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ' +
   'aria-[invalid=true]:border-error-500 min-h-[44px]';
-
-/** US29 / RFC 02 row 64: follow a safe `next`, else the sign-in landing. */
-function postSignInHref(
-  next: string | null,
-  landing: AuthLanding | null
-): string {
-  const safe =
-    next !== null &&
-    !next.startsWith('//') &&
-    ['/w/', '/akun/', '/accept-invite', '/go/'].some((p) => next.startsWith(p));
-  if (safe) return next;
-  if (landing?.kind === 'workspace') {
-    return `/w/${encodeURIComponent(landing.workspaceId)}/dashboard`;
-  }
-  return '/pilih-workspace';
-}
 
 export function SignInForm({
   expired = false,
