@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TeamClientError, acceptInvite } from '@/lib/team-client';
+import { inviteLandingHref } from '@/lib/next-guard';
 import { getTeamCopy } from '@/lib/team-copy';
 import { AuthAlert } from '../auth/AuthAlert';
 
@@ -49,9 +50,7 @@ export function AcceptInviteForm({
         ...(newPassword ? { newPassword } : {}),
       });
       // US29 / RFC 02 row 66: land on picker with the new workspace highlighted.
-      router.push(
-        `/pilih-workspace?highlight=${encodeURIComponent(result.workspaceId)}`
-      );
+      router.push(inviteLandingHref(result.workspaceId));
       router.refresh();
     } catch (err) {
       setError(
