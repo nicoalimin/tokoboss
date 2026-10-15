@@ -15,6 +15,9 @@ export * from './product-imports';
 export * from './legacy-store';
 export * from './transfers';
 export * from './purchase-orders';
+export * from './stock-count-sessions';
+export * from './stock-count-lines';
+export * from './stock-count-entries';
 
 import { auditEvents } from './audit-events';
 import { authPasswordResets, authSessions, authUsers } from './auth';
@@ -42,6 +45,9 @@ import {
   catalogPurchaseOrderItems,
   catalogPurchaseOrders,
 } from './purchase-orders';
+import { stockCountSessions } from './stock-count-sessions';
+import { stockCountLines } from './stock-count-lines';
+import { stockCountEntries } from './stock-count-entries';
 
 export const schema = {
   tenants,
@@ -73,4 +79,7 @@ export const schema = {
   catalogTransferItems,
   catalogPurchaseOrders,
   catalogPurchaseOrderItems,
+  stockCountSessions,
+  stockCountLines,
+  stockCountEntries,
 };
