@@ -10,3 +10,6 @@ export * from './replenish';
 export * from './bundles';
 export * from './imports';
 export * from './versioned';
+export * from './stock-counts';
+export * from './stock-count-views';
+export * from './stock-count-query-views';
