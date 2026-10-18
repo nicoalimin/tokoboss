@@ -1,4 +1,4 @@
-import { updateWarehouse } from '@tokoboss/application';
+import { assertNoOpenCount, updateWarehouse } from '@tokoboss/application';
 import { UpdateWarehouseBodySchema } from '@tokoboss/contracts';
 import {
   catalogErrorStatus,
@@ -9,6 +9,8 @@ import {
   toWarehouseView,
 } from '@/lib/catalog';
 import { authJson, routeContext } from '@/lib/auth-routes';
+import { getStockCountStore } from '@/lib/stock-count';
+import { stockCountFailed } from '@/lib/stock-count-routes';
 
 interface RouteParams {
   params: Promise<{ workspaceId: string; warehouseId: string }>;
@@ -48,6 +50,27 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       requestId,
       correlationId
     );
+  }
+
+  // RFC 03 task 36 (US06): no deactivate while a stock opname is open.
+  if (parsed.data.status === 'deactivated') {
+    const ws = manager.value.ctx.workspaceId;
+    try {
+      const current = await getCatalogStore().findWarehouseById(
+        ws,
+        warehouseId
+      );
+      if (current) {
+        await assertNoOpenCount(getStockCountStore(), {
+          workspaceId: ws,
+          warehouseId,
+          warehouseName: current.name,
+        });
+      }
+    } catch (err) {
+      const ids: [string, string] = [requestId, correlationId];
+      return stockCountFailed(err, ids, 'Warehouse update failed.');
+    }
   }
 
   try {
