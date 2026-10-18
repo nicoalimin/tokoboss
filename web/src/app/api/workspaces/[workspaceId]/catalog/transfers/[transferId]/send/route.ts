@@ -1,4 +1,7 @@
-import { sendTransferUseCase } from '@tokoboss/application';
+import {
+  assertNoOutboundFreeze,
+  sendTransferUseCase,
+} from '@tokoboss/application';
 import { SendTransferBodySchema } from '@tokoboss/contracts';
 import {
   catalogErrorStatus,
@@ -9,6 +12,8 @@ import {
   toTransferWithItemsView,
 } from '@/lib/catalog';
 import { authJson, routeContext } from '@/lib/auth-routes';
+import { getStockCountStore } from '@/lib/stock-count';
+import { stockCountFailed } from '@/lib/stock-count-routes';
 
 interface RouteParams {
   params: Promise<{ workspaceId: string; transferId: string }>;
@@ -47,6 +52,21 @@ export async function POST(request: Request, { params }: RouteParams) {
       requestId,
       correlationId
     );
+  }
+
+  // RFC 03 task 37 (D2): no outbound send while the source is frozen.
+  const ws = manager.value.ctx.workspaceId;
+  try {
+    const transfer = await getCatalogStore().findTransferById(ws, transferId);
+    if (transfer) {
+      await assertNoOutboundFreeze(getStockCountStore(), {
+        workspaceId: ws,
+        warehouseId: transfer.sourceWarehouseId,
+      });
+    }
+  } catch (err) {
+    const ids: [string, string] = [requestId, correlationId];
+    return stockCountFailed(err, ids, 'Sending transfer failed.');
   }
 
   try {
