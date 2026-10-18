@@ -223,17 +223,18 @@ export interface ChangeMemberInput {
  * invalidated. Deactivating or demoting the last active Admin is rejected
  * (`LastAdminError`).
  *
- * Active → deactivated removes access to this workspace only (US29 /
- * RFC 02 C2): the membership `auth_version` bump rejects sessions bound to
- * it, `security.workspace_access_revoked` (`admin_deactivate`) is emitted,
- * and the account session plus other workspaces keep working. Session rows
- * are not revoked; `_sessions` is kept for caller compatibility.
+ * When the status transitions active → deactivated and a `sessions`
+ * revoker is provided, every session row for the user is revoked and
+ * `security.forced_sign_out` (`admin_deactivate`) is emitted — matching
+ * the password-reset revoke-all. Callers that manage members (admin
+ * routes) must pass the session store; without it only the `auth_version`
+ * bump invalidates sessions (lazy, on next validation).
  */
 export async function changeMember(
   members: WorkspaceMemberStore,
   input: ChangeMemberInput,
   audit?: TenancyAuditSink,
-  _sessions?: SessionRevoker
+  sessions?: SessionRevoker
 ): Promise<WorkspaceMemberRecord> {
   assertSameWorkspace(input.ctx, input.workspaceId);
   if (input.ctx.role !== 'admin') {
@@ -322,21 +323,28 @@ export async function changeMember(
     }
   }
 
-  // Active → deactivated: workspace access only (RFC 02 C2), no global
-  // revoke. The auth_version bump above rejects workspace-bound sessions.
-  if (current.status === 'active' && nextStatus === 'deactivated' && audit) {
-    await audit.append({
-      workspaceId,
-      action: 'security.workspace_access_revoked',
-      category: 'security',
-      actorType: input.actorType ?? 'user',
-      actorId: input.ctx.userId,
-      correlationId: input.correlationId,
-      payload: auditPayload(
-        { workspaceId, userId: targetUserId, reason: 'admin_deactivate' },
-        'security.workspace_access_revoked'
-      ),
-    });
+  // Active → deactivated: revoke every session row now (not lazily on next
+  // validation) and audit it, mirroring the password-reset revoke-all.
+  if (current.status === 'active' && nextStatus === 'deactivated' && sessions) {
+    await sessions.revokeAllByUser(targetUserId, new Date());
+    if (audit) {
+      await audit.append({
+        workspaceId,
+        action: 'security.forced_sign_out',
+        category: 'security',
+        actorType: input.actorType ?? 'user',
+        actorId: input.ctx.userId,
+        correlationId: input.correlationId,
+        payload: auditPayload(
+          {
+            workspaceId,
+            userId: targetUserId,
+            reason: 'admin_deactivate',
+          },
+          'security.forced_sign_out'
+        ),
+      });
+    }
   }
   return updated;
 }
@@ -488,10 +496,9 @@ export async function emitSecurityEvent(
 }
 
 /**
- * Account-level security events (US29 / RFC 02): web sign-in, account
- * sign-out-all and account deactivation have no workspace, so the audit
- * row is written with a NULL `tenant_id` (nullable since `0018`).
- * Workspace-scoped events keep using `emitSecurityEvent` unchanged.
+ * Account-level security event (RFC 02): web sign-in, account
+ * sign-out-all, account deactivation. There is no workspace, so the
+ * audit row has a NULL `tenant_id`. Payloads stay identifier-free.
  */
 export async function emitAccountSecurityEvent(
   audit: TenancyAuditSink,
