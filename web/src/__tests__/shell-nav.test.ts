@@ -46,6 +46,7 @@ describe('shell nav (UTA-113)', () => {
       '/stok-tipis',
       '/gudang',
       '/transfer',
+      '/opname',
       '/team',
       '/pengaturan',
       '/profil',
