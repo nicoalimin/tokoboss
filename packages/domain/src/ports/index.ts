@@ -3,3 +3,5 @@
 export * from './repository';
 export * from './event-publisher';
 export * from './storage';
+export * from './marketplace-connector-types';
+export * from './marketplace-connector';
