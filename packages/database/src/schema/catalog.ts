@@ -220,6 +220,10 @@ export const catalogChannelMappings = pgTable(
     sellerSkuHint: text('seller_sku_hint'),
     barcodeHint: text('barcode_hint'),
     listingName: text('listing_name'),
+    archivedAt: timestamp('archived_at', {
+      withTimezone: true,
+      mode: 'date',
+    }),
     ...utcTimestamps(),
   },
   (t) => [
