@@ -34,6 +34,10 @@ export function CountPanel(props: CountPanelProps) {
   const labelOf = (l: StockCountLineView) =>
     labels?.[l.variantId] ?? l.variantId;
   const counted = lines.filter((l) => l.countedQty !== null).length;
+  // Labels are SKU codes, so a repeat SKU scan opens the duplicate dialog.
+  const countedCodes = labels
+    ? lines.filter((l) => l.countedQty !== null).map(labelOf)
+    : undefined;
   const q = query.trim().toLowerCase();
   const shown =
     q === ''
@@ -70,6 +74,7 @@ export function CountPanel(props: CountPanelProps) {
       <CountScanEntry
         workspaceId={workspaceId}
         sessionId={sessionId}
+        countedCodes={countedCodes}
         onRecorded={onRecorded}
       />
       <label className="block text-sm text-neutral-700">
