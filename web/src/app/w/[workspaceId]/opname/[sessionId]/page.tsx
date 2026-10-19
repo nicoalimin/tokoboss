@@ -3,8 +3,14 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import type { StockCountDetailView } from '@tokoboss/contracts';
+import type {
+  StockCountDetailView,
+  StockCountLineReviewBody,
+} from '@tokoboss/contracts';
+import { CountActionsBar } from '@/components/opname/CountActionsBar';
 import { CountPanel } from '@/components/opname/CountPanel';
+import { PostedResult } from '@/components/opname/PostedResult';
+import { ReviewPanel } from '@/components/opname/ReviewPanel';
 import { getStockCount } from '@/lib/stock-count-client';
 import { getStockCountCopy } from '@/lib/stock-count-copy';
 
@@ -25,6 +31,10 @@ export default function OpnameSessionPage() {
   const copy = getStockCountCopy('id');
   const [detail, setDetail] = useState<StockCountDetailView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<StockCountLineReviewBody[]>([]);
+  const reload = () => {
+    getStockCount(ws, id).then(setDetail, () => undefined);
+  };
 
   useEffect(() => {
     if (!ws || !id) return;
@@ -83,13 +93,28 @@ export default function OpnameSessionPage() {
           {s.status === 'counting' && detail && (
             <section data-testid="opname-panel-counting" className="mt-6">
               <CountPanel workspaceId={ws} sessionId={id} detail={detail} />
+              <CountActionsBar
+                workspaceId={ws}
+                detail={detail}
+                onDone={reload}
+              />
             </section>
           )}
-          {s.status === 'submitted' && (
-            <section data-testid="opname-panel-review" className="mt-6" />
+          {s.status === 'submitted' && detail && (
+            <section data-testid="opname-panel-review" className="mt-6">
+              <ReviewPanel detail={detail} onReviewsChange={setReviews} />
+              <CountActionsBar
+                workspaceId={ws}
+                detail={detail}
+                reviews={reviews}
+                onDone={reload}
+              />
+            </section>
           )}
-          {s.status === 'posted' && (
-            <section data-testid="opname-panel-posted" className="mt-6" />
+          {s.status === 'posted' && detail && (
+            <section data-testid="opname-panel-posted" className="mt-6">
+              <PostedResult detail={detail} />
+            </section>
           )}
           {s.status === 'cancelled' && (
             <p
