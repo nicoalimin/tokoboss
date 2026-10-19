@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { StockCountDetailView } from '@tokoboss/contracts';
+import { CountPanel } from '@/components/opname/CountPanel';
 import { getStockCount } from '@/lib/stock-count-client';
 import { getStockCountCopy } from '@/lib/stock-count-copy';
 
@@ -79,8 +80,10 @@ export default function OpnameSessionPage() {
             )}
           </div>
           <p className="mt-1 text-sm text-neutral-600">{copy.snapshotNote}</p>
-          {s.status === 'counting' && (
-            <section data-testid="opname-panel-counting" className="mt-6" />
+          {s.status === 'counting' && detail && (
+            <section data-testid="opname-panel-counting" className="mt-6">
+              <CountPanel workspaceId={ws} sessionId={id} detail={detail} />
+            </section>
           )}
           {s.status === 'submitted' && (
             <section data-testid="opname-panel-review" className="mt-6" />
