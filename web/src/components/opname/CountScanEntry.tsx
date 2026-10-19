@@ -1,9 +1,13 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import type { StockCountLineView } from '@tokoboss/contracts';
 import { recordCountEntry } from '@/lib/stock-count-client-actions';
 import { getStockCountCountCopy } from '@/lib/stock-count-count-copy';
+import {
+  DuplicateScanDialog,
+  type DuplicateScanChoice,
+} from './DuplicateScanDialog';
 
 const FIELD = 'mt-1 min-h-11 w-full rounded-lg border border-neutral-300 px-3';
 const MAX_QTY = 1_000_000;
@@ -11,6 +15,8 @@ const MAX_QTY = 1_000_000;
 export interface CountScanEntryProps {
   workspaceId: string;
   sessionId: string;
+  /** Scan codes already counted before this panel opened (dup check). */
+  countedCodes?: readonly string[];
   onRecorded: (line: StockCountLineView, deduplicated: boolean) => void;
 }
 
@@ -22,12 +28,20 @@ export interface CountScanEntryProps {
  * Online only; errors show client-safe copy. 44 px touch targets.
  */
 export function CountScanEntry(props: CountScanEntryProps) {
-  const { workspaceId, sessionId, onRecorded } = props;
+  const { workspaceId, sessionId, countedCodes, onRecorded } = props;
   const copy = getStockCountCountCopy('id');
   const [code, setCode] = useState('');
   const [qty, setQty] = useState('1');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [seen, setSeen] = useState<ReadonlySet<string>>(() => new Set());
+  const [pending, setPending] = useState<{ code: string; n: number } | null>(
+    null
+  );
+  const [remembered, setRemembered] = useState<DuplicateScanChoice | null>(
+    null
+  );
+  const closeDup = useCallback(() => setPending(null), []);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -39,15 +53,22 @@ export function CountScanEntry(props: CountScanEntryProps) {
       setError(bad ? copy.qtyInvalid : copy.onlineRequired);
       return;
     }
+    const dup = seen.has(scanCode) || !!countedCodes?.includes(scanCode);
+    if (dup && remembered === null) setPending({ code: scanCode, n });
+    else await save(scanCode, n, dup && remembered ? remembered : 'add');
+  }
+
+  async function save(scanCode: string, n: number, mode: DuplicateScanChoice) {
     setSaving(true);
     setError(null);
     try {
       const r = await recordCountEntry(workspaceId, sessionId, {
         scanCode,
         qty: n,
-        mode: 'add',
+        mode,
         clientEntryId: crypto.randomUUID(),
       });
+      setSeen((prev) => new Set(prev).add(scanCode));
       onRecorded(r.line, r.deduplicated);
       setCode('');
       setQty('1');
@@ -102,6 +123,16 @@ export function CountScanEntry(props: CountScanEntryProps) {
         </p>
       )}
       <p className="text-neutral-500">{copy.savedNote}</p>
+      <DuplicateScanDialog
+        open={pending !== null}
+        skuLabel={pending?.code ?? ''}
+        onChoose={(mode, remember) => {
+          if (remember) setRemembered(mode);
+          setPending(null);
+          if (pending) void save(pending.code, pending.n, mode);
+        }}
+        onClose={closeDup}
+      />
     </form>
   );
 }
