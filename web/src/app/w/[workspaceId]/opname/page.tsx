@@ -7,6 +7,7 @@ import type { StockCountListItemView } from '@tokoboss/contracts';
 import { listStockCounts } from '@/lib/stock-count-client';
 import { getStockCountCopy } from '@/lib/stock-count-copy';
 import { StartCountForm } from '@/components/opname/StartCountForm';
+import { StartCountSkuPicker } from '@/components/opname/StartCountSkuPicker';
 
 const BTN = 'inline-flex min-h-11 items-center justify-center rounded-lg px-4';
 const PILL = 'rounded-full px-2 py-0.5 text-xs';
@@ -62,6 +63,13 @@ export default function WorkspaceOpnamePage() {
           workspaceId={ws}
           onStarted={(id) => router.push(href(id))}
           onCancel={() => setStarting(false)}
+          renderSkuPicker={(_, selected, onChange) => (
+            <StartCountSkuPicker
+              workspaceId={ws}
+              selected={selected}
+              onChange={onChange}
+            />
+          )}
         />
       )}
       {error && (
