@@ -18,6 +18,13 @@ export * from './purchase-orders';
 export * from './stock-count-sessions';
 export * from './stock-count-lines';
 export * from './stock-count-entries';
+export * from './marketplace-connections';
+export * from './marketplace-oauth-states';
+export * from './marketplace-store-claims';
+export * from './marketplace-inbound-events';
+export * from './marketplace-listings';
+export * from './marketplace-location-links';
+export * from './marketplace-order-previews';
 
 import { auditEvents } from './audit-events';
 import { authPasswordResets, authSessions, authUsers } from './auth';
@@ -48,6 +55,16 @@ import {
 import { stockCountSessions } from './stock-count-sessions';
 import { stockCountLines } from './stock-count-lines';
 import { stockCountEntries } from './stock-count-entries';
+import {
+  marketplaceConnections,
+  marketplaceCredentials,
+} from './marketplace-connections';
+import { marketplaceOauthStates } from './marketplace-oauth-states';
+import { marketplaceStoreClaims } from './marketplace-store-claims';
+import { marketplaceInboundEvents } from './marketplace-inbound-events';
+import { marketplaceListings } from './marketplace-listings';
+import { marketplaceLocationLinks } from './marketplace-location-links';
+import { marketplaceOrderPreviews } from './marketplace-order-previews';
 
 export const schema = {
   tenants,
@@ -82,4 +99,12 @@ export const schema = {
   stockCountSessions,
   stockCountLines,
   stockCountEntries,
+  marketplaceConnections,
+  marketplaceCredentials,
+  marketplaceOauthStates,
+  marketplaceStoreClaims,
+  marketplaceInboundEvents,
+  marketplaceListings,
+  marketplaceLocationLinks,
+  marketplaceOrderPreviews,
 };
