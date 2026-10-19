@@ -52,6 +52,9 @@ const CHAIN = [
   '0014_variant_replenish_settings.sql',
   '0017_variant_max_stock.sql',
   '0018_account_sessions.sql',
+  '0020_marketplace_connections.sql',
+  '0021_marketplace_staging.sql',
+  '0022_marketplace_links_previews.sql',
 ];
 
 async function createMigratedDb() {
