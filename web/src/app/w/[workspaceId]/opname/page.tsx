@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { StockCountListItemView } from '@tokoboss/contracts';
 import { listStockCounts } from '@/lib/stock-count-client';
 import { getStockCountCopy } from '@/lib/stock-count-copy';
+import { StartCountForm } from '@/components/opname/StartCountForm';
 
 const BTN = 'inline-flex min-h-11 items-center justify-center rounded-lg px-4';
 const PILL = 'rounded-full px-2 py-0.5 text-xs';
@@ -23,6 +24,7 @@ export default function WorkspaceOpnamePage() {
   const [rows, setRows] = useState<StockCountListItemView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (!ws) return;
@@ -55,6 +57,13 @@ export default function WorkspaceOpnamePage() {
       >
         {starting ? copy.cancelButton : copy.startButton}
       </button>
+      {starting && (
+        <StartCountForm
+          workspaceId={ws}
+          onStarted={(id) => router.push(href(id))}
+          onCancel={() => setStarting(false)}
+        />
+      )}
       {error && (
         <p role="alert" className="mt-4 text-sm text-red-700">
           {error}
