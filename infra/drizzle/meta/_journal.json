@@ -141,6 +141,13 @@
       "when": 1790200000000,
       "tag": "0020_marketplace_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790300000000,
+      "tag": "0021_marketplace_staging",
+      "breakpoints": true
     }
   ]
 }
