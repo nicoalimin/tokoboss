@@ -12,3 +12,4 @@ export * from './catalog';
 export * from './bundles';
 export * from './imports';
 export * from './stock-count';
+export * from './integrations';
