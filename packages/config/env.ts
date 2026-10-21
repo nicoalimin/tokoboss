@@ -102,6 +102,29 @@ const serverEnvSchema = z.object({
     .enum(['production', 'staging', 'preview', 'local'])
     .optional()
     .describe('Application environment override'),
+
+  // UTA-39 (RFC 04 task 79a): marketplace credential vault + ship-dark gate.
+  // Optional everywhere so every environment boots without them; an empty
+  // MARKETPLACE_PROVIDERS_ENABLED disables all connects (RFC 04 rollout).
+  MARKETPLACE_CREDENTIALS_KEY: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9+/]{43}=$/, {
+      message: 'MARKETPLACE_CREDENTIALS_KEY must be 32 bytes, base64',
+    })
+    .optional()
+    .describe('AES-256-GCM key sealing marketplace credentials (base64)'),
+
+  MARKETPLACE_CREDENTIALS_KEY_ID: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('Key id stored with each sealed credential (key rotation)'),
+
+  MARKETPLACE_PROVIDERS_ENABLED: z
+    .string()
+    .optional()
+    .describe('Comma list of enabled providers: shopee,tiktok_shop,blibli'),
 });
 
 /**
