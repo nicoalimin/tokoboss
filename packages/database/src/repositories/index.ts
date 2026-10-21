@@ -9,3 +9,4 @@ export * from './drizzle-profile-repository';
 export * from './drizzle-catalog-repository';
 export * from './drizzle-product-import-repository';
 export * from './drizzle-stock-count-repository';
+export * from './drizzle-marketplace-store';
