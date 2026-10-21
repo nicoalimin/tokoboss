@@ -125,6 +125,30 @@ const serverEnvSchema = z.object({
     .string()
     .optional()
     .describe('Comma list of enabled providers: shopee,tiktok_shop,blibli'),
+
+  // UTA-39 (RFC 04 task 79b-1): Shopee Open Platform app credentials.
+  // Optional everywhere (ship dark until partner registration, RFC O4).
+  SHOPEE_PARTNER_ID: z
+    .string()
+    .trim()
+    .regex(/^[1-9]\d{0,14}$/, {
+      message: 'SHOPEE_PARTNER_ID must be a positive integer',
+    })
+    .optional()
+    .describe('Shopee partner id (ShopeeConnectorConfig.partnerId)'),
+
+  SHOPEE_PARTNER_KEY: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe('Shopee partner key used for HMAC signing (secret)'),
+
+  SHOPEE_API_HOST: z
+    .string()
+    .url()
+    .optional()
+    .describe('Shopee API host, live or sandbox (ShopeeConnectorConfig.host)'),
 });
 
 /**
