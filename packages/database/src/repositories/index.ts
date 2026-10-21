@@ -8,4 +8,5 @@ export * from './drizzle-auth-repository';
 export * from './drizzle-profile-repository';
 export * from './drizzle-catalog-repository';
 export * from './drizzle-product-import-repository';
+export * from './drizzle-marketplace-oauth-states';
 export * from './drizzle-stock-count-repository';
