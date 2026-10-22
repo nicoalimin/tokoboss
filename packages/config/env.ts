@@ -162,6 +162,20 @@ const serverEnvSchema = z.object({
   TIKTOK_SHOP_AUTH_HOST: z.string().url().optional(),
   // e.g. https://services.tiktokshop.com (seller authorize page)
   TIKTOK_SHOP_AUTHORIZE_HOST: z.string().url().optional(),
+
+  // UTA-39 (RFC 04 task 79c): Blibli partner (API client) credentials, 1:1
+  // onto BlibliPartnerConfig. Optional everywhere (ship dark, RFC O4).
+  // Picks BLIBLI_BASE_URL (uat or production); the message never echoes it.
+  BLIBLI_ENV: z
+    .enum(['uat', 'production'], {
+      errorMap: () => ({ message: 'BLIBLI_ENV must be uat or production' }),
+    })
+    .optional(),
+  BLIBLI_CLIENT_ID: z.string().trim().min(1).optional(),
+  // Client key is the Basic-auth password; never log it.
+  BLIBLI_CLIENT_KEY: z.string().trim().min(1).optional(),
+  // Platform name sent as channelId, e.g. tokoboss
+  BLIBLI_CHANNEL_ID: z.string().trim().min(1).optional(),
 });
 
 /**
@@ -198,7 +212,6 @@ const productionSecretsSchema = z.object({
   // TODO: Add production blob storage secrets
   // BLOB_READ_WRITE_TOKEN: z.string(),
 
-  // TODO: Add production marketplace API keys
   // TODO: Add production billing/payment secrets
   // TODO: Add production signing keys
 });
