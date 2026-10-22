@@ -13,3 +13,6 @@ export * from './versioned';
 export * from './stock-counts';
 export * from './stock-count-views';
 export * from './stock-count-query-views';
+export * from './integrations';
+export * from './integration-requests';
+export * from './integration-listings';
