@@ -21,6 +21,7 @@ export * from './remove-connection-tx';
 export * from './remove-connection';
 export * from './list-connections';
 export * from './list-staged-listings';
+export * from './list-order-previews';
 export * from './ingest-webhook-event';
 export * from './inbound-event-plan';
 export * from './process-inbound-event';
