@@ -1,15 +1,21 @@
 /**
- * Marketplace connection detail (US20 / RFC 04 task 86a).
+ * Marketplace connection detail (US20 / RFC 04 tasks 86a, 86b).
  * GET /api/workspaces/:workspaceId/integrations/:connectionId (every member)
+ * DELETE same path = Putuskan (Admin only, `write` access)
  *
  * Membership gate first (401 / neutral 404 via `admitIntegrationMember`),
  * then `getConnection` re-checks the status-read role. Removed (Hapus
  * koneksi), unknown, other-workspace or non-UUID ids are 404
  * CONNECTION_NOT_FOUND. The view never carries secrets. Shape:
  * `IntegrationConnectionDetailResponse` (dates serialize as ISO strings).
- * DELETE (Putuskan, Admin) is task 86b.
+ * DELETE: `disconnectConnection` (shred, release claim, keep mappings).
  */
-import { connectionNotFound, getConnection } from '@tokoboss/application';
+import {
+  connectionNotFound,
+  disconnectConnection,
+  getConnection,
+  toConnectionView,
+} from '@tokoboss/application';
 import { authJson, routeContext } from '@/lib/auth-routes';
 import {
   admitIntegrationMember,
@@ -43,5 +49,27 @@ export async function GET(request: Request, { params }: RouteParams) {
     return authJson({ connection }, 200, ...ids, admitted.cookie);
   } catch (err) {
     return integrationFailed(err, ids, 'Gagal memuat koneksi toko');
+  }
+}
+
+export async function DELETE(request: Request, { params }: RouteParams) {
+  const { requestId, correlationId } = routeContext(request);
+  const ids: RouteIds = [requestId, correlationId];
+  const { workspaceId, connectionId } = await params;
+
+  const admitted = await admitIntegrationMember(request, workspaceId, 'write');
+  if (!admitted.ok) return integrationDenied(admitted.denial, ids);
+
+  try {
+    if (!UUID_RE.test(connectionId)) throw connectionNotFound();
+    const saved = await disconnectConnection(
+      getIntegrationDeps(),
+      admitted.ctx,
+      { workspaceId: admitted.ctx.workspaceId, connectionId }
+    );
+    const connection = toConnectionView(saved);
+    return authJson({ connection }, 200, ...ids, admitted.cookie);
+  } catch (err) {
+    return integrationFailed(err, ids, 'Gagal memutuskan koneksi toko');
   }
 }
