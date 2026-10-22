@@ -149,6 +149,19 @@ const serverEnvSchema = z.object({
     .url()
     .optional()
     .describe('Shopee API host, live or sandbox (ShopeeConnectorConfig.host)'),
+
+  // UTA-39 (RFC 04 task 79b-2): TikTok Shop app credentials, 1:1 onto
+  // TikTokConnectorConfig. Optional everywhere (ship dark, RFC O4).
+  TIKTOK_SHOP_APP_KEY: z.string().trim().min(1).optional(),
+  // App secret signs every request (HMAC-SHA256); never log it.
+  TIKTOK_SHOP_APP_SECRET: z.string().trim().min(1).optional(),
+  TIKTOK_SHOP_SERVICE_ID: z.string().trim().min(1).optional(),
+  // e.g. https://open-api.tiktokglobalshop.com
+  TIKTOK_SHOP_API_HOST: z.string().url().optional(),
+  // e.g. https://auth.tiktok-shops.com (token exchange and refresh)
+  TIKTOK_SHOP_AUTH_HOST: z.string().url().optional(),
+  // e.g. https://services.tiktokshop.com (seller authorize page)
+  TIKTOK_SHOP_AUTHORIZE_HOST: z.string().url().optional(),
 });
 
 /**
