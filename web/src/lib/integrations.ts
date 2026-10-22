@@ -12,20 +12,28 @@ import {
 } from '@tokoboss/database';
 import {
   InMemoryIntegrationStore,
+  createJob,
+  providerNotAvailable,
   type ConnectionStore,
   type CredentialVault,
   type InboundEventStore,
   type ListingStore,
+  type NewJobInput,
   type OAuthStateStore,
   type OrderPreviewStore,
   type StoreClaimStore,
 } from '@tokoboss/application';
-import { storageKind } from '@/lib/auth';
+import { getAuthAudit, storageKind } from '@/lib/auth';
 import {
   SecretBoxCredentialVault,
   secretBoxFromEnv,
 } from '@/lib/integration-vault';
-import { __resetConnectorRegistryForTests } from '@/lib/integration-registry';
+import {
+  __resetConnectorRegistryForTests,
+  getConnectorRegistry,
+  redirectUri,
+} from '@/lib/integration-registry';
+import { getJobTxRunner } from '@/lib/jobs';
 
 export { getAuthAudit as getIntegrationAudit, storageKind } from '@/lib/auth';
 
@@ -97,4 +105,27 @@ export function __resetIntegrationsForTests(): void {
   }
   memory = new InMemoryIntegrationStore();
   __resetConnectorRegistryForTests();
+}
+
+/** Deps for every US20 use case: store ports, audit, registry and clock. */
+export function getIntegrationDeps() {
+  const registry = getConnectorRegistry();
+  return {
+    ...getIntegrationStore(),
+    audit: getAuthAudit(),
+    enabledProviders: registry.enabledProviders,
+    connectorFor: (provider: string) => {
+      const connector = registry.get(provider);
+      if (!connector) throw providerNotAvailable();
+      return connector;
+    },
+    redirectUri,
+    newId: () => crypto.randomUUID(),
+    now: () => new Date(),
+  };
+}
+
+/** Enqueue a durable integration job (import, refresh) via `@/lib/jobs`. */
+export function enqueueIntegrationJob(input: NewJobInput) {
+  return createJob(getJobTxRunner(), input);
 }
