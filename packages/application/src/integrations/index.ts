@@ -20,6 +20,7 @@ export * from './disconnect-connection';
 export * from './remove-connection-tx';
 export * from './remove-connection';
 export * from './list-connections';
+export * from './list-staged-listings';
 export * from './ingest-webhook-event';
 export * from './inbound-event-plan';
 export * from './process-inbound-event';
