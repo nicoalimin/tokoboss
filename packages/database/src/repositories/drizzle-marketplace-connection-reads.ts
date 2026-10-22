@@ -75,3 +75,22 @@ export function listExpiringConnections(
     )
   );
 }
+
+/**
+ * Connected OAuth rows whose access token expires before `before` (token
+ * refresh Cron, RFC 04 task 95; served by the status + expiry index).
+ */
+export function listRefreshDueConnections(
+  db: DbOrTx,
+  before: Date
+): Promise<ConnectionRecord[]> {
+  return selectConnections(
+    db,
+    and(
+      eq(marketplaceConnections.status, 'connected'),
+      eq(marketplaceConnections.connectMode, 'oauth_redirect'),
+      isNotNull(marketplaceConnections.accessTokenExpiresAt),
+      lt(marketplaceConnections.accessTokenExpiresAt, before)
+    )
+  );
+}
