@@ -7,7 +7,7 @@
   "scripts": {
     "build": "echo \"Database build stub\" && exit 0",
     "lint": "echo \"Database lint stub\" && exit 0",
-    "typecheck": "npx tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate --config ./drizzle.config.ts",
     "db:check": "tsx scripts/check.ts",
