@@ -14,10 +14,10 @@ export interface PurgeInboundEventsResult {
 }
 
 /**
- * Inbound event retention (US20 / RFC 04 task 95h). Called from the
- * marketplace-tokens cron route: deletes raw inbound webhook events of any
- * status created strictly before now - 30 days and returns the cutoff and
- * the number removed. Idempotent: an immediate re-run purges 0.
+ * Inbound event retention (US20 / RFC 04 task 95h). Deletes raw inbound
+ * webhook events of any status created strictly before now - 30 days and
+ * returns the cutoff and the number removed. Idempotent: an immediate re-run
+ * purges 0.
  */
 export async function purgeInboundEvents(
   deps: PurgeInboundEventsDeps
