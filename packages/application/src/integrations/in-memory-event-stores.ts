@@ -17,6 +17,7 @@ const PREVIEW_LIMIT = 50;
  */
 export class InMemoryInboundEventStore implements InboundEventStore {
   readonly events = new Map<string, InboundEventRecord>();
+  private readonly createdAts = new Map<string, Date>();
 
   async insert(event: InboundEventRecord) {
     const dupe = [...this.events.values()].some(
@@ -24,6 +25,7 @@ export class InMemoryInboundEventStore implements InboundEventStore {
     );
     if (dupe || this.events.has(event.id)) return false;
     this.events.set(event.id, { ...event });
+    this.createdAts.set(event.id, new Date());
     return true;
   }
 
@@ -40,6 +42,18 @@ export class InMemoryInboundEventStore implements InboundEventStore {
     const row = this.events.get(id);
     if (!row) return;
     this.events.set(id, { ...row, ...patch, id, status });
+  }
+
+  async purgeBefore(before: Date): Promise<number> {
+    const toDelete: string[] = [];
+    for (const [id, created] of this.createdAts.entries()) {
+      if (created < before) toDelete.push(id);
+    }
+    for (const id of toDelete) {
+      this.events.delete(id);
+      this.createdAts.delete(id);
+    }
+    return toDelete.length;
   }
 }
 
