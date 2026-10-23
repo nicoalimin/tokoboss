@@ -71,6 +71,8 @@ export interface InboundEventStore {
     status: InboundEventStatus,
     patch: Partial<InboundEventRecord>
   ): Promise<void>;
+  /** O9 30-day purge: any status, strictly before `before`; returns count. */
+  purgeBefore(before: Date): Promise<number>;
 }
 
 export interface ListingStore {
