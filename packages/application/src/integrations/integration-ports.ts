@@ -29,6 +29,8 @@ export interface ConnectionStore {
   list(workspaceId: string): Promise<ConnectionRecord[]>;
   /** Connected rows whose auth expires before `before` (expiry sweep). */
   listExpiring(before: Date): Promise<ConnectionRecord[]>;
+  /** Connected OAuth rows whose access token expires before `before`. */
+  listRefreshDue(before: Date): Promise<ConnectionRecord[]>;
   upsert(input: UpsertConnectionInput): Promise<ConnectionRecord>;
   /** Throws on a stale `expectedVersion`. */
   update(
