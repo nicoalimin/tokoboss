@@ -17,6 +17,10 @@ const PREVIEW_LIMIT = 50;
  */
 export class InMemoryInboundEventStore implements InboundEventStore {
   readonly events = new Map<string, InboundEventRecord>();
+  /** Insert time per event id; mirrors the SQL created_at default. */
+  readonly receivedAt = new Map<string, Date>();
+
+  constructor(private readonly now: () => Date = () => new Date()) {}
 
   async insert(event: InboundEventRecord) {
     const dupe = [...this.events.values()].some(
@@ -24,6 +28,7 @@ export class InMemoryInboundEventStore implements InboundEventStore {
     );
     if (dupe || this.events.has(event.id)) return false;
     this.events.set(event.id, { ...event });
+    this.receivedAt.set(event.id, this.now());
     return true;
   }
 
@@ -40,6 +45,18 @@ export class InMemoryInboundEventStore implements InboundEventStore {
     const row = this.events.get(id);
     if (!row) return;
     this.events.set(id, { ...row, ...patch, id, status });
+  }
+
+  /** Removes events received before `before` (30-day purge, O9). */
+  async purgeBefore(before: Date) {
+    let removed = 0;
+    for (const [id, at] of this.receivedAt) {
+      if (at.getTime() >= before.getTime()) continue;
+      this.events.delete(id);
+      this.receivedAt.delete(id);
+      removed += 1;
+    }
+    return removed;
   }
 }
 
