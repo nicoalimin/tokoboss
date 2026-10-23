@@ -71,8 +71,6 @@ export interface InboundEventStore {
     status: InboundEventStatus,
     patch: Partial<InboundEventRecord>
   ): Promise<void>;
-  /** Deletes events received before `before` (30-day purge, O9). */
-  purgeBefore(before: Date): Promise<number>;
 }
 
 export interface ListingStore {
