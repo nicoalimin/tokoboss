@@ -47,6 +47,15 @@ export class InMemoryConnectionStore implements ConnectionStore {
       .map((r) => ({ ...r }));
   }
 
+  async listRefreshDue(before: Date) {
+    return [...this.rows.values()]
+      .filter((r) => r.status === 'connected')
+      .filter((r) => r.connectMode === 'oauth_redirect')
+      .filter((r) => r.accessTokenExpiresAt !== null)
+      .filter((r) => (r.accessTokenExpiresAt as Date) < before)
+      .map((r) => ({ ...r }));
+  }
+
   async upsert(input: UpsertConnectionInput) {
     const { shop, ...rest } = input;
     const prev = await this.findByStore({ ...input, ...shop });
