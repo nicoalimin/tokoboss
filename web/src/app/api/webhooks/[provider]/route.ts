@@ -10,10 +10,15 @@
  * provider gets an empty 200. Unknown or disabled provider → 404
  * PROVIDER_NOT_AVAILABLE; any other failure is a 500 so the provider
  * retries (dedupe keys make retries safe).
+ *
+ * Task 132 (no crons, Nico 2026-10-23): after the events are stored, the
+ * 30-day inbound event purge (`purgeInboundEvents`) runs best-effort; a
+ * purge error is logged and never fails the webhook.
  */
 import {
   enqueueInboundEventJobs,
   ingestWebhookEvent,
+  purgeInboundEvents,
 } from '@tokoboss/application';
 import {
   CORRELATION_ID_HEADER,
@@ -60,6 +65,22 @@ export async function POST(request: Request, { params }: RouteParams) {
       result.acceptedEventIds,
       correlationId
     );
+    try {
+      const { purged } = await purgeInboundEvents(deps);
+      if (purged > 0) {
+        log.info('inbound events purged', {
+          route: '/api/webhooks/[provider]',
+          purged,
+        });
+      }
+    } catch (err) {
+      log.error('inbound event purge failed', {
+        route: '/api/webhooks/[provider]',
+        provider,
+        errorCode: 'INBOUND_EVENT_PURGE_FAILED',
+        error: err instanceof Error ? err.name : 'unknown',
+      });
+    }
     return emptyResponse(200, ids);
   } catch (err) {
     return integrationFailed(err, ids, 'Gagal memproses webhook');
