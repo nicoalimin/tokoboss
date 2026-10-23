@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, lt } from 'drizzle-orm';
 import type {
   InboundEventRecord,
   InboundEventStatus,
@@ -72,5 +72,14 @@ export class DrizzleInboundEventStore implements InboundEventStore {
       .update(marketplaceInboundEvents)
       .set({ ...rest, status })
       .where(eq(marketplaceInboundEvents.id, id));
+  }
+
+  /** Deletes events received before `before` (30-day purge, O9). */
+  async purgeBefore(before: Date): Promise<number> {
+    const rows = await this.db
+      .delete(marketplaceInboundEvents)
+      .where(lt(marketplaceInboundEvents.createdAt, before))
+      .returning({ id: marketplaceInboundEvents.id });
+    return rows.length;
   }
 }
