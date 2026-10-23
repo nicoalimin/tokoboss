@@ -14,6 +14,7 @@ import {
   findConnectionByStore,
   listConnections,
   listExpiringConnections,
+  listRefreshDueConnections,
 } from './drizzle-marketplace-connection-reads';
 import {
   CONNECTION_UPSERT_TARGET,
@@ -53,6 +54,10 @@ export class DrizzleConnectionStore implements ConnectionStore {
 
   listExpiring(before: Date): Promise<ConnectionRecord[]> {
     return listExpiringConnections(this.db, before);
+  }
+
+  listRefreshDue(before: Date): Promise<ConnectionRecord[]> {
+    return listRefreshDueConnections(this.db, before);
   }
 
   async upsert(input: UpsertConnectionInput): Promise<ConnectionRecord> {
