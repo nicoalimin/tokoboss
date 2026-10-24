@@ -82,6 +82,27 @@ export type IntegrationLocationLinkResponse = z.infer<
   typeof IntegrationLocationLinkResponseSchema
 >;
 
+/** One provider location and its source warehouse (null = not linked). */
+export const IntegrationLocationLinkViewSchema = z
+  .object({
+    connectionId: z.string().min(1),
+    externalLocationId: z.string().min(1),
+    name: z.string().nullable(),
+    warehouseId: z.string().min(1).nullable(),
+  })
+  .strict();
+export type IntegrationLocationLinkView = z.infer<
+  typeof IntegrationLocationLinkViewSchema
+>;
+
+/** GET .../locations (Admin/Manager): Pilih gudang sumber list (121). */
+export const IntegrationLocationLinkListResponseSchema = z
+  .object({ locations: z.array(IntegrationLocationLinkViewSchema) })
+  .strict();
+export type IntegrationLocationLinkListResponse = z.infer<
+  typeof IntegrationLocationLinkListResponseSchema
+>;
+
 /** OAuth callback redirect: /w/<id>/integrasi/<connectionId>?result=… */
 export const IntegrationCallbackResultSchema = z.enum([
   'connected',
