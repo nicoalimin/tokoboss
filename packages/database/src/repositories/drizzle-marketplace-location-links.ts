@@ -1,4 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm';
+import type { LocationLinkView } from '@tokoboss/application';
 import type { MarketplaceLocation } from '@tokoboss/domain';
 import type { DatabaseHandle, Transaction } from '../db';
 import { marketplaceLocationLinks } from '../schema/index';
@@ -63,5 +64,22 @@ export class DrizzleLocationLinkStore {
       )
       .returning({ id: marketplaceLocationLinks.id });
     return rows.length > 0;
+  }
+
+  async listLocations(ref: ConnectionRef): Promise<LocationLinkView[]> {
+    return this.db
+      .select({
+        connectionId: marketplaceLocationLinks.connectionId,
+        externalLocationId: marketplaceLocationLinks.externalLocationId,
+        name: marketplaceLocationLinks.name,
+        warehouseId: marketplaceLocationLinks.warehouseId,
+      })
+      .from(marketplaceLocationLinks)
+      .where(
+        and(
+          eq(marketplaceLocationLinks.workspaceId, ref.workspaceId),
+          eq(marketplaceLocationLinks.connectionId, ref.connectionId)
+        )
+      );
   }
 }
