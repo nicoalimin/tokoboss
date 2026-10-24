@@ -9,6 +9,7 @@
 import type {
   IntegrationListingMappingState,
   IntegrationListingsPage,
+  IntegrationLocationLinkListResponse,
   IntegrationOrderPreviewView,
 } from '@tokoboss/contracts';
 import {
@@ -64,4 +65,16 @@ export async function getOrderPreviews(
     orders?: IntegrationOrderPreviewView[];
   }>(integrationsPath(workspaceId, connectionId, 'orders'), {}, fetchFn);
   return Array.isArray(data.orders) ? data.orders : [];
+}
+
+/** GET Pilih gudang sumber rows (sorted; null warehouseId = not linked). */
+export async function listIntegrationLocationLinks(
+  workspaceId: string,
+  connectionId: string,
+  fetchFn: FetchFn = fetch
+): Promise<IntegrationLocationLinkListResponse> {
+  const data = await integrationsRequest<
+    Partial<IntegrationLocationLinkListResponse>
+  >(integrationsPath(workspaceId, connectionId, 'locations'), {}, fetchFn);
+  return { locations: Array.isArray(data.locations) ? data.locations : [] };
 }
