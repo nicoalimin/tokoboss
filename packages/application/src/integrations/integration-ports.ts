@@ -16,6 +16,7 @@ import type {
   UpsertConnectionInput,
 } from './integration-port-inputs';
 import type { ListingRowView, OrderPreviewView } from './integration-types';
+import type { LocationLinkView } from './list-location-links';
 
 /** US20 integration store ports (RFC 04 task 16b). Misses return null. */
 type StoreKey = { provider: MarketplaceProvider; providerStoreId: string };
@@ -87,6 +88,8 @@ export interface ListingStore {
     ref: ConnectionRef & { externalLocationId: string },
     warehouseId: string | null
   ): Promise<boolean>;
+  /** Pilih gudang sumber read (121): staged locations and their links. */
+  listLocations(ref: ConnectionRef): Promise<LocationLinkView[]>;
   /** Archive (Hapus koneksi) or unarchive (reconnect) channel mappings. */
   setMappingsArchived(
     key: StoreKey & { workspaceId: string },
