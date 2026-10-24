@@ -56,6 +56,9 @@ export class DrizzleMarketplaceListingStore implements ListingStore {
   ) {
     return this.locations.linkLocation(ref, warehouseId);
   }
+  listLocations(ref: ConnectionRef) {
+    return this.locations.listLocations(ref);
+  }
   setMappingsArchived(key: StoreRef, archivedAt: Date | null) {
     return this.archive.setMappingsArchived(key, archivedAt);
   }
