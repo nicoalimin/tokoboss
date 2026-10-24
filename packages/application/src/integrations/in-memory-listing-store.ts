@@ -5,6 +5,7 @@ import type {
 import type { ListingUpsertInput } from './integration-port-inputs';
 import type { ListingStore } from './integration-ports';
 import type { ListingRowView } from './integration-types';
+import type { LocationLinkView } from './list-location-links';
 
 type ConnectionRef = { workspaceId: string; connectionId: string };
 type StoreKey = { provider: MarketplaceProvider; providerStoreId: string };
@@ -70,6 +71,21 @@ export class InMemoryListingStore implements ListingStore {
     if (!row) return false;
     row.warehouseId = warehouseId;
     return true;
+  }
+
+  async listLocations(ref: ConnectionRef): Promise<LocationLinkView[]> {
+    return [...this.locations.values()]
+      .filter(
+        (r) =>
+          r.workspaceId === ref.workspaceId &&
+          r.connectionId === ref.connectionId
+      )
+      .map((r) => ({
+        connectionId: r.connectionId,
+        externalLocationId: r.externalLocationId,
+        name: r.name,
+        warehouseId: r.warehouseId,
+      }));
   }
 
   async setMappingsArchived(
