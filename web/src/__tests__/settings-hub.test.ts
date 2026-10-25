@@ -74,8 +74,21 @@ describe('settings hub rows (UTA-74)', () => {
       'notifikasi',
       'tagihan',
     ]);
+    // RFC 04 row 124: Integrasi is either the old stub or the live
+    // Integration Center link (via the /go resolver), never in between.
+    const integrasi = SETTINGS_ROWS.find((r) => r.slug === 'integrasi');
+    expect([
+      { href: '/pengaturan/integrasi', live: false, adminOnly: false },
+      { href: '/go/integrasi', live: true, adminOnly: false },
+    ]).toContainEqual({
+      href: integrasi?.href,
+      live: integrasi?.live,
+      adminOnly: integrasi?.adminOnly,
+    });
     const live = SETTINGS_ROWS.filter((r) => r.live).map((r) => r.slug);
-    expect(live).toEqual(['profil', 'tim']);
+    expect(live).toEqual(
+      integrasi?.live ? ['profil', 'tim', 'integrasi'] : ['profil', 'tim']
+    );
     expect(SETTINGS_ROWS.find((r) => r.slug === 'profil')?.href).toBe(
       '/profil'
     );
@@ -83,13 +96,7 @@ describe('settings hub rows (UTA-74)', () => {
   });
 
   it('routes stub rows under /pengaturan with honest coming states', () => {
-    for (const slug of [
-      'gudang',
-      'integrasi',
-      'bahasa',
-      'notifikasi',
-      'tagihan',
-    ] as const) {
+    for (const slug of ['gudang', 'bahasa', 'notifikasi', 'tagihan'] as const) {
       const row = SETTINGS_ROWS.find((r) => r.slug === slug);
       expect(row?.live).toBe(false);
       expect(row?.href).toBe(`/pengaturan/${slug}`);
