@@ -24,6 +24,12 @@ export const SHELL_NAV_ITEMS: readonly ShellNavItem[] = [
   { href: '/transfer', label: 'Transfer', icon: '🔁', testId: 'nav-transfer' },
   { href: '/opname', label: 'Stock Opname', icon: '📋', testId: 'nav-opname' },
   {
+    href: '/integrasi',
+    label: 'Integrasi',
+    icon: '🔌',
+    testId: 'nav-integrasi',
+  },
+  {
     href: '/team',
     label: 'Tim & Akses',
     icon: '👥',
