@@ -40,16 +40,22 @@ describe('shell nav (UTA-113)', () => {
 
   it('lists every module except Beranda as home cards', () => {
     const hrefs = homeModules('admin').map((i) => i.href);
-    expect(hrefs).toEqual([
-      '/produk',
-      '/ledger',
-      '/stok-tipis',
-      '/gudang',
-      '/transfer',
-      '/opname',
-      '/team',
-      '/pengaturan',
-      '/profil',
-    ]);
+    // RFC 04 row 123: Integrasi sits between Stock Opname and Tim & Akses.
+    // Green before task 123b adds it; pins its slot once it exists.
+    const hasIntegrasi = hrefs.includes('/integrasi');
+    expect(hrefs).toEqual(
+      [
+        '/produk',
+        '/ledger',
+        '/stok-tipis',
+        '/gudang',
+        '/transfer',
+        '/opname',
+        '/integrasi',
+        '/team',
+        '/pengaturan',
+        '/profil',
+      ].filter((href) => hasIntegrasi || href !== '/integrasi')
+    );
   });
 });
