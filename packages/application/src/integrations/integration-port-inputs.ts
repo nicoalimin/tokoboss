@@ -4,6 +4,7 @@ import type {
   MarketplaceProvider,
   MarketplaceShop,
 } from '@tokoboss/domain';
+import type { InitialImportCursor } from './initial-import-state';
 import type { ConnectionView, ListingMappingState } from './integration-types';
 
 /**
@@ -22,6 +23,7 @@ export interface ConnectionRecord extends ConnectionView {
   disconnectedBy: string | null;
   removedAt: Date | null;
   importJobId: string | null;
+  initialImportCursor?: InitialImportCursor | null;
   version: number;
 }
 
