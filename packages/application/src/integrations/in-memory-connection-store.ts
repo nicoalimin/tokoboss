@@ -68,6 +68,7 @@ export class InMemoryConnectionStore implements ConnectionStore {
       disconnectedAt: null,
       disconnectedBy: null,
       removedAt: null,
+      initialImportCursor: prev?.initialImportCursor ?? null,
       version: (prev?.version ?? 0) + 1,
     };
     this.rows.set(row.id, row);
@@ -103,5 +104,6 @@ function emptyConnection(id: string) {
     initialImportStatus: null,
     lastRefreshedAt: null,
     importJobId: null,
+    initialImportCursor: null,
   };
 }
