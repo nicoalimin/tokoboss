@@ -5,6 +5,7 @@
  * ROLE_FORBIDDEN `IntegrationClientError`. Reuses the 101a request helper
  * (same-origin cookie, 401 `needsReauth`). Blibli keys go out once in the
  * body and are never kept or echoed. Location link + import retry: 101d.
+ * First Blibli connect (task 113b) posts the keys to the list route.
  */
 import type {
   IntegrationBlibliKeyFormBody,
@@ -29,6 +30,18 @@ export function startIntegrationConnection(
   const path = integrationsPath(workspaceId);
   const init = { method: 'POST', body: { provider } };
   return integrationsRequest(path, init, fetchFn);
+}
+
+/** POST {provider:'blibli', ...keys}: first Blibli connect (task 113b). */
+export async function connectBlibliStore(
+  workspaceId: string,
+  keys: IntegrationBlibliKeyFormBody,
+  fetchFn: FetchFn = fetch
+): Promise<IntegrationConnectionView> {
+  const path = integrationsPath(workspaceId);
+  const init = { method: 'POST', body: { provider: 'blibli', ...keys } };
+  const data = await integrationsRequest<ConnectionBody>(path, init, fetchFn);
+  return data.connection;
 }
 
 /** POST .../reauthorize with no body: restart the connect flow. */
