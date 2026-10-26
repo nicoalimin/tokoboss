@@ -7,13 +7,20 @@
  * (Hapus koneksi) are hidden and views never carry secrets. Shape:
  * `IntegrationConnectionListResponse` (dates serialize as ISO strings).
  * POST {provider} (Admin, task 85b): authorize URL or Blibli key form.
+ * POST {provider, merchantCode, apiSellerKey, signatureKey} (Admin, task
+ * 113a): first Blibli connect via `connectWithCredentials`; keys never echo.
  */
 import {
+  connectWithCredentials,
   integrationValidation,
   listConnections,
   startConnection,
+  toConnectionView,
 } from '@tokoboss/application';
-import { IntegrationStartConnectionBodySchema } from '@tokoboss/contracts';
+import {
+  IntegrationBlibliKeyFormBodySchema,
+  IntegrationStartConnectionBodySchema,
+} from '@tokoboss/contracts';
 import { authJson, routeContext } from '@/lib/auth-routes';
 import {
   admitIntegrationMember,
@@ -57,13 +64,25 @@ export async function POST(request: Request, { params }: RouteParams) {
 
   try {
     const body: unknown = await request.json().catch(() => ({}));
-    const parsed = IntegrationStartConnectionBodySchema.safeParse(body);
+    const { provider, ...keys } = (
+      body && typeof body === 'object' ? body : {}
+    ) as Record<string, unknown>;
+    const parsed = IntegrationStartConnectionBodySchema.safeParse({ provider });
     if (!parsed.success) throw integrationValidation('Permintaan tidak valid.');
-    const started = await startConnection(getIntegrationDeps(), admitted.ctx, {
-      workspaceId: admitted.ctx.workspaceId,
-      provider: parsed.data.provider,
+    const deps = getIntegrationDeps();
+    const input = { workspaceId: admitted.ctx.workspaceId, ...parsed.data };
+    if (Object.keys(keys).length === 0) {
+      const started = await startConnection(deps, admitted.ctx, input);
+      return authJson(started, 200, ...ids, admitted.cookie);
+    }
+    const form = IntegrationBlibliKeyFormBodySchema.safeParse(keys);
+    if (!form.success) throw integrationValidation('Permintaan tidak valid.');
+    const saved = await connectWithCredentials(deps, admitted.ctx, {
+      ...input,
+      ...form.data,
     });
-    return authJson(started, 200, ...ids, admitted.cookie);
+    const connection = toConnectionView(saved);
+    return authJson({ connection }, 200, ...ids, admitted.cookie);
   } catch (err) {
     return integrationFailed(err, ids, 'Gagal memulai koneksi toko');
   }
