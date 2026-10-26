@@ -11,7 +11,6 @@ export const metadata = { title: 'Pengaturan — TokoBoss' };
 
 const STUB_SLUGS: SettingsAreaSlug[] = [
   'gudang',
-  'integrasi',
   'bahasa',
   'notifikasi',
   'tagihan',
@@ -23,7 +22,7 @@ interface PageProps {
 
 /**
  * Workspace coming-soon stub for Settings areas (US29 / RFC 02 row 56).
- * The `/w/[workspaceId]` layout enforces membership. Only the five non-live
+ * The `/w/[workspaceId]` layout enforces membership. Only the four non-live
  * rows resolve here; anything else 404s. Legacy `/pengaturan/[area]` stays
  * until middleware (row 60) redirects it.
  */
