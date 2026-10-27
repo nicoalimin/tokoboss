@@ -28,6 +28,7 @@ import {
   integrationFailed,
   type RouteIds,
 } from '@/lib/integration-access';
+import { runConnectionInitialImport } from '@/lib/integration-jobs';
 import { getIntegrationDeps } from '@/lib/integrations';
 
 interface RouteParams {
@@ -55,7 +56,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 }
 
 export async function POST(request: Request, { params }: RouteParams) {
-  const { requestId, correlationId } = routeContext(request);
+  const { requestId, correlationId, log } = routeContext(request);
   const ids: RouteIds = [requestId, correlationId];
   const { workspaceId } = await params;
 
@@ -81,7 +82,21 @@ export async function POST(request: Request, { params }: RouteParams) {
       ...input,
       ...form.data,
     });
-    const connection = toConnectionView(saved);
+    // Task 141: run the first import inline (no crons); a failure to queue
+    // never fails the save — the connection stays retryable via /import.
+    const imported = await runConnectionInitialImport(
+      admitted.ctx,
+      { workspaceId: input.workspaceId, connectionId: saved.id },
+      log
+    ).catch((err: unknown) => {
+      log.error('initial import start failed', {
+        connectionId: saved.id,
+        errorCode: 'INTEGRATION_IMPORT_START_FAILED',
+        error: err instanceof Error ? err.name : 'unknown',
+      });
+      return null;
+    });
+    const connection = toConnectionView(imported?.connection ?? saved);
     return authJson({ connection }, 200, ...ids, admitted.cookie);
   } catch (err) {
     return integrationFailed(err, ids, 'Gagal memulai koneksi toko');
