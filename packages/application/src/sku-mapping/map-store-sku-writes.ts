@@ -4,7 +4,11 @@ import type {
   StoreSkuKey,
   UpsertSkuMappingInput,
 } from './sku-mapping-port-inputs';
-import type { SkuMappingAction, SkuMappingRecord } from './sku-mapping-types';
+import type {
+  SkuMappingAction,
+  SkuMappingRecord,
+  SkuMappingSource,
+} from './sku-mapping-types';
 
 /**
  * Write builders for mapStoreSku (UTA-40 / US03, RFC 05 task 13b): the
@@ -48,7 +52,7 @@ export function buildMappingEvent(
   listing: MappableListingRecord,
   action: SkuMappingAction,
   previousVariantId: string | null,
-  ctx: { actorId: string; source: 'manual' | 'suggested_single' },
+  ctx: { actorId: string; source: SkuMappingSource },
   correlationId?: string
 ): AppendSkuMappingEventInput {
   return {
