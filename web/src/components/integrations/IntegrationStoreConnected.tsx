@@ -9,8 +9,9 @@ import { LocationLinks } from './LocationLinks';
  * 122d): mockup v2 screen 3. ConnectResult (115c) with step 2 "Pilih gudang
  * sumber" jumping to the LocationLinks section (121m) below it, then the
  * import review (ListingReviewList, 120g). Import counts show a dash (the
- * connection view has no import summary); step 1 (Story 03) and step 3
- * (Story 04) stay disabled. The 122d-ii screen body picks this screen.
+ * connection view has no import summary); step 1 links to Petakan Store SKU
+ * filtered to this store (Story 03 / RFC 05 row 44) and step 3 (Story 04)
+ * stays disabled. The 122d-ii screen body picks this screen.
  */
 
 export const STORE_WAREHOUSES_ANCHOR = 'pilih-gudang';
@@ -37,6 +38,7 @@ export function IntegrationStoreConnected({
     >
       <ConnectResult
         connection={connection}
+        mapHref={`/w/${encodeURIComponent(workspaceId)}/produk/pemetaan?connectionId=${encodeURIComponent(connectionId)}`}
         warehouseHref={`#${STORE_WAREHOUSES_ANCHOR}`}
         lang={lang}
       />
