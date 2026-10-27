@@ -50,6 +50,13 @@ export default async function WorkspaceProdukPage({
             >
               Review product imports
             </Link>
+            <Link
+              href={`${base}/produk/pemetaan`}
+              data-testid="produk-sku-mapping-link"
+              className={linkClass}
+            >
+              Petakan Store SKU
+            </Link>
             <Link href={`${base}/dashboard`} className={linkClass}>
               {copy.backHomeLink}
             </Link>
