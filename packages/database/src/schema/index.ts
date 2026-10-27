@@ -25,6 +25,7 @@ export * from './marketplace-inbound-events';
 export * from './marketplace-listings';
 export * from './marketplace-location-links';
 export * from './marketplace-order-previews';
+export * from './sku-mapping-events';
 
 import { auditEvents } from './audit-events';
 import { authPasswordResets, authSessions, authUsers } from './auth';
@@ -65,6 +66,7 @@ import { marketplaceInboundEvents } from './marketplace-inbound-events';
 import { marketplaceListings } from './marketplace-listings';
 import { marketplaceLocationLinks } from './marketplace-location-links';
 import { marketplaceOrderPreviews } from './marketplace-order-previews';
+import { catalogChannelMappingEvents } from './sku-mapping-events';
 
 export const schema = {
   tenants,
@@ -107,4 +109,5 @@ export const schema = {
   marketplaceListings,
   marketplaceLocationLinks,
   marketplaceOrderPreviews,
+  catalogChannelMappingEvents,
 };
