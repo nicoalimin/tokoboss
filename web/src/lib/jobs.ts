@@ -20,7 +20,17 @@ import {
   type JobStore,
   type JobTxRunner,
 } from '@tokoboss/application';
+import { buildInitialImportWorkflowDeps } from '@/lib/integration-import-deps';
+import { getIntegrationDeps } from '@/lib/integrations';
 import { createLocalHelloExecutor } from '@/workflows/executor';
+import {
+  MARKETPLACE_INBOUND_EVENT_JOB_TYPE,
+  executeInboundEventJob,
+} from '@/workflows/marketplace-inbound-event';
+import {
+  MARKETPLACE_INITIAL_IMPORT_JOB_TYPE,
+  executeInitialImportJob,
+} from '@/workflows/marketplace-initial-import';
 
 let memoryStore: InMemoryJobStore | null = null;
 let dbHandle: DbHandle | null = null;
@@ -55,6 +65,16 @@ export function getJobTxRunner(): JobTxRunner {
   return getMemoryStore();
 }
 
+/** Hello + marketplace job types (task 139); runs on request/intake, no cron. */
 export function getJobExecutor(): JobExecutor {
-  return createLocalHelloExecutor(() => getJobStore(), 'local');
+  return createLocalHelloExecutor(() => getJobStore(), 'local', {
+    [MARKETPLACE_INITIAL_IMPORT_JOB_TYPE]: (store, input) =>
+      executeInitialImportJob(
+        store,
+        buildInitialImportWorkflowDeps(input.workspaceId),
+        input
+      ),
+    [MARKETPLACE_INBOUND_EVENT_JOB_TYPE]: (store, input) =>
+      executeInboundEventJob(store, getIntegrationDeps(), input),
+  });
 }
