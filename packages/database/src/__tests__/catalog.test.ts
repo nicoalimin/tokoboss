@@ -55,6 +55,7 @@ const CHAIN = [
   '0020_marketplace_connections.sql',
   '0021_marketplace_staging.sql',
   '0022_marketplace_links_previews.sql',
+  '0023_sku_mapping_history.sql',
 ];
 
 async function createMigratedDb() {
