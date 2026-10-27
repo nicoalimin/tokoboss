@@ -23,6 +23,7 @@ import {
   type BundleWire,
 } from '@/lib/bundles-client';
 import { getCatalogCopy } from '@/lib/catalog-copy';
+import { DrawerStoreSkusSection } from './DrawerStoreSkusSection';
 
 const inputClass =
   'w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-base text-neutral-900 ' +
@@ -741,51 +742,11 @@ export function SkuDrawer({
                 </form>
               ) : null}
 
-              <section
-                aria-labelledby="drawer-mappings-title"
-                className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4"
-              >
-                <h3
-                  id="drawer-mappings-title"
-                  className="text-base font-semibold text-neutral-900"
-                >
-                  {copy.mappingsTitle}
-                </h3>
-                <p className="text-xs text-neutral-500">
-                  {copy.mappingsSubtitle}
-                </p>
-                {mappings.length === 0 ? (
-                  <p
-                    data-testid="drawer-mappings-empty"
-                    className="mt-2 text-sm text-neutral-500"
-                  >
-                    {copy.mappingsEmpty}
-                  </p>
-                ) : (
-                  <ul
-                    data-testid="drawer-mappings"
-                    className="mt-2 divide-y divide-neutral-100"
-                  >
-                    {mappings.map((m) => (
-                      <li
-                        key={m.id}
-                        data-testid="drawer-mapping-row"
-                        className="py-2 text-sm"
-                      >
-                        <p className="font-semibold text-neutral-900">
-                          {m.channel} ·{' '}
-                          <span className="font-mono">{m.platformSkuId}</span>
-                        </p>
-                        <p className="text-neutral-600">
-                          {copy.mappingShopLabel}: {m.shopExtId}
-                          {m.sellerSkuHint ? ` · ${m.sellerSkuHint}` : ''}
-                          {m.listingName ? ` · ${m.listingName}` : ''}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
+              <DrawerStoreSkusSection
+                workspaceId={workspaceId}
+                variantId={variant.id}
+                mappings={mappings}
+              />
 
               <section
                 aria-labelledby="drawer-bundle-title"
