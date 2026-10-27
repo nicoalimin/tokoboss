@@ -27,6 +27,7 @@ import {
   integrationFailed,
   type RouteIds,
 } from '@/lib/integration-access';
+import { runConnectionInitialImport } from '@/lib/integration-jobs';
 import { getIntegrationDeps } from '@/lib/integrations';
 
 interface RouteParams {
@@ -46,7 +47,7 @@ function isEmptyBody(body: unknown): boolean {
 }
 
 export async function POST(request: Request, { params }: RouteParams) {
-  const { requestId, correlationId } = routeContext(request);
+  const { requestId, correlationId, log } = routeContext(request);
   const ids: RouteIds = [requestId, correlationId];
   const { workspaceId, connectionId } = await params;
 
@@ -75,7 +76,22 @@ export async function POST(request: Request, { params }: RouteParams) {
       provider: row.provider,
       ...parsed.data,
     });
-    const connection = toConnectionView(saved);
+    // Task 142: an unfinished first import runs inline (no crons); a failure
+    // to queue never fails the reauthorize (still retryable via /import).
+    const imported =
+      saved.initialImportStatus === 'complete'
+        ? null
+        : await runConnectionInitialImport(admitted.ctx, target, log).catch(
+            (err: unknown) => {
+              log.error('initial import start failed', {
+                connectionId,
+                errorCode: 'INTEGRATION_IMPORT_START_FAILED',
+                error: err instanceof Error ? err.name : 'unknown',
+              });
+              return null;
+            }
+          );
+    const connection = toConnectionView(imported?.connection ?? saved);
     return authJson({ connection }, 200, ...ids, admitted.cookie);
   } catch (err) {
     return integrationFailed(err, ids, 'Gagal mengotorisasi ulang koneksi');
