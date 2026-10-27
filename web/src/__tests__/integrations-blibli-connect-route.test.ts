@@ -129,7 +129,8 @@ describe('POST /integrations first Blibli connect (task 113c)', () => {
     };
     expect(connection.provider).toBe('blibli');
     expect(connection.providerStoreId).toBe(KEYS.merchantCode);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // The first call is the one validation read; the inline first import
+    // (task 141) adds its own reads after the keys are saved.
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('getProductList');
     const sealed = vault().sealed.get(connection.id);
     expect(sealed?.kind).toBe('blibli_keys');
