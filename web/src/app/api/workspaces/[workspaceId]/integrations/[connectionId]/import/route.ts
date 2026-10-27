@@ -12,7 +12,7 @@
  * CONNECTION_NOT_FOUND. Shape: `{ connectionId, jobId, status,
  * alreadyQueued }`; never secrets.
  */
-import { connectionNotFound, retryInitialImport } from '@tokoboss/application';
+import { connectionNotFound } from '@tokoboss/application';
 import { authJson, routeContext } from '@/lib/auth-routes';
 import {
   admitIntegrationMember,
@@ -20,7 +20,7 @@ import {
   integrationFailed,
   type RouteIds,
 } from '@/lib/integration-access';
-import { enqueueIntegrationJob, getIntegrationDeps } from '@/lib/integrations';
+import { runConnectionInitialImport } from '@/lib/integration-jobs';
 
 interface RouteParams {
   params: Promise<{ workspaceId: string; connectionId: string }>;
@@ -30,7 +30,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request: Request, { params }: RouteParams) {
-  const { requestId, correlationId } = routeContext(request);
+  const { requestId, correlationId, log } = routeContext(request);
   const ids: RouteIds = [requestId, correlationId];
   const { workspaceId, connectionId } = await params;
 
@@ -39,14 +39,19 @@ export async function POST(request: Request, { params }: RouteParams) {
 
   try {
     if (!UUID_RE.test(connectionId)) throw connectionNotFound();
-    const deps = {
-      ...getIntegrationDeps(),
-      enqueueImport: enqueueIntegrationJob,
+    // Task 143: the queued import runs inline (no crons). Queue errors keep
+    // the 400/404 contract; a run error is logged and stays retryable here.
+    const run = await runConnectionInitialImport(
+      admitted.ctx,
+      { workspaceId: admitted.ctx.workspaceId, connectionId },
+      log
+    );
+    const result = {
+      connectionId: run.connectionId,
+      jobId: run.jobId,
+      status: run.connection?.initialImportStatus ?? run.status,
+      alreadyQueued: run.alreadyQueued,
     };
-    const result = await retryInitialImport(deps, admitted.ctx, {
-      workspaceId: admitted.ctx.workspaceId,
-      connectionId,
-    });
     return authJson(result, 200, ...ids, admitted.cookie);
   } catch (err) {
     return integrationFailed(err, ids, 'Gagal melanjutkan impor');
