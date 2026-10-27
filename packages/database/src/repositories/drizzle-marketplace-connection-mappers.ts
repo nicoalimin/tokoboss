@@ -9,6 +9,7 @@ import {
 import {
   INITIAL_IMPORT_STATUSES,
   type ConnectionRecord,
+  type InitialImportCursor,
   type InitialImportStatus,
 } from '@tokoboss/application';
 import type { MarketplaceConnectionRow } from '../schema/index';
@@ -93,6 +94,8 @@ export function toConnectionRecord(
       INITIAL_IMPORT_STATUSES,
       row.initialImportStatus
     ),
+    initialImportCursor:
+      (row.initialImportCursor as InitialImportCursor | null) ?? null,
     importJobId: row.importJobId,
     connectedBy: row.connectedBy,
     connectedAt: row.connectedAt,
