@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { marketplaceConnections } from './marketplace-connections';
 import { tenants } from './tenants';
 import { utcCreatedAt, utcTimestamps, uuidPk } from './helpers';
 import type { ProductPicture } from '@tokoboss/application';
@@ -220,6 +221,15 @@ export const catalogChannelMappings = pgTable(
     sellerSkuHint: text('seller_sku_hint'),
     barcodeHint: text('barcode_hint'),
     listingName: text('listing_name'),
+    /** RFC 05 / Story 03 provenance (migration 0023). */
+    connectionId: uuid('connection_id').references(
+      () => marketplaceConnections.id,
+      { onDelete: 'set null' }
+    ),
+    externalItemId: text('external_item_id'),
+    variantName: text('variant_name'),
+    mappedBy: text('mapped_by'),
+    version: integer('version').notNull().default(1),
     archivedAt: timestamp('archived_at', {
       withTimezone: true,
       mode: 'date',
