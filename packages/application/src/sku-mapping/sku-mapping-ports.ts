@@ -47,6 +47,15 @@ export interface SkuMappingReadStore {
     workspaceId: string,
     listingId: string
   ): Promise<MappableListingRecord | null>;
+
+  /** Live mapping by id + its staged listing (null: row left staging). */
+  findMapping(
+    workspaceId: string,
+    mappingId: string
+  ): Promise<{
+    mapping: SkuMappingRecord;
+    listing: MappableListingRecord | null;
+  } | null>;
 }
 
 /** Writes; the Drizzle store runs them on one Postgres transaction. */
