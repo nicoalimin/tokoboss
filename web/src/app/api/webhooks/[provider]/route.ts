@@ -15,18 +15,15 @@
  * 30-day inbound event purge (`purgeInboundEvents`) runs best-effort; a
  * purge error is logged and never fails the webhook.
  */
-import {
-  enqueueInboundEventJobs,
-  ingestWebhookEvent,
-  purgeInboundEvents,
-} from '@tokoboss/application';
+import { ingestWebhookEvent, purgeInboundEvents } from '@tokoboss/application';
 import {
   CORRELATION_ID_HEADER,
   REQUEST_ID_HEADER,
 } from '@tokoboss/observability';
 import { routeContext } from '@/lib/auth-routes';
 import { integrationFailed, type RouteIds } from '@/lib/integration-access';
-import { enqueueIntegrationJob, getIntegrationDeps } from '@/lib/integrations';
+import { runInboundEventJobs } from '@/lib/integration-jobs';
+import { getIntegrationDeps } from '@/lib/integrations';
 
 interface RouteParams {
   params: Promise<{ provider: string }>;
@@ -60,11 +57,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       });
       return emptyResponse(401, ids);
     }
-    await enqueueInboundEventJobs(
-      { ...deps, enqueueJob: enqueueIntegrationJob },
-      result.acceptedEventIds,
-      correlationId
-    );
+    // Task 144: each new inbound-event job runs on intake (no crons). Queue
+    // errors still 500 (provider retries); a run error is logged and the job
+    // stays retryable, so the webhook is still acked 200.
+    await runInboundEventJobs(result.acceptedEventIds, correlationId, log);
     try {
       const { purged } = await purgeInboundEvents(deps);
       if (purged > 0) {
