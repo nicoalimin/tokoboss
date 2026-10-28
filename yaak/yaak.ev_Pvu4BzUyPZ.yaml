@@ -10,25 +10,25 @@ base: false
 parentModel: environment
 parentId: null
 variables:
-- enabled: true
-  name: base_url
-  value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3RVpYS3U5Tmp0Nk9FYmNzaEd1RDZ5Y2RNWnM5eXp3aUQxai9VQzlUK1BtM1krZDVtS2J6OVJUbGNrWW04WEJzTDh4TmRwQUN5Sk5yeXNUdjA1RXhjdWg3MzVPQUdUempBNnFkSCtO') ]}
-  id: VdjdSbpFdh
-- enabled: true
-  name: bootstrap_password
-  value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3RUpJRmZlcE5UWjNRSlRaS3JQVEFPMXpNcVd2QzdUM3MyaS9aMTZoc3BZUjkyckkxOVR6UkRZQjNXRWdtakFDdGszeGlTbGpNRUFXRWhnUTNWTVZuNjM4amVVUEI2ZUl4Zz0') ]}
-  id: p5tt6btTQB
-- enabled: true
-  name: workspace_id
-  value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3RVdldVh1WjRQZnUrOXhacytvbyt6VGxCSjVCazJmMndUVHBwWmtZRExKTHM1cUhhNEdNNHhBVlI4QmJzNVBHUT09') ]}
-  id: Re5eSz7NB9
-- enabled: true
-  name: login_email
-  value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3SEFaTGVGZ1dZU2t3ZUVtU0plN0tLc2NGVVZWSkVGVXBtK2s1dWFyTThTSzd4Qmh6dm1adGNGdHFqTERjQVZOV2w4RjVISmNnVWRIbWd3QWhRPQ') ]}
-  id: R6HxMGjD3V
-- enabled: true
-  name: login_password
-  value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3RWlZZ2dVQk5SeUtYOHN1eW5WTU90SnRWWE5mVkhKZ2lsb3hUR1JxM2tKV3FiSXRZdmJma1VGTEZEL1hEa2VWYXNoNm8ybnZrengyRXpIQnNKQ05xOTlvcmhwZWRlZWp3QT0') ]}
-  id: BN9sN0VZxf
+  - enabled: true
+    name: base_url
+    value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3RVpYS3U5Tmp0Nk9FYmNzaEd1RDZ5Y2RNWnM5eXp3aUQxai9VQzlUK1BtM1krZDVtS2J6OVJUbGNrWW04WEJzTDh4TmRwQUN5Sk5yeXNUdjA1RXhjdWg3MzVPQUdUempBNnFkSCtO') ]}
+    id: VdjdSbpFdh
+  - enabled: true
+    name: bootstrap_password
+    value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3RUpJRmZlcE5UWjNRSlRaS3JQVEFPMXpNcVd2QzdUM3MyaS9aMTZoc3BZUjkyckkxOVR6UkRZQjNXRWdtakFDdGszeGlTbGpNRUFXRWhnUTNWTVZuNjM4amVVUEI2ZUl4Zz0') ]}
+    id: p5tt6btTQB
+  - enabled: true
+    name: workspace_id
+    value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3RVdldVh1WjRQZnUrOXhacytvbyt6VGxCSjVCazJmMndUVHBwWmtZRExKTHM1cUhhNEdNNHhBVlI4QmJzNVBHUT09') ]}
+    id: Re5eSz7NB9
+  - enabled: true
+    name: login_email
+    value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3SEFaTGVGZ1dZU2t3ZUVtU0plN0tLc2NGVVZWSkVGVXBtK2s1dWFyTThTSzd4Qmh6dm1adGNGdHFqTERjQVZOV2w4RjVISmNnVWRIbWd3QWhRPQ') ]}
+    id: R6HxMGjD3V
+  - enabled: true
+    name: login_password
+    value: ${[ secure(value=b64'WUVOQ19lVUUwYXpOdVF3RWlZZ2dVQk5SeUtYOHN1eW5WTU90SnRWWE5mVkhKZ2lsb3hUR1JxM2tKV3FiSXRZdmJma1VGTEZEL1hEa2VWYXNoNm8ybnZrengyRXpIQnNKQ05xOTlvcmhwZWRlZWp3QT0') ]}
+    id: BN9sN0VZxf
 color: var(--danger)
 sortPriority: 0.0

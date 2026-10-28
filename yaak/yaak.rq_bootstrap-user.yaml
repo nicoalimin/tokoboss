@@ -17,14 +17,14 @@ body:
 bodyType: application/json
 description: Creates a new workspace and its initial Admin. Copy workspaceId from the response into the Local development environment before signing in.
 headers:
-- enabled: true
-  name: Content-Type
-  value: application/json
-  id: null
-- enabled: true
-  name: X-Bootstrap-Password
-  value: ${[bootstrap_password]}
-  id: null
+  - enabled: true
+    name: Content-Type
+    value: application/json
+    id: null
+  - enabled: true
+    name: X-Bootstrap-Password
+    value: ${[bootstrap_password]}
+    id: null
 method: POST
 name: Bootstrap workspace Admin
 sortPriority: 1.0
