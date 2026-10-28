@@ -4,9 +4,10 @@ import type {
   TokobossSkuMappingCardView,
 } from '@tokoboss/contracts';
 import type { SkuMappingLang } from '@/lib/sku-mapping-copy';
+import type { InventorySyncHandlers } from '@/lib/use-inventory-sync';
 import { SkuMappingCardHeader } from './SkuMappingCardHeader';
 import { StoreSkuPicker } from './StoreSkuPicker';
-import { SubordinateStoreSlot } from './SubordinateStoreSlot';
+import { SyncedStoreSlot } from './SyncedStoreSlot';
 
 /**
  * Primary SKU TokoBoss card (UTA-40 / US03, RFC 05 row 36b): header (36a),
@@ -26,6 +27,8 @@ export interface SkuMappingVariantCardProps {
   busy?: boolean;
   canEdit?: boolean;
   lang?: SkuMappingLang;
+  /** Story 04 sync states + handlers (RFC 06 row 50d). */
+  sync?: InventorySyncHandlers;
 }
 
 export function SkuMappingVariantCard({
@@ -38,6 +41,7 @@ export function SkuMappingVariantCard({
   busy = false,
   canEdit = true,
   lang = 'id',
+  sync,
 }: Readonly<SkuMappingVariantCardProps>) {
   const mapped = new Set(item.mappings.map((m) => m.connectionId));
   const open = stores.filter(
@@ -65,8 +69,9 @@ export function SkuMappingVariantCard({
       <SkuMappingCardHeader item={item} lang={lang} />
       <div className="grid gap-2 md:grid-cols-2">
         {item.mappings.map((m) => (
-          <SubordinateStoreSlot
+          <SyncedStoreSlot
             key={m.mappingId}
+            sync={sync}
             mapping={m}
             onUnmap={onUnmap}
             busy={busy}
