@@ -10,7 +10,15 @@ import type {
   MarketplaceLocation,
   MarketplaceOrderPreviewRow,
   MarketplaceShop,
+  MarketplaceStockPushInput,
+  MarketplaceStockPushResult,
   MarketplaceWebhookEvent,
+} from './marketplace-connector-types';
+
+export type {
+  MarketplaceLocationStockTarget,
+  MarketplaceStockPushInput,
+  MarketplaceStockPushResult,
 } from './marketplace-connector-types';
 
 /**
@@ -76,4 +84,10 @@ export interface MarketplaceConnector {
 
   verifyWebhook(request: MarketplaceWebhookRequest): boolean;
   parseWebhook(rawBody: string): readonly MarketplaceWebhookEvent[];
+
+  /** Absolute stock push per location (UTA-37 / US04, RFC 06 task 5). */
+  pushInventory?(
+    ctx: MarketplaceConnectorContext,
+    input: MarketplaceStockPushInput
+  ): Promise<MarketplaceStockPushResult>;
 }
