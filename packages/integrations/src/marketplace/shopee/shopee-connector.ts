@@ -21,6 +21,7 @@ import {
   withShopeeAuthExpiry,
 } from './shopee-shop-info';
 import { ShopeeSigner } from './shopee-signer';
+import { shopeePushInventory } from './shopee-stock';
 
 /**
  * Shopee v2 `MarketplaceConnector` (UTA-39 / US20, RFC 04 task 52b).
@@ -94,5 +95,6 @@ export function createShopeeConnector(
     listRecentOrders: (ctx, window) => shopeeRecentOrders(deps, ctx, window),
     verifyWebhook: (request) => shopeeVerifyPush(signer, request),
     parseWebhook: (rawBody) => shopeeParsePush(rawBody),
+    pushInventory: (ctx, input) => shopeePushInventory(deps, ctx, input),
   };
 }
