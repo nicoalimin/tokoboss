@@ -18,6 +18,7 @@ import {
 import { IntegrationLocationLinkBodySchema } from '@tokoboss/contracts';
 import { authJson, routeContext } from '@/lib/auth-routes';
 import { getCatalogStore } from '@/lib/catalog';
+import { triggerVariantInventorySync } from '@/lib/inventory-sync';
 import {
   admitIntegrationMember,
   integrationDenied,
@@ -38,7 +39,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function PUT(request: Request, { params }: RouteParams) {
-  const { requestId, correlationId } = routeContext(request);
+  const { requestId, correlationId, log } = routeContext(request);
   const ids: RouteIds = [requestId, correlationId];
   const { workspaceId, connectionId, locationLinkId } = await params;
 
@@ -61,6 +62,14 @@ export async function PUT(request: Request, { params }: RouteParams) {
       externalLocationId: locationLinkId,
       warehouseId,
     });
+    // Best-effort marketplace stock push (US04 / RFC 06 row 44); never throws.
+    const sync = { workspaceId: admitted.ctx.workspaceId, connectionId };
+    const actorId = admitted.ctx.userId;
+    const trigger = 'location_link' as const;
+    await triggerVariantInventorySync(
+      { ...sync, actorId, correlationId, trigger },
+      log
+    );
     return authJson(link, 200, ...ids, admitted.cookie);
   } catch (err) {
     return integrationFailed(err, ids, 'Gagal menyimpan gudang sumber');
