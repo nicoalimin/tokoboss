@@ -84,6 +84,8 @@ export interface MappingSyncContextSnapshot extends InventorySyncMappingRef {
   workspaceId: string;
   connectionId: string | null;
   connectionStatus: MarketplaceConnectionStatus | null;
+  /** Store-level Sinkronisasi Stok switch (US18); undefined = on. */
+  connectionInventorySyncEnabled?: boolean;
   shopExtId: string;
   externalItemId: string | null;
   state: MappingSyncState | null;
