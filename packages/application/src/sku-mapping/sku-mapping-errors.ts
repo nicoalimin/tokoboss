@@ -33,16 +33,24 @@ export function skuMappingNotFound(what = 'SKU mapping'): SkuMappingError {
   );
 }
 
-/** Store SKU already mapped to another SKU TokoBoss, no allowRemap → 409. */
+/**
+ * Store SKU already mapped to another SKU TokoBoss, no allowRemap → 409.
+ * `currentVersion` = owner mapping version for the allowRemap resend.
+ */
 export function skuMappingAlreadyAssigned(
   currentVariantId: string,
-  currentSkuCode: string | null
+  currentSkuCode: string | null,
+  currentVersion?: number
 ): SkuMappingError {
   return build(
     'SkuMappingAlreadyAssignedError',
     'SKU_MAPPING_ALREADY_ASSIGNED',
     'This Store SKU is already mapped to another SKU TokoBoss.',
-    { currentVariantId, currentSkuCode: currentSkuCode ?? undefined }
+    {
+      currentVariantId,
+      currentSkuCode: currentSkuCode ?? undefined,
+      currentVersion,
+    }
   );
 }
 
