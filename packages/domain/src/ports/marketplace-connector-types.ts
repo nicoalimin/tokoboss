@@ -90,3 +90,26 @@ export class MarketplaceConnectorError extends DomainError {
     this.retryAfterMs = retryAfterMs;
   }
 }
+
+/** Absolute stock for one store location; `null` = provider default. */
+export interface MarketplaceLocationStockTarget {
+  readonly externalLocationId: string | null;
+  readonly quantity: number;
+}
+
+/** One Store SKU push (UTA-37 / US04, RFC 06 task 4); never a delta. */
+export interface MarketplaceStockPushInput {
+  readonly externalItemId: string;
+  readonly platformSkuId: string;
+  readonly targets: readonly MarketplaceLocationStockTarget[];
+}
+
+/** Per-target outcome; `pushedQty` sums the successful targets. */
+export interface MarketplaceStockPushResult {
+  readonly pushedQty: number;
+  readonly targets: readonly (MarketplaceLocationStockTarget & {
+    readonly success: boolean;
+    readonly errorKind: MarketplaceConnectorErrorKind | null;
+    readonly errorCode: string | null;
+  })[];
+}
