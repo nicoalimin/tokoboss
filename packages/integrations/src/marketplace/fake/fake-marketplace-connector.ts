@@ -13,14 +13,21 @@ import {
   type MarketplaceShop,
   type MarketplaceWebhookEvent,
 } from '@tokoboss/domain';
+import {
+  createFakeStockPushState,
+  fakePushInventory,
+  type FakeStockPushCapability,
+  type FakeStockPushFixture,
+} from './fake-stock-push';
 
 /**
  * Fixture-driven fake `MarketplaceConnector` (UTA-39 / US20, RFC 04 task
  * 63) covering all three shapes: Shopee/TikTok Shop `oauth_redirect`,
  * Blibli `credential_binding`. No network, clock or DB; a fixture `fail`
- * kind makes every provider call throw that error.
+ * kind makes every provider call throw that error, `failPushInventory`
+ * only stock pushes (UTA-37 / US04, RFC 06 task 7).
  */
-export interface FakeMarketplaceFixture {
+export interface FakeMarketplaceFixture extends FakeStockPushFixture {
   readonly provider: MarketplaceProvider;
   readonly shops: readonly MarketplaceShop[];
   readonly credentials: MarketplaceCredentials;
@@ -57,10 +64,14 @@ export function fakeParseWebhook(
 
 export function createFakeMarketplaceConnector(
   fixture: FakeMarketplaceFixture
-): MarketplaceConnector {
+): MarketplaceConnector & FakeStockPushCapability {
   const { provider, credentials } = fixture;
   const connectMode = MARKETPLACE_CONNECT_MODES[provider];
-  const pages = fixture.listingPages ?? [];
+  const pushState = createFakeStockPushState(
+    fixture.listingPages ?? [],
+    fixture.failPushInventory
+  );
+  const pages = pushState.listingPages;
   async function call<T>(value: () => T): Promise<T> {
     if (fixture.fail) {
       throw new MarketplaceConnectorError(fixture.fail, `FAKE_${fixture.fail}`);
@@ -103,5 +114,8 @@ export function createFakeMarketplaceConnector(
       fixture.webhookSecret !== undefined &&
       headers['x-fake-signature'] === fixture.webhookSecret,
     parseWebhook: (rawBody) => fakeParseWebhook(provider, rawBody),
+    pushInventory: (_ctx, input) =>
+      call(() => fakePushInventory(pushState, input)),
+    pushedInventory: pushState.pushedInventory,
   };
 }
