@@ -162,6 +162,13 @@
       "when": 1790500000000,
       "tag": "0023_sku_mapping_history",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790600000000,
+      "tag": "0024_inventory_sync",
+      "breakpoints": true
     }
   ]
 }
