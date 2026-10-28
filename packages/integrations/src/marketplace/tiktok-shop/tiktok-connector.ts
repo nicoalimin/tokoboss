@@ -10,6 +10,7 @@ import {
   tiktokRefresh,
   type TikTokAuthDeps,
 } from './tiktok-auth';
+import { tiktokPushInventory } from './tiktok-inventory';
 import { tiktokListingsPage } from './tiktok-listings';
 import { tiktokRecentOrders } from './tiktok-orders';
 import { tiktokAuthorizedShops } from './tiktok-shops';
@@ -95,5 +96,6 @@ export function createTikTokConnector(
     listRecentOrders: (ctx, window) => tiktokRecentOrders(deps, ctx, window),
     verifyWebhook: (request) => tiktokVerifyWebhook(signer, request),
     parseWebhook: (rawBody) => tiktokParseWebhook(rawBody),
+    pushInventory: (ctx, input) => tiktokPushInventory(deps, ctx, input),
   };
 }
