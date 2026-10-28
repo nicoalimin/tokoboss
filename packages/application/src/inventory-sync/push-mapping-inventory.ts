@@ -34,7 +34,7 @@ const retryable = (err: unknown) =>
  * Pushes one Store SKU's absolute stock (UTA-37 / US04, RFC 06 task 24b):
  * fresh read, lazy token refresh, 1 bounded retry on rate_limited /
  * unavailable, CAS commit (24a). Failures → needs_attention, never thrown;
- * null = mapping gone or sync off. skipped_stale catch-up is task 25's.
+ * null = mapping gone or sync off (SKU or store). skipped_stale is task 25's.
  */
 export async function pushMappingInventory(
   deps: InventorySyncDeps,
@@ -43,7 +43,13 @@ export async function pushMappingInventory(
   const { workspaceId, mappingId } = input;
   const mapping = await deps.reads.loadMappingContext(workspaceId, mappingId);
   const state = mapping?.state;
-  if (mapping?.workspaceId !== workspaceId || !state?.syncEnabled) return null;
+  if (
+    mapping?.workspaceId !== workspaceId ||
+    !state?.syncEnabled ||
+    mapping.connectionInventorySyncEnabled === false
+  ) {
+    return null;
+  }
 
   const computed = computeDesiredLocationStocks({
     provider: mapping.channel,
