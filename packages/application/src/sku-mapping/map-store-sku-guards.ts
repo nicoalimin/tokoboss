@@ -73,7 +73,11 @@ export async function assertRemapAllowed(
       input.workspaceId,
       existing.variantId
     );
-    throw skuMappingAlreadyAssigned(existing.variantId, owner?.skuCode ?? null);
+    throw skuMappingAlreadyAssigned(
+      existing.variantId,
+      owner?.skuCode ?? null,
+      existing.version
+    );
   }
   if (input.expectedVersion === undefined) {
     throw skuMappingValidation('expectedVersion is required to remap');
