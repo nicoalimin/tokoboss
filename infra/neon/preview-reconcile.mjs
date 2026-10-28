@@ -31,21 +31,16 @@ async function prIsClosed({ prNumber, fetchImpl = fetch }) {
   const token = process.env.GITHUB_TOKEN;
   const repo = process.env.GITHUB_REPOSITORY;
   if (!token || !repo) return null; // unknown — TTL decides
-  const res = await fetchImpl(
-    `https://api.github.com/repos/${repo}/pulls/${prNumber}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-    }
-  );
+  const res = await fetchImpl(`https://api.github.com/repos/${repo}/pulls/${prNumber}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
+  });
   if (res.status === 404) return true; // PR gone → treat as closed
   if (!res.ok) {
-    console.error(
-      `[preview-reconcile] GitHub PR lookup failed for #${prNumber}: HTTP ${res.status}; falling back to TTL.`
-    );
+    console.error(`[preview-reconcile] GitHub PR lookup failed for #${prNumber}: HTTP ${res.status}; falling back to TTL.`);
     return null;
   }
   const json = await res.json();
@@ -55,9 +50,7 @@ async function prIsClosed({ prNumber, fetchImpl = fetch }) {
 async function main() {
   const args = new Set(process.argv.slice(2));
   const dryRun = args.has('--dry-run') || process.env.PREVIEW_DRY_RUN === '1';
-  const ttlHours = Number(
-    process.env.PREVIEW_BRANCH_TTL_HOURS ?? DEFAULT_TTL_HOURS
-  );
+  const ttlHours = Number(process.env.PREVIEW_BRANCH_TTL_HOURS ?? DEFAULT_TTL_HOURS);
 
   // Vercel creds not needed for the sweep itself.
   let env;
@@ -77,13 +70,9 @@ async function main() {
   });
 
   const candidates = branches.filter(
-    (b) =>
-      prNumberFromBranchName(b.name) !== null &&
-      !PROTECTED_NAMES.has(String(b.name).toLowerCase())
+    (b) => prNumberFromBranchName(b.name) !== null && !PROTECTED_NAMES.has(String(b.name).toLowerCase())
   );
-  console.log(
-    `[preview-reconcile] Found ${candidates.length} preview branch(es); TTL=${ttlHours}h${dryRun ? ' (dry run)' : ''}.`
-  );
+  console.log(`[preview-reconcile] Found ${candidates.length} preview branch(es); TTL=${ttlHours}h${dryRun ? ' (dry run)' : ''}.`);
 
   let deleted = 0;
   for (const branch of candidates) {
@@ -92,15 +81,11 @@ async function main() {
     const closed = await prIsClosed({ prNumber });
     const reason = closed === true ? 'pr-closed' : old ? 'ttl-expired' : null;
     if (!reason) {
-      console.log(
-        `[preview-reconcile] keep ${branch.name} (age ok, PR open/unknown).`
-      );
+      console.log(`[preview-reconcile] keep ${branch.name} (age ok, PR open/unknown).`);
       continue;
     }
     if (dryRun) {
-      console.log(
-        `[preview-reconcile] would delete ${branch.name} (${reason}).`
-      );
+      console.log(`[preview-reconcile] would delete ${branch.name} (${reason}).`);
       continue;
     }
     const ok = await deleteNeonBranch({
@@ -108,9 +93,7 @@ async function main() {
       projectId: env.neonProjectId,
       branchId: branch.id,
     }).catch((error) => {
-      console.error(
-        `[preview-reconcile] delete ${branch.name} failed: ${error.message}`
-      );
+      console.error(`[preview-reconcile] delete ${branch.name} failed: ${error.message}`);
       return false;
     });
     if (ok) {
@@ -118,9 +101,7 @@ async function main() {
       console.log(`[preview-reconcile] deleted ${branch.name} (${reason}).`);
     }
   }
-  console.log(
-    `[preview-reconcile] Done: ${deleted} deleted, ${candidates.length - deleted} kept/listed.`
-  );
+  console.log(`[preview-reconcile] Done: ${deleted} deleted, ${candidates.length - deleted} kept/listed.`);
 }
 
 main();
