@@ -10,6 +10,7 @@ import {
   toLevelView,
 } from '@/lib/catalog';
 import { authJson, routeContext } from '@/lib/auth-routes';
+import { triggerVariantInventorySync } from '@/lib/inventory-sync';
 
 interface RouteParams {
   params: Promise<{ workspaceId: string; variantId: string }>;
@@ -76,6 +77,13 @@ export async function POST(request: Request, { params }: RouteParams) {
         '/api/workspaces/[workspaceId]/catalog/variants/[variantId]/adjustments',
       variantId,
     });
+    // Best-effort marketplace stock push (US04 / RFC 06 row 39); never throws.
+    const sync = { workspaceId, variantIds: [variantId], correlationId };
+    if (result.deduplicated !== true) {
+      const actorId = member.value.ctx.userId;
+      const trigger = 'stock_adjustment' as const;
+      await triggerVariantInventorySync({ ...sync, trigger, actorId }, log);
+    }
     return authJson(
       {
         level: toLevelView(result.level),
