@@ -9,6 +9,7 @@ import {
   toTransferWithItemsView,
 } from '@/lib/catalog';
 import { authJson, routeContext } from '@/lib/auth-routes';
+import { triggerVariantInventorySync } from '@/lib/inventory-sync';
 
 interface RouteParams {
   params: Promise<{ workspaceId: string; transferId: string }>;
@@ -20,7 +21,7 @@ interface RouteParams {
  * (Manager/Admin only).
  */
 export async function POST(request: Request, { params }: RouteParams) {
-  const { requestId, correlationId } = routeContext(request);
+  const { requestId, correlationId, log } = routeContext(request);
   const { workspaceId, transferId } = await params;
 
   const manager = await requireManagerOrAdmin(request, workspaceId);
@@ -57,6 +58,12 @@ export async function POST(request: Request, { params }: RouteParams) {
       expectedVersion: parsed.data.expectedVersion,
       idempotencyKey: parsed.data.idempotencyKey,
     });
+    // Best-effort marketplace stock push (US04 / RFC 06 row 42); never throws.
+    const variantIds = [...new Set(result.items.map((i) => i.variantId))];
+    const { workspaceId: ws, userId: actorId } = manager.value.ctx;
+    const sync = { workspaceId: ws, variantIds, correlationId, actorId };
+    const trigger = 'transfer_cancel' as const;
+    await triggerVariantInventorySync({ ...sync, trigger }, log);
     return authJson(
       { ...toTransferWithItemsView(result), storage: storageKind() },
       200,
