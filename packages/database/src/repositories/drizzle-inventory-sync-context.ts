@@ -77,6 +77,7 @@ export async function loadInventorySyncContext(
     connectionId: connection?.id ?? null,
     connectionStatus:
       (connection?.status as MarketplaceConnectionStatus | undefined) ?? null,
+    connectionInventorySyncEnabled: connection?.inventorySyncEnabled,
     shopExtId: mapping.shopExtId,
     externalItemId: mapping.externalItemId,
     state: (row.state as MappingSyncState | null) ?? null,
