@@ -15,6 +15,7 @@ import { postStockCount } from '@tokoboss/application';
 import { PostStockCountBodySchema } from '@tokoboss/contracts';
 import { getAuthAudit } from '@/lib/auth';
 import { authJson, routeContext } from '@/lib/auth-routes';
+import { triggerVariantInventorySync } from '@/lib/inventory-sync';
 import { getCatalogStore } from '@/lib/catalog';
 import { getStockCountStore, storageKind } from '@/lib/stock-count';
 import { toStockCountPostResultView } from '@/lib/stock-count-query-mappers';
@@ -31,7 +32,7 @@ interface RouteParams {
 }
 
 export async function POST(request: Request, { params }: RouteParams) {
-  const { requestId, correlationId } = routeContext(request);
+  const { requestId, correlationId, log } = routeContext(request);
   const ids: RouteIds = [requestId, correlationId];
   const { workspaceId, sessionId } = await params;
   const admitted = await admitStockCountMember(request, workspaceId);
@@ -56,6 +57,14 @@ export async function POST(request: Request, { params }: RouteParams) {
       lines: lines ?? [],
       now: new Date(),
     });
+    // Best-effort marketplace stock push (US04 / RFC 06 row 43); never throws.
+    const read = deps.store.listLines(workspaceId, sessionId);
+    const posted = (await read.catch(() => [])).filter((l) => l.ledgerEntryId);
+    const variantIds = [...new Set(posted.map((l) => l.variantId))];
+    const sync = { workspaceId, variantIds, correlationId };
+    const actorId = admitted.ctx.userId;
+    const trigger = 'stock_count_post' as const;
+    await triggerVariantInventorySync({ ...sync, actorId, trigger }, log);
     const body = {
       ...toStockCountPostResultView(result),
       storage: storageKind(),
