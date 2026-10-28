@@ -11,6 +11,10 @@ import {
   fetchSkuMappingOverview,
 } from './sku-mapping-client';
 import {
+  useInventorySync,
+  type InventorySyncState,
+} from './use-inventory-sync';
+import {
   useSkuMappingActions,
   type SkuMappingActions,
 } from './use-sku-mapping-actions';
@@ -37,6 +41,8 @@ export interface SkuMappingsState extends SkuMappingsData, SkuMappingActions {
   setFilters: (patch: Partial<SkuMappingOverviewQuery>) => void;
   bulkItems: { listingId: string; variantId: string }[];
   retry: () => void;
+  /** Story 04 sync states + Perlu tindakan (RFC 06 row 50b). */
+  sync?: InventorySyncState;
 }
 
 const START: SkuMappingsData = {
@@ -91,5 +97,8 @@ export function useSkuMappings(
       .map((s) => ({ listingId: s.listingId, variantId: card.variantId }))
   );
 
-  return { ...data, ...actions, filters, setFilters, bulkItems, retry: reload };
+  const ids = data.overview?.items.map((i) => i.variantId) ?? null;
+  const sync = useInventorySync(workspaceId, ids);
+  const retry = reload;
+  return { ...data, ...actions, filters, setFilters, bulkItems, retry, sync };
 }
