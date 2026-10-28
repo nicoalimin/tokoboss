@@ -5,6 +5,7 @@ import type { SkuMappingLang } from '@/lib/sku-mapping-copy';
 import { useSkuMappingReview } from '@/lib/use-sku-mapping-review';
 import { useSkuMappings } from '@/lib/use-sku-mappings';
 import { AmbiguousMatchDialog } from './AmbiguousMatchDialog';
+import { InventorySyncAttentionBanner } from './InventorySyncAttentionBanner';
 import { SkuMappingFilterBar } from './SkuMappingFilterBar';
 import { SkuMappingHistoryPanel } from './SkuMappingHistoryPanel';
 import {
@@ -45,6 +46,14 @@ export function SkuMappingPanel({
     );
   return (
     <div data-testid="sku-mapping-panel" className="flex flex-col gap-4">
+      {s.sync ? (
+        <InventorySyncAttentionBanner
+          items={s.sync.attention}
+          onAction={s.sync.remediate}
+          busyMappingId={s.sync.busyMappingId}
+          canEdit={canEdit}
+        />
+      ) : null}
       <SkuMappingSummaryGrid
         summary={o.summary}
         bulkCount={s.bulkItems.length}
@@ -79,6 +88,7 @@ export function SkuMappingPanel({
           busy={busy}
           canEdit={canEdit}
           lang={lang}
+          sync={s.sync}
         />
       ))}
       <SkuMappingHistoryPanel events={s.history} lang={lang} />
