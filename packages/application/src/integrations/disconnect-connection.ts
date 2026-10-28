@@ -55,6 +55,8 @@ export async function disconnectConnection(
         disconnectSource: 'admin',
         disconnectedAt: now,
         disconnectedBy: actorId,
+        orderImportEnabled: false,
+        inventorySyncEnabled: false,
       },
     });
     await tx.vault.shred(connectionId);
