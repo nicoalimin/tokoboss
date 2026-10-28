@@ -38,3 +38,8 @@ export * from './in-memory-auth-stores';
 export * from './in-memory-event-stores';
 export * from './in-memory-listing-store';
 export * from './in-memory-integration-store';
+// RFC 07 (US18) rows 10–13: management ports, in-memory reads, controls, activity.
+export * from './integration-management-ports';
+export * from './in-memory-integration-management-reads';
+export * from './update-connection-controls';
+export * from './list-integration-activity';
