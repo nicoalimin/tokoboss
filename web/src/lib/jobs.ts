@@ -31,6 +31,11 @@ import {
   MARKETPLACE_INITIAL_IMPORT_JOB_TYPE,
   executeInitialImportJob,
 } from '@/workflows/marketplace-initial-import';
+import { getInventorySyncDeps } from '@/lib/inventory-sync';
+import {
+  MARKETPLACE_INVENTORY_SYNC_JOB_TYPE,
+  createMarketplaceInventorySyncHandler,
+} from '@/workflows/marketplace-inventory-sync';
 
 let memoryStore: InMemoryJobStore | null = null;
 let dbHandle: DbHandle | null = null;
@@ -76,5 +81,10 @@ export function getJobExecutor(): JobExecutor {
       ),
     [MARKETPLACE_INBOUND_EVENT_JOB_TYPE]: (store, input) =>
       executeInboundEventJob(store, getIntegrationDeps(), input),
+    [MARKETPLACE_INVENTORY_SYNC_JOB_TYPE]: (store, input) =>
+      createMarketplaceInventorySyncHandler(getInventorySyncDeps())(
+        store,
+        input
+      ),
   });
 }
