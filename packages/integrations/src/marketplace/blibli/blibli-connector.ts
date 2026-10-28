@@ -16,6 +16,7 @@ import {
 } from './blibli-http';
 import { blibliListingsPage } from './blibli-listings';
 import { blibliRecentOrders } from './blibli-orders';
+import { blibliPushInventory } from './blibli-stock';
 
 /**
  * Blibli `MarketplaceConnector` (UTA-39 / US20, RFC 04 task 61). Credential
@@ -96,5 +97,6 @@ export function createBlibliConnector(
     listRecentOrders: (ctx, window) => blibliRecentOrders(deps, ctx, window),
     verifyWebhook: () => false,
     parseWebhook: () => [],
+    pushInventory: (ctx, input) => blibliPushInventory(deps, ctx, input),
   };
 }
