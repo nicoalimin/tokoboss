@@ -2,6 +2,7 @@ import type { SubordinateStoreSkuView } from '@tokoboss/contracts';
 import { INTEGRATION_PROVIDER_NAMES } from '@/lib/integration-copy';
 import { getSkuMappingCopy, type SkuMappingLang } from '@/lib/sku-mapping-copy';
 import { getSkuMappingStatusCopy } from '@/lib/sku-mapping-status-copy';
+import { SyncStatusBadge, type SyncStatusBadgeProps } from './SyncStatusBadge';
 
 /**
  * Mapped Store SKU row under a SKU TokoBoss card (UTA-40 / US03, RFC 05
@@ -21,6 +22,8 @@ export interface SubordinateStoreSlotProps {
   busy?: boolean;
   canEdit?: boolean;
   lang?: SkuMappingLang;
+  /** Story 04 sync state (RFC 06 row 49); absent → Mati. */
+  syncState?: SyncStatusBadgeProps['state'];
 }
 
 export function SubordinateStoreSlot({
@@ -29,6 +32,7 @@ export function SubordinateStoreSlot({
   busy = false,
   canEdit = true,
   lang = 'id',
+  syncState = null,
 }: Readonly<SubordinateStoreSlotProps>) {
   const copy = getSkuMappingCopy(lang);
   const status = getSkuMappingStatusCopy(lang);
@@ -68,6 +72,7 @@ export function SubordinateStoreSlot({
               {status.lifecycle[m.lifecycleIssue]}
             </span>
           ) : null}
+          <SyncStatusBadge state={syncState} />
         </div>
         {stock !== null ? (
           <p className="text-xs text-neutral-500">
