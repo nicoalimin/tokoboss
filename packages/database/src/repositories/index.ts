@@ -11,3 +11,4 @@ export * from './drizzle-product-import-repository';
 export * from './drizzle-stock-count-repository';
 export * from './drizzle-marketplace-store';
 export * from './drizzle-sku-mapping-repository';
+export * from './drizzle-inventory-sync-repository';
