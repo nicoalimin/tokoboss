@@ -139,7 +139,11 @@ describe('mapStoreSku', () => {
       mapStoreSku(deps, ADMIN, input('lst-1', 'var-b'))
     ).rejects.toMatchObject({
       code: 'SKU_MAPPING_ALREADY_ASSIGNED',
-      details: { currentVariantId: 'var-a', currentSkuCode: 'SKU-A' },
+      details: {
+        currentVariantId: 'var-a',
+        currentSkuCode: 'SKU-A',
+        currentVersion: 1,
+      },
     });
     expect(state.mappings[0]).toMatchObject({ variantId: 'var-a', version: 1 });
     expect(state.events).toHaveLength(1);
