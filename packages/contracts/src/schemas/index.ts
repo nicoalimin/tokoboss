@@ -20,3 +20,4 @@ export * from './sku-mappings';
 export * from './sku-mapping-views';
 export * from './sku-mapping-overview-views';
 export * from './sku-mapping-history-views';
+export * from './inventory-sync';
