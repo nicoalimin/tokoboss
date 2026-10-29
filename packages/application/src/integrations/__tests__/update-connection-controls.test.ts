@@ -37,7 +37,7 @@ const member = (role: WorkspaceRole) =>
 
 async function setup() {
   const connections = new InMemoryConnectionStore();
-  const row = await connections.upsert({
+  const created = await connections.upsert({
     workspaceId: WS,
     provider: 'shopee',
     connectMode: 'oauth_redirect',
@@ -53,6 +53,13 @@ async function setup() {
     authExpiresAt: null,
     connectedBy: 'user-admin',
     connectedAt: NOW,
+  });
+  // Start paused: a first connect enables both (RFC 07 row 43b).
+  const row = await connections.update({
+    workspaceId: WS,
+    connectionId: created.id,
+    expectedVersion: created.version,
+    patch: flags(false, false),
   });
   const jobs: NewJobInput[] = [];
   const audit: AuditEntry[] = [];
