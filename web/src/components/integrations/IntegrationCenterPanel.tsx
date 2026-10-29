@@ -7,6 +7,10 @@ import {
 } from '@/lib/integration-copy';
 import { getIntegrationConsentCopy } from '@/lib/integration-consent-copy';
 import { groupConnectionsByProvider } from '@/lib/integration-views';
+import {
+  IntegrationCenterManagement,
+  type IntegrationCenterManagementData,
+} from './IntegrationCenterManagement';
 import { ProviderCard } from './ProviderCard';
 import { StatusBadge } from './StatusBadge';
 
@@ -40,7 +44,13 @@ export function IntegrationCenterPanel({
   connectHref,
   storeHrefBase,
   lang = 'id',
-}: Readonly<IntegrationCenterPanelProps>) {
+  management,
+}: Readonly<
+  IntegrationCenterPanelProps & {
+    /** Story 18 health + activity (RFC 07 row 37b); hidden when absent. */
+    management?: IntegrationCenterManagementData;
+  }
+>) {
   const copy = getIntegrationCopy(lang);
   return (
     <div data-testid="integration-center" className="flex flex-col gap-4">
@@ -91,6 +101,9 @@ export function IntegrationCenterPanel({
           />
         ))}
       </div>
+      {management ? (
+        <IntegrationCenterManagement {...management} isAdmin={isAdmin} />
+      ) : null}
       <p
         data-testid="integration-center-note"
         className="rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700"
