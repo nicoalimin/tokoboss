@@ -32,7 +32,10 @@ export class DrizzleInventorySyncReads implements InventorySyncReadStore {
 
   async listSyncEnabledMappingIds(scope: InventorySyncScope) {
     const rows = await selectScopedMappings(this.db, scope);
-    return rows.filter((r) => r.state?.syncEnabled).map((r) => r.mapping.id);
+    // Skip stores with store-level stock sync paused (RFC 07 row 18).
+    const on = (r: (typeof rows)[number]) =>
+      r.state?.syncEnabled && r.connection?.inventorySyncEnabled !== false;
+    return rows.filter(on).map((r) => r.mapping.id);
   }
 
   async listStates(scope: InventorySyncScope): Promise<MappingSyncState[]> {
