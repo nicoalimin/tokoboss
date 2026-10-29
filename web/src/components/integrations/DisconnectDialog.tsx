@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { IntegrationLang } from '@/lib/integration-copy';
 import { getIntegrationConnectCopy } from '@/lib/integration-connect-copy';
 import { getIntegrationDisconnectDialogCopy } from '@/lib/integration-disconnect-dialog-copy';
@@ -34,8 +34,14 @@ export function DisconnectDialog({
   lang = 'id',
 }: Readonly<DisconnectDialogProps>) {
   const copy = getIntegrationDisconnectDialogCopy(lang);
+  // US18 / RFC 07 row 36: typed PUTUSKAN guard before the destructive button.
+  const [typed, setTyped] = useState('');
+  const armed = typed.trim() === 'PUTUSKAN';
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setTyped('');
+      return;
+    }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape' && !busy) onCancel();
     }
@@ -75,11 +81,24 @@ export function DisconnectDialog({
             {copy.failed}
           </p>
         ) : null}
+        <label className="block text-sm text-neutral-700">
+          {lang === 'en'
+            ? 'Type PUTUSKAN to confirm'
+            : 'Ketik PUTUSKAN untuk mengonfirmasi'}
+          <input
+            data-testid="disconnect-confirm-input"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            disabled={busy}
+            autoComplete="off"
+            className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2"
+          />
+        </label>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={onConfirm}
-            disabled={busy}
+            disabled={busy || !armed}
             className={`${BTN} bg-error-500 text-white hover:bg-error-600`}
           >
             {busy ? copy.busy : copy.confirm}
