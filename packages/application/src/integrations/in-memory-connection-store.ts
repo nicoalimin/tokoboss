@@ -91,7 +91,8 @@ export class InMemoryConnectionStore implements ConnectionStore {
   }
 }
 
-/** Columns the upsert input does not carry, at their SQL defaults. */
+/** Columns the upsert input does not carry; first connect enables both
+ * capabilities (CoS 2026-10-30, RFC 07 row 43b), the rest at SQL defaults. */
 function emptyConnection(id: string) {
   return {
     id,
@@ -99,8 +100,8 @@ function emptyConnection(id: string) {
     missingPermissions: [],
     lastCheckedAt: null,
     lastErrorCode: null,
-    orderImportEnabled: false,
-    inventorySyncEnabled: false,
+    orderImportEnabled: true,
+    inventorySyncEnabled: true,
     initialImportStatus: null,
     lastRefreshedAt: null,
     importJobId: null,
