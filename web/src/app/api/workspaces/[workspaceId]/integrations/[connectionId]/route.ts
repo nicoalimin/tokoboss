@@ -7,8 +7,11 @@
  * then `getConnection` re-checks the status-read role. Removed (Hapus
  * koneksi), unknown, other-workspace or non-UUID ids are 404
  * CONNECTION_NOT_FOUND. The view never carries secrets. Shape:
- * `IntegrationConnectionDetailResponse` (dates serialize as ISO strings).
+ * `IntegrationConnectionDetailResponse` (dates serialize as ISO strings)
+ * plus Story 18 `health`, `metrics` and `checklist` (RFC 07 row 27).
  * DELETE: `disconnectConnection` (shred, release claim, keep mappings).
+ * Optional body `{ confirmationText: 'PUTUSKAN' }`; any other confirmation
+ * is 422 INTEGRATION_VALIDATION. No body keeps the old behaviour.
  */
 import {
   connectionNotFound,
@@ -16,6 +19,7 @@ import {
   getConnection,
   toConnectionView,
 } from '@tokoboss/application';
+import { DisconnectConnectionBodySchema } from '@tokoboss/contracts';
 import { authJson, routeContext } from '@/lib/auth-routes';
 import {
   admitIntegrationMember,
@@ -24,6 +28,8 @@ import {
   type RouteIds,
 } from '@/lib/integration-access';
 import { getIntegrationDeps } from '@/lib/integrations';
+import { getIntegrationMetricsReads } from '@/lib/integration-management-reads';
+import { toStoreHealthRowView } from '@/lib/integration-management-views';
 
 interface RouteParams {
   params: Promise<{ workspaceId: string; connectionId: string }>;
@@ -46,7 +52,12 @@ export async function GET(request: Request, { params }: RouteParams) {
       workspaceId: admitted.ctx.workspaceId,
       connectionId,
     });
-    return authJson({ connection }, 200, ...ids, admitted.cookie);
+    const metrics = await getIntegrationMetricsReads().getByConnection(
+      admitted.ctx.workspaceId,
+      connectionId
+    );
+    const view = toStoreHealthRowView(connection, metrics, new Date());
+    return authJson(view, 200, ...ids, admitted.cookie);
   } catch (err) {
     return integrationFailed(err, ids, 'Gagal memuat koneksi toko');
   }
@@ -62,6 +73,12 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
   try {
     if (!UUID_RE.test(connectionId)) throw connectionNotFound();
+    const body: unknown = await request.json().catch(() => ({}));
+    if (!DisconnectConnectionBodySchema.safeParse(body).success) {
+      const error = 'Ketik PUTUSKAN untuk memutuskan toko.';
+      const errorCode = 'INTEGRATION_VALIDATION';
+      return authJson({ error, errorCode }, 422, ...ids);
+    }
     const saved = await disconnectConnection(
       getIntegrationDeps(),
       admitted.ctx,
