@@ -9,6 +9,7 @@ import {
 import { resolveIntegrationProblem } from '@/lib/integration-problem-views';
 import { getIntegrationStoreDetailCopy } from '@/lib/integration-store-detail-copy';
 import type { IntegrationStoreActions } from '@/lib/use-integration-store-actions';
+import { useIntegrationStoreManagement } from '@/lib/use-integration-store-management';
 import { ConnectProblem } from './ConnectProblem';
 import { DisconnectedPanel } from './DisconnectedPanel';
 import { IntegrationStoreConnected } from './IntegrationStoreConnected';
@@ -46,6 +47,7 @@ export function IntegrationStoreBody({
 }: Readonly<IntegrationStoreBodyProps>) {
   const { status } = connection;
   const problem = resolveIntegrationProblem({ result, connection });
+  const management = useIntegrationStoreManagement(workspaceId, connection.id);
   const base = `/w/${encodeURIComponent(workspaceId)}/integrasi`;
   let screen;
   if (problem) {
@@ -78,6 +80,7 @@ export function IntegrationStoreBody({
         connection={connection}
         isAdmin={isAdmin}
         lang={lang}
+        {...management}
       />
     );
   }
