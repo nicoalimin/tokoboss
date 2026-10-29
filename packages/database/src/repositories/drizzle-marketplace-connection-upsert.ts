@@ -35,6 +35,10 @@ function refreshedValues(input: UpsertConnectionInput) {
   };
 }
 
+/**
+ * First connect starts with order import and stock sync on (CoS 2026-10-30,
+ * RFC 07 row 43a); a reconnect keeps the stored flags via the conflict set.
+ */
 export function toConnectionInsert(
   input: UpsertConnectionInput
 ): NewMarketplaceConnectionRow {
@@ -42,6 +46,8 @@ export function toConnectionInsert(
     workspaceId: input.workspaceId,
     provider: input.provider,
     providerStoreId: input.shop.providerStoreId,
+    orderImportEnabled: true,
+    inventorySyncEnabled: true,
     ...refreshedValues(input),
   };
 }
