@@ -93,7 +93,8 @@ describe('connection controls, activity and Putuskan routes (row 28)', () => {
       connectedAt: new Date(),
     });
     connections.rows.delete(row.id);
-    connections.rows.set(CONNECTION_ID, { ...row, id: CONNECTION_ID });
+    const off = { orderImportEnabled: false, inventorySyncEnabled: false };
+    connections.rows.set(CONNECTION_ID, { ...row, ...off, id: CONNECTION_ID });
   }
 
   const base = () =>
