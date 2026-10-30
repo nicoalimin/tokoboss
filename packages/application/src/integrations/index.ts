@@ -43,3 +43,6 @@ export * from './integration-management-ports';
 export * from './in-memory-integration-management-reads';
 export * from './update-connection-controls';
 export * from './list-integration-activity';
+// RFC 07 addendum rows 44a1–44a2: Integration Center overview use case.
+export * from './integration-center-overview-mappers';
+export * from './get-integration-center-overview';
