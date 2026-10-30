@@ -18,6 +18,7 @@ export * from './integration-requests';
 export * from './integration-listings';
 export * from './integration-management';
 export * from './integration-health-views';
+export * from './integration-center-overview';
 export * from './sku-mappings';
 export * from './sku-mapping-views';
 export * from './sku-mapping-overview-views';
