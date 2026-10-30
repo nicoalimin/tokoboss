@@ -30,7 +30,8 @@ const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const BEARER_RE =
   /\b(Bearer\s+[A-Za-z0-9\-._~+/=]{8,}|sk-[A-Za-z0-9\-_]{8,}|xox[bap]-[A-Za-z0-9\-_]{8,})\b/g;
 const POSTGRES_RE = /postgres(?:ql)?:\/\/[^\s"'`]+/g;
-const PHONE_RE = /(?:(?:\+62|62|0)8\d{2}[\s-]?\d{3,4}[\s-]?\d{3,5})/g;
+const PHONE_RE =
+  /(?<![A-Za-z0-9_-])(?:\+62|62|0)8\d{2}[\s.-]?\d{3,4}[\s.-]?\d{3,5}(?![A-Za-z0-9_-])/g;
 const NIK_RE = /\b\d{16}\b/g;
 const LONG_HEX_RE = /\b(?:[0-9a-f]{32,}|[A-Za-z0-9\-_]{32,})\b/g;
 
