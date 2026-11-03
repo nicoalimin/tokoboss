@@ -10,7 +10,11 @@
  * through; a non-JSON or empty body gets a generic message. 401 sets
  * `needsReauth`.
  */
-import type { IntegrationConnectionView } from '@tokoboss/contracts';
+import {
+  IntegrationCenterOverviewResponseSchema,
+  type IntegrationCenterOverviewResponse,
+  type IntegrationConnectionView,
+} from '@tokoboss/contracts';
 
 export type FetchFn = typeof fetch;
 
@@ -100,4 +104,17 @@ export async function getIntegrationConnection(
     connection: IntegrationConnectionView;
   }>(integrationsPath(workspaceId, connectionId), {}, fetchFn);
   return data.connection;
+}
+
+/** GET Integration Center overview (every member; 44d schema-validated). */
+export async function getIntegrationCenterOverview(
+  workspaceId: string,
+  fetchFn: FetchFn = fetch
+): Promise<IntegrationCenterOverviewResponse> {
+  const data = await integrationsRequest<unknown>(
+    integrationsPath(workspaceId, 'overview'),
+    {},
+    fetchFn
+  );
+  return IntegrationCenterOverviewResponseSchema.parse(data);
 }
