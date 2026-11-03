@@ -10,6 +10,8 @@ import {
 } from '@/lib/integrations-client';
 import type { IntegrationLang } from '@/lib/integration-copy';
 import { useMembership } from '@/lib/use-membership';
+import { useIntegrationCenterActions } from '@/lib/use-integration-center-actions';
+import { DisconnectDialog } from './DisconnectDialog';
 import type { IntegrationCenterManagementData } from './IntegrationCenterManagement';
 import { IntegrationCenterPanel } from './IntegrationCenterPanel';
 
@@ -79,6 +81,15 @@ export function IntegrationCenterLoader({
     };
   }, [workspaceId, attempt]);
 
+  const isAdmin = membership?.role === 'admin';
+  const { actions, onManageConnection, toast, disconnect } =
+    useIntegrationCenterActions(
+      workspaceId,
+      management?.rows ?? [],
+      isAdmin,
+      () => setAttempt((n) => n + 1)
+    );
+
   const text = TEXT[lang] ?? TEXT.id;
   if (state.kind === 'error') {
     return (
@@ -109,14 +120,21 @@ export function IntegrationCenterLoader({
     );
   }
   const base = `/w/${encodeURIComponent(workspaceId)}/integrasi`;
+  const managementWithActions =
+    management == null
+      ? undefined
+      : { ...management, actions, onManageConnection, toast };
   return (
-    <IntegrationCenterPanel
-      connections={state.connections}
-      isAdmin={membership?.role === 'admin'}
-      connectHref={`${base}/hubungkan`}
-      storeHrefBase={base}
-      lang={lang}
-      management={management}
-    />
+    <>
+      <IntegrationCenterPanel
+        connections={state.connections}
+        isAdmin={isAdmin}
+        connectHref={`${base}/hubungkan`}
+        storeHrefBase={base}
+        lang={lang}
+        management={managementWithActions}
+      />
+      <DisconnectDialog {...disconnect} lang={lang} />
+    </>
   );
 }
