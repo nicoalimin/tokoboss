@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import type { IntegrationConnectionView } from '@tokoboss/contracts';
 import {
+  getIntegrationCenterOverview,
   getIntegrationConnections,
   IntegrationClientError,
   INTEGRATIONS_GENERIC_ERROR,
 } from '@/lib/integrations-client';
 import type { IntegrationLang } from '@/lib/integration-copy';
 import { useMembership } from '@/lib/use-membership';
+import type { IntegrationCenterManagementData } from './IntegrationCenterManagement';
 import { IntegrationCenterPanel } from './IntegrationCenterPanel';
 
 /**
@@ -40,9 +42,13 @@ export function IntegrationCenterLoader({
   const { membership, loading: roleLoading } = useMembership();
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  const [management, setManagement] = useState<
+    IntegrationCenterManagementData | undefined
+  >(undefined);
 
   useEffect(() => {
     let cancelled = false;
+    setManagement(undefined);
     getIntegrationConnections(workspaceId)
       .then((connections) => {
         if (!cancelled) setState({ kind: 'ready', connections });
@@ -54,6 +60,19 @@ export function IntegrationCenterLoader({
             ? err.message
             : INTEGRATIONS_GENERIC_ERROR;
         setState({ kind: 'error', message });
+      });
+    getIntegrationCenterOverview(workspaceId)
+      .then((overview) => {
+        if (cancelled) return;
+        const { kpis, stores, activity } = overview;
+        setManagement({
+          summary: kpis,
+          rows: stores as IntegrationCenterManagementData['rows'],
+          activity,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setManagement(undefined);
       });
     return () => {
       cancelled = true;
@@ -97,6 +116,7 @@ export function IntegrationCenterLoader({
       connectHref={`${base}/hubungkan`}
       storeHrefBase={base}
       lang={lang}
+      management={management}
     />
   );
 }
