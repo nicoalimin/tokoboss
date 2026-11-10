@@ -1,7 +1,7 @@
 /**
  * Marketplace integrations application module (US20 / RFC 04).
  * Barrel for rows 15–34: types, ports, errors, guards, use cases, and in-memory store.
- * Rows 21 (complete OAuth) and 25 (reauthorize) are G1-gated and get added when they land.
+ * Rows 21 (complete OAuth, 21a–21c) and 25 (reauthorize): see the block at the end.
  */
 export * from './integration-types';
 export * from './integration-ports';
@@ -46,3 +46,11 @@ export * from './list-integration-activity';
 // RFC 07 addendum rows 44a1–44a2: Integration Center overview use case.
 export * from './integration-center-overview-mappers';
 export * from './get-integration-center-overview';
+// RFC 04 rows 21a/21b/21c/25 (split 35b): OAuth callback use cases for route 93.
+export * from './oauth-callback-state';
+export * from './complete-oauth-connection';
+export type {
+  OAuthShopPersistDeps,
+  OAuthShopPersistTx,
+} from './oauth-shop-persist';
+export type { ReauthorizeConnectionTx } from './reauthorize-connection';
