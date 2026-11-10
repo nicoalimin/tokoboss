@@ -1,11 +1,18 @@
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
+import { MarketplaceProviderSchema } from '@tokoboss/contracts';
 import { CORRELATION_ID_HEADER } from '@tokoboss/observability';
 import { AskAdminButton } from '@/components/integrations/AskAdminButton';
+import { ConnectProblem } from '@/components/integrations/ConnectProblem';
 import { ConnectWizard } from '@/components/integrations/ConnectWizard';
 import { IntegrationStoreBreadcrumb } from '@/components/integrations/IntegrationStoreBreadcrumb';
 import { ROLE_LABELS } from '@/components/shell/nav-items';
 import { getIntegrationConnectCopy } from '@/lib/integration-connect-copy';
+import { INTEGRATION_PROVIDER_NAMES } from '@/lib/integration-copy';
+import {
+  parseIntegrationCallbackResult,
+  resolveIntegrationProblem,
+} from '@/lib/integration-problem-views';
 import { requireWorkspaceMember } from '@/lib/workspace-access';
 
 const copy = getIntegrationConnectCopy('id');
@@ -19,11 +26,22 @@ export const metadata = { title: `${copy.title} — TokoBoss` };
  * the connect wizard (113e) with the Blibli client id read server-side
  * (`BLIBLI_CLIENT_ID`, null when unset); Manager / Staff -> the read-only
  * screen 6 notice with Minta Admin (105b). The API routes stay the boundary.
+ * 93-pre: row-less OAuth callback outcome (?provider=&result=) -> screen 4.
  */
+type Query = Record<string, string | string[] | undefined>;
 export default async function WorkspaceIntegrasiConnectPage({
   params,
-}: Readonly<{ params: Promise<{ workspaceId: string }> }>) {
+  searchParams,
+}: Readonly<{
+  params: Promise<{ workspaceId: string }>;
+  searchParams: Promise<Query>;
+}>) {
   const { workspaceId } = await params;
+  const query = await searchParams;
+  const provider = MarketplaceProviderSchema.safeParse(query.provider);
+  const problem = resolveIntegrationProblem({
+    result: parseIntegrationCallbackResult(query.result),
+  });
   const incoming = await headers();
   const access = await requireWorkspaceMember(
     new Request('http://tokoboss.internal/', { headers: incoming }),
@@ -51,6 +69,16 @@ export default async function WorkspaceIntegrasiConnectPage({
             {copy.adminOnlyBadge}
           </span>
         </h1>
+        {role === 'admin' && provider.success && problem ? (
+          <div className="mb-4">
+            <ConnectProblem
+              problem={problem}
+              provider={INTEGRATION_PROVIDER_NAMES[provider.data]}
+              centerHref={`/w/${encodeURIComponent(workspaceId)}/integrasi`}
+              isAdmin
+            />
+          </div>
+        ) : null}
         <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-6 shadow-md sm:p-8">
           {role === 'admin' ? (
             <ConnectWizard
